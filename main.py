@@ -236,11 +236,13 @@ def _generate_final_report_sync(answers: list) -> dict:
     return {"text": feedback_text, "averages": averages, "overall_band": overall}
 
 
-# --- Tarixdan tasodifiy savol (Random History Quiz) --------------------
+# --- Tarixdan ketma-ket savollar (History Quiz Session) ----------------
 
-# Har bir foydalanuvchining hozirgi faol tarix savolini saqlab turadi.
-# user_id -> {"question": str, "options": list[str], "correct_index": int, "explanation": str}
+# Har bir foydalanuvchining hozirgi faol tarix viktorina sessiyasini saqlab turadi.
+# user_id -> {"questions": [...], "idx": int, "score": int}
 active_history_quizzes: dict[int, dict] = {}
+
+HISTORY_QUIZ_LENGTH = 10
 
 HISTORY_TOPICS = [
     "jahon tarixi",
@@ -256,24 +258,28 @@ HISTORY_TOPICS = [
 ]
 
 
-def _generate_history_question_sync() -> dict:
-    """Groq (LLM) orqali tasodifiy, qiziqarli tarix savolini 4 variantli
-    (ABCD) formatda JSON ko'rinishida generatsiya qiladi."""
-    import random
-
-    topic = random.choice(HISTORY_TOPICS)
+def _generate_history_quiz_set_sync(count: int = HISTORY_QUIZ_LENGTH) -> list:
+    """Groq (LLM) orqali bir-biriga o'xshamaydigan `count` ta tarix savolidan
+    iborat to'plamni bitta so'rovda JSON ko'rinishida generatsiya qiladi."""
+    topics_str = ", ".join(HISTORY_TOPICS)
     prompt = (
-        f"Siz tarix fanidan qiziqarli viktorina (trivia) savollari tuzuvchi mutaxassissiz. "
-        f"'{topic}' mavzusidan tasodifiy, qiziqarli va faktlarga asoslangan bitta savol tuzing. "
+        "Siz tarix fanidan qiziqarli viktorina (trivia) savollari tuzuvchi mutaxassissiz. "
+        f"Quyidagi mavzular doirasida bir-biriga o'xshamaydigan, xilma-xil {count} ta savol tuzing: "
+        f"{topics_str}. Har bir savol turli mavzu va faktlarga oid bo'lsin, takrorlanmasin. "
         "Javobni FAQAT quyidagi JSON formatida qaytaring, boshqa hech qanday matn qo'shmang:\n"
         "{\n"
-        '  "question": "savol matni o\'zbek tilida",\n'
-        '  "options": ["variant A", "variant B", "variant C", "variant D"],\n'
-        '  "correct_index": 0,\n'
-        '  "explanation": "to\'g\'ri javobning qisqa (1-2 gapli) izohi o\'zbek tilida"\n'
+        '  "questions": [\n'
+        "    {\n"
+        '      "question": "savol matni o\'zbek tilida",\n'
+        '      "options": ["variant A", "variant B", "variant C", "variant D"],\n'
+        '      "correct_index": 0,\n'
+        '      "explanation": "to\'g\'ri javobning qisqa (1-2 gapli) izohi o\'zbek tilida"\n'
+        "    }\n"
+        f"    // ... jami {count} ta shunday obyekt\n"
+        "  ]\n"
         "}\n"
-        "correct_index — to'g'ri variantning options ro'yxatidagi indeksi (0 dan boshlanadi). "
-        "Savol va barcha variantlar o'zbek tilida bo'lsin."
+        "Har bir savolning options ro'yxatida aniq 4 ta variant, correct_index esa 0-3 "
+        "oralig'idagi (options ro'yxatidagi to'g'ri variant indeksi) butun son bo'lsin."
     )
     completion = groq_client.chat.completions.create(
         model=LLM_MODEL,
@@ -281,7 +287,37 @@ def _generate_history_question_sync() -> dict:
         temperature=1.0,
         response_format={"type": "json_object"},
     )
-    return json.loads(completion.choices[0].message.content)
+    data = json.loads(completion.choices[0].message.content)
+    questions = data.get("questions", [])
+
+    # Faqat to'g'ri formatdagi savollarni qoldiramiz (LLM xato format bersa ham bot yiqilmasin)
+    valid = []
+    for q in questions:
+        options = q.get("options")
+        correct_index = q.get("correct_index")
+        if (
+            isinstance(options, list)
+            and len(options) >= 2
+            and isinstance(correct_index, int)
+            and 0 <= correct_index < len(options)
+            and q.get("question")
+        ):
+            valid.append(q)
+    return valid[:count]
+
+
+def _build_history_question_view(quiz: dict, idx: int):
+    """Berilgan indeksdagi savol uchun matn va inline tugmalarni tayyorlaydi."""
+    q = quiz["questions"][idx]
+    total = len(quiz["questions"])
+    letters = ["A", "B", "C", "D", "E", "F"]
+    buttons = [
+        [InlineKeyboardButton(text=f"{letters[i]}) {opt}", callback_data=f"histans:{i}")]
+        for i, opt in enumerate(q["options"])
+    ]
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    text = f"📜 <b>Savol {idx + 1}/{total}:</b>\n\n{q['question']}"
+    return text, keyboard
 
 
 def _text_to_speech_ogg_sync(text: str, out_path_ogg: str) -> str:
@@ -340,7 +376,7 @@ WELCOME_TEXT = (
     "• Savollarga faqat <b>ovozli xabar (voice)</b> bilan javob bering.\n"
     "• Har bir javobingiz avtomatik tinglanadi va tahlil qilinadi.\n"
     "• Testni istalgan vaqtda /stop bilan to'xtatishingiz mumkin.\n\n"
-    "🎲 Bonus: /tarix buyrug'i bilan tasodifiy tarix savolidan bilimingizni sinab ko'rishingiz mumkin!\n\n"
+    "🎲 Bonus: /tarix buyrug'i bilan ketma-ket 10 ta tarix savolidan iborat viktorina o'ynashingiz mumkin!\n\n"
     "🚀 Boshlash uchun /test buyrug'ini yuboring!"
 )
 
@@ -364,38 +400,29 @@ async def cmd_stop(message: Message, state: FSMContext):
 
 @dp.message(Command("tarix"))
 async def cmd_tarix(message: Message):
-    """Tasodifiy tarix savolini generatsiya qilib, 4 variantli tugmalar bilan yuboradi.
-    Bu funksiya IELTS imtihon holatidan (FSM state) mustaqil ishlaydi — imtihon
-    davomida ham chaqirish mumkin, chunki alohida (active_history_quizzes)
-    xotirada saqlanadi va exam FSM ma'lumotlariga tegmaydi."""
-    prep_msg = await message.answer("⏳ Tarixdan savol tayyorlanmoqda...")
+    f"""Ketma-ket {HISTORY_QUIZ_LENGTH} ta tasodifiy tarix savolidan iborat viktorina
+    sessiyasini boshlaydi. Bu funksiya IELTS imtihon holatidan (FSM state) mustaqil
+    ishlaydi — imtihon davomida ham chaqirish mumkin, chunki alohida
+    (active_history_quizzes) xotirada saqlanadi va exam FSM ma'lumotlariga tegmaydi."""
+    prep_msg = await message.answer(f"⏳ {HISTORY_QUIZ_LENGTH} ta tarix savoli tayyorlanmoqda...")
 
     try:
-        q = await asyncio.to_thread(_generate_history_question_sync)
-        options = q["options"]
-        correct_index = int(q["correct_index"])
-        if not (0 <= correct_index < len(options)):
-            raise ValueError("correct_index diapazondan tashqarida")
+        questions = await asyncio.to_thread(_generate_history_quiz_set_sync, HISTORY_QUIZ_LENGTH)
+        if not questions:
+            raise ValueError("Yaroqli savollar generatsiya qilinmadi")
     except Exception as e:
-        logger.exception("Tarix savolini generatsiya qilishda xatolik: %s", e)
-        await prep_msg.edit_text("❌ Savol tayyorlashda xatolik yuz berdi. Iltimos /tarix bilan qayta urinib ko'ring.")
+        logger.exception("Tarix viktorinasini generatsiya qilishda xatolik: %s", e)
+        await prep_msg.edit_text("❌ Savollarni tayyorlashda xatolik yuz berdi. Iltimos /tarix bilan qayta urinib ko'ring.")
         return
 
     active_history_quizzes[message.from_user.id] = {
-        "question": q["question"],
-        "options": options,
-        "correct_index": correct_index,
-        "explanation": q.get("explanation", ""),
+        "questions": questions,
+        "idx": 0,
+        "score": 0,
     }
 
-    letters = ["A", "B", "C", "D", "E", "F"]
-    buttons = [
-        [InlineKeyboardButton(text=f"{letters[i]}) {opt}", callback_data=f"histans:{i}")]
-        for i, opt in enumerate(options)
-    ]
-    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-
-    await prep_msg.edit_text(f"📜 <b>Tarixdan savol:</b>\n\n{q['question']}", reply_markup=keyboard)
+    text, keyboard = _build_history_question_view(active_history_quizzes[message.from_user.id], 0)
+    await prep_msg.edit_text(text, reply_markup=keyboard)
 
 
 @dp.callback_query(F.data.startswith("histans:"))
@@ -404,7 +431,7 @@ async def handle_history_answer(callback: CallbackQuery):
     quiz = active_history_quizzes.get(user_id)
 
     if not quiz:
-        await callback.answer("⏱ Bu savolning muddati o'tgan. Yangi savol uchun /tarix yuboring.", show_alert=True)
+        await callback.answer("⏱ Bu sessiya tugagan yoki muddati o'tgan. Yangi test uchun /tarix yuboring.", show_alert=True)
         return
 
     try:
@@ -413,32 +440,58 @@ async def handle_history_answer(callback: CallbackQuery):
         await callback.answer("Xatolik yuz berdi.", show_alert=True)
         return
 
-    correct_index = quiz["correct_index"]
+    idx = quiz["idx"]
+    total = len(quiz["questions"])
+    q = quiz["questions"][idx]
+    correct_index = q["correct_index"]
     letters = ["A", "B", "C", "D", "E", "F"]
-    correct_letter = letters[correct_index]
-    correct_option = quiz["options"][correct_index]
 
-    if selected_index == correct_index:
+    is_correct = selected_index == correct_index
+    if is_correct:
+        quiz["score"] += 1
         result_line = "✅ <b>To'g'ri javob!</b>"
     else:
+        correct_letter = letters[correct_index]
+        correct_option = q["options"][correct_index]
         result_line = f"❌ <b>Noto'g'ri.</b> To'g'ri javob: <b>{correct_letter}) {correct_option}</b>"
 
-    explanation = quiz.get("explanation", "")
-    final_text = f"📜 {quiz['question']}\n\n{result_line}"
+    explanation = q.get("explanation", "")
+    final_text = f"📜 <b>Savol {idx + 1}/{total}:</b>\n\n{q['question']}\n\n{result_line}"
     if explanation:
         final_text += f"\n\n💡 <i>{explanation}</i>"
-    final_text += "\n\n🎲 Yana savol uchun /tarix yuboring."
 
+    # Javob berilgan savoldagi tugmalarni olib tashlab, natijani ko'rsatamiz
     try:
-        await callback.message.edit_text(final_text)
+        await callback.message.edit_text(final_text, reply_markup=None)
     except Exception:
-        # Xabar allaqachon o'sha matnda bo'lishi yoki tahrirlab bo'lmasligi mumkin
         pass
 
-    await callback.answer("To'g'ri! 🎉" if selected_index == correct_index else "Noto'g'ri 😔")
+    await callback.answer("To'g'ri! 🎉" if is_correct else "Noto'g'ri 😔")
 
-    # Savol javob berilgach, xotiradan tozalaymiz
-    active_history_quizzes.pop(user_id, None)
+    quiz["idx"] += 1
+
+    if quiz["idx"] < total:
+        # Keyingi savolni yangi xabar sifatida yuboramiz
+        next_text, next_keyboard = _build_history_question_view(quiz, quiz["idx"])
+        await callback.message.answer(next_text, reply_markup=next_keyboard)
+    else:
+        score = quiz["score"]
+        percentage = round((score / total) * 100)
+        if percentage >= 80:
+            verdict = "🏆 Ajoyib natija! Tarixni juda yaxshi bilasiz."
+        elif percentage >= 50:
+            verdict = "👍 Yomon emas! Yana mashq qilsangiz yanada yaxshi bo'ladi."
+        else:
+            verdict = "📚 Tarixni ko'proq o'qishga arziydi, lekin harakat qildingiz!"
+
+        summary = (
+            f"🏁 <b>Viktorina yakunlandi!</b>\n\n"
+            f"🎯 Natijangiz: <b>{score}/{total}</b> ({percentage}%)\n\n"
+            f"{verdict}\n\n"
+            "🔁 Yana boshlash uchun /tarix yuboring."
+        )
+        await callback.message.answer(summary)
+        active_history_quizzes.pop(user_id, None)
 
 
 @dp.message(Command("test"))
