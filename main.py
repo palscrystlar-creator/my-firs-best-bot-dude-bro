@@ -67,7 +67,7 @@ if not BOT_TOKEN:
 if not GROQ_API_KEY:
     raise RuntimeError("GROQ_API_KEY environment variable topilmadi!")
 
-LLM_MODEL = "llama-3.3-70b-versatile"
+LLM_MODEL = "openai/gpt-oss-120b"
 STT_MODEL = "whisper-large-v3-turbo"
 
 PART1_QUESTIONS_COUNT = 4
