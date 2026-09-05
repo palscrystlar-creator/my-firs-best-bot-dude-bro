@@ -52,6 +52,7 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
+    BotCommand,
 )
 
 from gtts import gTTS
@@ -714,7 +715,23 @@ async def start_web_server():
 
 
 # --------------------------------------------------------------------------
-# 8) MAIN
+# 8) BOT BUYRUQLAR MENYUSI (Telegram'da "/" bosilganda avtomatik chiqadigan
+#    ro'yxat — foydalanuvchi "/ta" deb yozsa, mos buyruqlar filtrlanib ko'rsatiladi)
+# --------------------------------------------------------------------------
+
+async def setup_bot_commands():
+    commands = [
+        BotCommand(command="start", description="Botni boshlash va yo'riqnoma"),
+        BotCommand(command="test", description="Yangi IELTS Speaking mock testini boshlash"),
+        BotCommand(command="tarix", description="10 ta ketma-ket tarix savoli viktorinasi"),
+        BotCommand(command="stop", description="Joriy testni to'xtatish"),
+    ]
+    await bot.set_my_commands(commands)
+    logger.info("Bot buyruqlar menyusi o'rnatildi.")
+
+
+# --------------------------------------------------------------------------
+# 9) MAIN
 # --------------------------------------------------------------------------
 
 async def main():
@@ -722,6 +739,7 @@ async def main():
     await bot.delete_webhook(drop_pending_updates=True)
     logger.info("Webhook o'chirildi, polling boshlanmoqda...")
 
+    await setup_bot_commands()
     await start_web_server()
 
     try:
