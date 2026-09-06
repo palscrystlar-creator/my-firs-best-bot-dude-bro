@@ -249,6 +249,10 @@ class ExamStates(StatesGroup):
     part3 = State()
 
 
+class EnglishPracticeStates(StatesGroup):
+    practicing = State()
+
+
 # --------------------------------------------------------------------------
 # 5) YORDAMCHI FUNKSIYALAR (Groq / gTTS / pydub bilan ishlash — sync,
 #    shuning uchun asyncio.to_thread orqali chaqiriladi)
@@ -580,6 +584,40 @@ def _generate_chat_reply_sync(history: list) -> str:
     return completion.choices[0].message.content.strip()
 
 
+# --- Ingliz tili mashq rejimi (English Practice) ------------------------
+
+ENGLISH_PRACTICE_HISTORY_LIMIT = 20
+
+ENGLISH_PRACTICE_SYSTEM_PROMPT = (
+    "You are a warm, encouraging English conversation tutor helping an Uzbek-speaking "
+    "student practice English. ALWAYS reply in English only, regardless of what language "
+    "the student writes in.\n\n"
+    "For every message the student sends, follow this structure:\n"
+    "1. If their message contains any grammar, vocabulary, spelling, or word-choice "
+    "mistakes, start your reply with a line '📝 Correction: <the corrected sentence>', "
+    "then one short line explaining the fix in simple terms, e.g. "
+    "'💡 Tip: we use \"have been\" for actions that started in the past and continue now.'\n"
+    "2. If their message has no mistakes, start with a short, genuine compliment instead "
+    "(e.g. 'Great sentence! 👍').\n"
+    "3. After the correction/compliment, continue the conversation naturally in English — "
+    "react to what they said and ask a friendly follow-up question to keep them talking.\n\n"
+    "Keep your whole reply concise (3-5 sentences total), friendly, and never condescending. "
+    "Use simple, encouraging language appropriate for an intermediate English learner."
+)
+
+
+def _generate_english_practice_reply_sync(history: list) -> str:
+    """Groq (LLM) orqali ingliz tili mashq rejimi uchun javob generatsiya qiladi:
+    xatolarni tuzatadi va suhbatni ingliz tilida davom ettiradi."""
+    messages = [{"role": "system", "content": ENGLISH_PRACTICE_SYSTEM_PROMPT}] + history
+    completion = groq_client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=messages,
+        temperature=0.7,
+    )
+    return completion.choices[0].message.content.strip()
+
+
 def _text_to_speech_ogg_sync(text: str, out_path_ogg: str) -> str:
     """gTTS bilan matnni ovozga aylantiradi va Telegram voice uchun
     ogg/opus formatiga konvertatsiya qiladi."""
@@ -639,6 +677,7 @@ WELCOME_TEXT = (
     "🎲 Bonus: /tarix buyrug'i bilan ketma-ket 10 ta tarix savolidan iborat viktorina o'ynashingiz mumkin!\n"
     "🎓 /sertifikat bilan esa 25 ta savolli test topshirib, natijangiz yetarli bo'lsa sertifikat olishingiz mumkin!\n"
     "🏆 /reyting bilan eng yaxshi natijalar jadvalini ko'rishingiz mumkin!\n"
+    "🇬🇧 /english bilan ingliz tilida erkin suhbatlashib, xatolaringizni tuzatib olishingiz mumkin!\n"
     "💬 Yoki menga oddiygina yozing (yoki ovozli xabar yuboring) — hech qanday maxsus "
     "buyruqsiz erkin suhbatlashishimiz mumkin!\n\n"
     "🚀 Boshlash uchun /test buyrug'ini yuboring!"
@@ -659,6 +698,11 @@ async def cmd_stop(message: Message, state: FSMContext):
         # Faol imtihon yo'q, lekin suhbat xotirasi bo'lishi mumkin — uni tozalaymiz.
         await state.set_data({})
         await message.answer("🔄 Suhbat xotirasi tozalandi. Yangidan yozishingiz mumkin, yoki /test bilan imtihon boshlang.")
+        return
+
+    if current == EnglishPracticeStates.practicing.state:
+        await state.clear()
+        await message.answer("🛑 English Practice Mode stopped. Send /english to start again.")
         return
 
     await state.clear()
@@ -723,6 +767,85 @@ async def cmd_reyting(message: Message):
 
     await message.answer(tarix_text)
     await message.answer(cert_text)
+
+
+@dp.message(Command("english"))
+async def cmd_english(message: Message, state: FSMContext):
+    """Ingliz tili mashq rejimini yoqadi — bot ingliz tilida yozadi,
+    foydalanuvchining xatolarini muloyimlik bilan tuzatib, suhbatni davom ettiradi."""
+    await state.set_data({"english_history": []})
+    await state.set_state(EnglishPracticeStates.practicing)
+    await message.answer(
+        "🇬🇧 <b>English Practice Mode ON!</b>\n\n"
+        "Write to me in English (text or voice) and I'll gently correct your mistakes "
+        "while we chat. Don't worry about being perfect — let's just talk!\n\n"
+        "To exit, send /stop.\n\n"
+        "So, tell me — how has your day been so far? 😊"
+    )
+
+
+@dp.message(EnglishPracticeStates.practicing, F.text)
+async def handle_english_practice_text(message: Message, state: FSMContext):
+    data = await state.get_data()
+    history = data.get("english_history", [])
+    history.append({"role": "user", "content": message.text})
+
+    await bot.send_chat_action(message.chat.id, "typing")
+
+    try:
+        reply = await asyncio.to_thread(_generate_english_practice_reply_sync, history)
+    except Exception as e:
+        logger.exception("Ingliz tili mashqida javob generatsiya qilishda xatolik: %s", e)
+        await message.answer("❌ Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
+        return
+
+    history.append({"role": "assistant", "content": reply})
+    await state.update_data(english_history=history[-ENGLISH_PRACTICE_HISTORY_LIMIT:])
+    await message.answer(reply)
+
+
+@dp.message(EnglishPracticeStates.practicing, F.voice)
+async def handle_english_practice_voice(message: Message, state: FSMContext):
+    """Ingliz tili mashqida ovozli xabar yuborilsa, uni matnga aylantirib
+    xuddi yozma xabardek tuzatish va javob beradi."""
+    user_dir = _user_dir(message.from_user.id)
+    ogg_path = os.path.join(user_dir, f"english_voice_{message.voice.file_unique_id}.ogg")
+
+    try:
+        file = await bot.get_file(message.voice.file_id)
+        await bot.download_file(file.file_path, destination=ogg_path)
+        transcript = await asyncio.to_thread(_transcribe_sync, ogg_path)
+    except Exception as e:
+        logger.exception("Ingliz tili mashqida ovozni tanib olishda xatolik: %s", e)
+        await message.answer("❌ Ovozli xabarni tushunishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
+        return
+    finally:
+        if os.path.exists(ogg_path):
+            try:
+                os.remove(ogg_path)
+            except OSError:
+                pass
+
+    if not transcript:
+        await message.answer("⚠️ Ovozingizda nutq aniqlanmadi. Please try speaking again.")
+        return
+
+    data = await state.get_data()
+    history = data.get("english_history", [])
+    history.append({"role": "user", "content": transcript})
+
+    await bot.send_chat_action(message.chat.id, "typing")
+
+    try:
+        reply = await asyncio.to_thread(_generate_english_practice_reply_sync, history)
+    except Exception as e:
+        logger.exception("Ingliz tili mashqida javob generatsiya qilishda xatolik: %s", e)
+        await message.answer("❌ Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
+        return
+
+    history.append({"role": "assistant", "content": reply})
+    await state.update_data(english_history=history[-ENGLISH_PRACTICE_HISTORY_LIMIT:])
+    await message.answer(f"🎙 <i>You said:</i> {transcript}\n\n{reply}")
 
 
 @dp.message(Command("tarix"))
@@ -1255,6 +1378,7 @@ async def setup_bot_commands():
         BotCommand(command="sertifikat", description="25 ta savolli sertifikat testi"),
         BotCommand(command="stats", description="Bot statistikasini ko'rish"),
         BotCommand(command="reyting", description="TOP 10 reyting jadvalini ko'rish"),
+        BotCommand(command="english", description="Ingliz tili mashq rejimi (xatolarni tuzatadi)"),
         BotCommand(command="stop", description="Joriy testni to'xtatish / suhbatni tozalash"),
     ]
     await bot.set_my_commands(commands)
