@@ -41,7 +41,7 @@ import shutil
 import secrets
 from datetime import datetime
 
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher, F, BaseMiddleware
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart, StateFilter
@@ -61,6 +61,7 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 from gtts import gTTS
 from pydub import AudioSegment
 from groq import Groq
+from upstash_redis.asyncio import Redis as UpstashRedis
 
 from aiohttp import web
 
@@ -104,6 +105,18 @@ WEBHOOK_URL = WEBHOOK_BASE_URL.rstrip("/") + WEBHOOK_PATH
 # alohida saqlash yoki env orqali berish shart emas.
 WEBHOOK_SECRET = secrets.token_urlsafe(32)
 
+# --- Foydalanuvchilar statistikasi (Upstash Redis) ----------------------
+# Render'ning fayl tizimi vaqtinchalik bo'lgani uchun (har qayta ishga
+# tushishda yo'qoladi), foydalanuvchilar sonini Upstash Redis'da (bepul,
+# doimiy saqlanadigan HTTP-based Redis) saqlaymiz.
+UPSTASH_REDIS_REST_URL = os.getenv("UPSTASH_REDIS_REST_URL")
+UPSTASH_REDIS_REST_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+BOT_USERS_SET_KEY = "ielts_bot:unique_users"
+BOT_STARTS_COUNTER_KEY = "ielts_bot:total_starts"
+# Ixtiyoriy: /stats buyrug'ini faqat shu Telegram user_id egasiga cheklash uchun.
+# Agar bo'sh qoldirilsa, /stats hamma uchun ochiq bo'ladi.
+ADMIN_USER_ID = os.getenv("ADMIN_USER_ID")
+
 # --------------------------------------------------------------------------
 # 2) LOGGING
 # --------------------------------------------------------------------------
@@ -115,12 +128,50 @@ logging.basicConfig(
 logger = logging.getLogger("ielts_bot")
 
 # --------------------------------------------------------------------------
-# 3) BOT / DISPATCHER / GROQ CLIENT
+# 3) BOT / DISPATCHER / GROQ CLIENT / REDIS CLIENT
 # --------------------------------------------------------------------------
 
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
 groq_client = Groq(api_key=GROQ_API_KEY)
+
+if UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN:
+    redis_client = UpstashRedis(url=UPSTASH_REDIS_REST_URL, token=UPSTASH_REDIS_REST_TOKEN)
+    logger.info("Upstash Redis ulandi — foydalanuvchilar statistikasi saqlanadi.")
+else:
+    redis_client = None
+    logger.warning(
+        "UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN topilmadi — "
+        "foydalanuvchilar statistikasi (/stats) o'chirilgan holda ishlaydi."
+    )
+
+
+async def track_user(user_id: int):
+    """Foydalanuvchini Upstash Redis'dagi noyob foydalanuvchilar to'plamiga
+    qo'shadi va umumiy murojaatlar sonini oshiradi. Xatolik bo'lsa botni
+    to'xtatmaydi, faqat log yozadi."""
+    if redis_client is None:
+        return
+    try:
+        await redis_client.sadd(BOT_USERS_SET_KEY, str(user_id))
+        await redis_client.incr(BOT_STARTS_COUNTER_KEY)
+    except Exception as e:
+        logger.warning("Redis orqali statistika yozishda xatolik: %s", e)
+
+
+class UserTrackingMiddleware(BaseMiddleware):
+    """Har bir kiruvchi xabar/tugma bosilishida foydalanuvchini fon rejimida
+    (asosiy jarayonni kutdirmasdan) statistikaga qo'shib boradi."""
+
+    async def __call__(self, handler, event, data):
+        user = getattr(event, "from_user", None)
+        if user is not None:
+            asyncio.create_task(track_user(user.id))
+        return await handler(event, data)
+
+
+dp.message.outer_middleware(UserTrackingMiddleware())
+dp.callback_query.outer_middleware(UserTrackingMiddleware())
 
 
 # --------------------------------------------------------------------------
@@ -418,6 +469,40 @@ async def cmd_stop(message: Message, state: FSMContext):
     await state.clear()
     cleanup_user_dir(message.from_user.id)
     await message.answer("🛑 Test to'xtatildi. Qayta boshlash uchun /test yuboring.")
+
+
+@dp.message(Command("stats"))
+async def cmd_stats(message: Message):
+    """Botga jami nechta noyob foydalanuvchi kirganini va umumiy murojaatlar
+    sonini ko'rsatadi. Agar ADMIN_USER_ID sozlangan bo'lsa, faqat o'sha
+    foydalanuvchiga ruxsat beriladi."""
+    if ADMIN_USER_ID and str(message.from_user.id) != str(ADMIN_USER_ID):
+        await message.answer("⛔ Bu buyruq faqat bot egasi uchun.")
+        return
+
+    if redis_client is None:
+        await message.answer(
+            "⚠️ Statistika xizmati sozlanmagan.\n\n"
+            "UPSTASH_REDIS_REST_URL va UPSTASH_REDIS_REST_TOKEN "
+            "environment variable'larini qo'shing."
+        )
+        return
+
+    try:
+        total_users = await redis_client.scard(BOT_USERS_SET_KEY)
+        total_starts = await redis_client.get(BOT_STARTS_COUNTER_KEY)
+    except Exception as e:
+        logger.exception("Statistikani o'qishda xatolik: %s", e)
+        await message.answer("❌ Statistikani olishda xatolik yuz berdi.")
+        return
+
+    total_starts = total_starts or 0
+
+    await message.answer(
+        "📊 <b>Bot statistikasi</b>\n\n"
+        f"👥 Jami noyob foydalanuvchilar: <b>{total_users}</b>\n"
+        f"📨 Jami murojaatlar (xabar/tugma): <b>{total_starts}</b>"
+    )
 
 
 @dp.message(Command("tarix"))
@@ -769,6 +854,7 @@ async def setup_bot_commands():
         BotCommand(command="start", description="Botni boshlash va yo'riqnoma"),
         BotCommand(command="test", description="Yangi IELTS Speaking mock testini boshlash"),
         BotCommand(command="tarix", description="10 ta ketma-ket tarix savoli viktorinasi"),
+        BotCommand(command="stats", description="Bot statistikasini ko'rish"),
         BotCommand(command="stop", description="Joriy testni to'xtatish"),
     ]
     await bot.set_my_commands(commands)
