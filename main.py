@@ -8,27 +8,28 @@ Stack:
   - gTTS               (Text-to-Speech — Google Text-to-Speech, tekin)
   - pydub + ffmpeg     (audio konvertatsiya: mp3 -> ogg/opus voice)
 
-Render.com Free Tier'da ishlashga moslashtirilgan:
-  - Polling rejimida ishlaydi (webhook emas)
-  - Portni ushlab turish uchun mini aiohttp health-check server qo'shilgan
-    (Render "Web Service" turi portni kutadi; agar "Background Worker"
-    turida deploy qilsangiz, health-server shart emas, lekin zarar keltirmaydi)
-  - Ishga tushishda `delete_webhook(drop_pending_updates=True)` chaqiriladi,
-    bu TelegramConflictError xatosini oldini oladi
+Render.com Free Tier'da ishlashga moslashtirilgan (WEBHOOK rejimida):
+  - Bot Telegram'dan WEBHOOK orqali yangilanishlarni oladi (polling emas) —
+    bu bir nechta instance bir-biriga to'qnashib "TelegramConflictError"
+    berish xavfini deyarli yo'qotadi.
+  - Render "Web Service" allaqachon ochiq HTTPS URL (RENDER_EXTERNAL_URL)
+    beradi, shu URL avtomatik webhook manzili sifatida ishlatiladi.
+  - Har bir ishga tushishda tasodifiy secret_token bilan set_webhook chaqiriladi.
 
 MUHIM (Render sozlamalari uchun):
   - Environment Variables:
         BOT_TOKEN   = <BotFather bergan token>
         GROQ_API_KEY= <Groq Cloud API key>
         PORT        = 10000   (Render avtomatik beradi, kod o'zi ham oladi)
+        (WEBHOOK_BASE_URL kerak emas — Render'da RENDER_EXTERNAL_URL avtomatik keladi;
+         boshqa platformada ishlatsangiz shuni qo'lda kiritish kerak bo'ladi)
   - Build Command misolida ffmpeg ham o'rnatilishi kerak, chunki pydub
     ffmpeg binarini talab qiladi. Masalan Render "Native Environment"da:
         apt-get update && apt-get install -y ffmpeg
     yoki Dockerfile ishlatilsa:
         RUN apt-get update && apt-get install -y ffmpeg
   - WEB_CONCURRENCY=1 (Render env var) — bitta worker process bo'lishini
-    ta'minlaydi, aks holda bir nechta process bitta botga bog'lanib
-    TelegramConflictError yuzaga kelishi mumkin.
+    ta'minlaydi.
 """
 
 import os
@@ -37,6 +38,7 @@ import asyncio
 import logging
 import tempfile
 import shutil
+import secrets
 from datetime import datetime
 
 from aiogram import Bot, Dispatcher, F
@@ -54,6 +56,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     BotCommand,
 )
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 from gtts import gTTS
 from pydub import AudioSegment
@@ -82,6 +85,24 @@ PART3_QUESTIONS_COUNT = 4
 
 TEMP_DIR = os.path.join(tempfile.gettempdir(), "ielts_bot_files")
 os.makedirs(TEMP_DIR, exist_ok=True)
+
+# --- Webhook sozlamalari -------------------------------------------------
+# Render "Web Service"lar uchun RENDER_EXTERNAL_URL o'zgaruvchisini avtomatik
+# beradi (masalan https://my-firs-best-bot-dude-bro.onrender.com). Boshqa
+# platformada ishlatsangiz, buni qo'lda WEBHOOK_BASE_URL orqali bering.
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_BASE_URL = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("WEBHOOK_BASE_URL")
+if not WEBHOOK_BASE_URL:
+    raise RuntimeError(
+        "WEBHOOK_BASE_URL (yoki Render'ning RENDER_EXTERNAL_URL) topilmadi! "
+        "Render'da bu avtomatik beriladi; boshqa platformada WEBHOOK_BASE_URL "
+        "environment variable orqali to'liq https:// manzilni kiriting."
+    )
+WEBHOOK_URL = WEBHOOK_BASE_URL.rstrip("/") + WEBHOOK_PATH
+# Har bir ishga tushishda yangi tasodifiy secret token generatsiya qilinadi va
+# set_webhook orqali darhol qayta ro'yxatdan o'tkaziladi, shuning uchun uni
+# alohida saqlash yoki env orqali berish shart emas.
+WEBHOOK_SECRET = secrets.token_urlsafe(32)
 
 # --------------------------------------------------------------------------
 # 2) LOGGING
@@ -696,22 +717,46 @@ async def handle_fallback(message: Message):
 
 
 # --------------------------------------------------------------------------
-# 7) RENDER FREE TIER UCHUN MINI HEALTH-CHECK WEB SERVER
-#    (Render "Web Service" turi doim ochiq portni talab qiladi)
+# 7) AIOHTTP WEB SERVER — HAM HEALTH-CHECK, HAM TELEGRAM WEBHOOK
+#    (Render "Web Service" doim ochiq portni talab qiladi; shu server orqali
+#    Telegram to'g'ridan-to'g'ri /webhook manziliga yangilanish yuboradi)
 # --------------------------------------------------------------------------
 
 async def health(request):
-    return web.Response(text="IELTS Speaking Bot is running.")
+    return web.Response(text="IELTS Speaking Bot is running (webhook mode).")
 
 
-async def start_web_server():
+async def on_startup(app: web.Application):
+    await bot.set_webhook(
+        url=WEBHOOK_URL,
+        secret_token=WEBHOOK_SECRET,
+        drop_pending_updates=True,
+    )
+    logger.info("Webhook o'rnatildi: %s", WEBHOOK_URL)
+    await setup_bot_commands()
+
+
+async def on_shutdown(app: web.Application):
+    await bot.delete_webhook()
+    await bot.session.close()
+    logger.info("Webhook o'chirildi, bot sessiyasi yopildi.")
+
+
+def create_app() -> web.Application:
     app = web.Application()
     app.router.add_get("/", health)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, host="0.0.0.0", port=PORT)
-    await site.start()
-    logger.info("Health-check web server ishga tushdi: 0.0.0.0:%s", PORT)
+
+    SimpleRequestHandler(
+        dispatcher=dp,
+        bot=bot,
+        secret_token=WEBHOOK_SECRET,
+    ).register(app, path=WEBHOOK_PATH)
+
+    setup_application(app, dp, bot=bot)
+
+    app.on_startup.append(on_startup)
+    app.on_cleanup.append(on_shutdown)
+    return app
 
 
 # --------------------------------------------------------------------------
@@ -734,19 +779,10 @@ async def setup_bot_commands():
 # 9) MAIN
 # --------------------------------------------------------------------------
 
-async def main():
-    # TelegramConflictError oldini olish uchun webhookni o'chiramiz
-    await bot.delete_webhook(drop_pending_updates=True)
-    logger.info("Webhook o'chirildi, polling boshlanmoqda...")
-
-    await setup_bot_commands()
-    await start_web_server()
-
-    try:
-        await dp.start_polling(bot)
-    finally:
-        await bot.session.close()
+def main():
+    app = create_app()
+    web.run_app(app, host="0.0.0.0", port=PORT)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
