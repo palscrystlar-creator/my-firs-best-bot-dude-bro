@@ -62,6 +62,7 @@ from gtts import gTTS
 from pydub import AudioSegment
 from groq import Groq
 from upstash_redis.asyncio import Redis as UpstashRedis
+from PIL import Image, ImageDraw, ImageFont
 
 from aiohttp import web
 
@@ -312,10 +313,13 @@ def _generate_final_report_sync(answers: list) -> dict:
 # --- Tarixdan ketma-ket savollar (History Quiz Session) ----------------
 
 # Har bir foydalanuvchining hozirgi faol tarix viktorina sessiyasini saqlab turadi.
-# user_id -> {"questions": [...], "idx": int, "score": int}
+# user_id -> {"questions": [...], "idx": int, "score": int, "mode": "quiz"|"certificate"}
 active_history_quizzes: dict[int, dict] = {}
 
 HISTORY_QUIZ_LENGTH = 10
+CERTIFICATE_QUIZ_LENGTH = 25
+CERTIFICATE_PASS_PERCENT = 70  # sertifikat olish uchun kerakli minimal foiz
+MAX_QUESTIONS_PER_LLM_CALL = 10  # bitta so'rovda ishonchli generatsiya qilinadigan maksimal savol soni
 
 HISTORY_TOPICS = [
     "jahon tarixi",
@@ -331,9 +335,10 @@ HISTORY_TOPICS = [
 ]
 
 
-def _generate_history_quiz_set_sync(count: int = HISTORY_QUIZ_LENGTH) -> list:
+def _generate_history_quiz_batch_sync(count: int) -> list:
     """Groq (LLM) orqali bir-biriga o'xshamaydigan `count` ta tarix savolidan
-    iborat to'plamni bitta so'rovda JSON ko'rinishida generatsiya qiladi."""
+    iborat BITTA to'plamni bitta so'rovda JSON ko'rinishida generatsiya qiladi.
+    `count` MAX_QUESTIONS_PER_LLM_CALL dan oshmasligi kerak (ishonchlilik uchun)."""
     topics_str = ", ".join(HISTORY_TOPICS)
     prompt = (
         "Siz tarix fanidan qiziqarli viktorina (trivia) savollari tuzuvchi mutaxassissiz. "
@@ -379,6 +384,25 @@ def _generate_history_quiz_set_sync(count: int = HISTORY_QUIZ_LENGTH) -> list:
     return valid[:count]
 
 
+def _generate_history_quiz_set_sync(count: int) -> list:
+    """Kerakli umumiy savol sonini MAX_QUESTIONS_PER_LLM_CALL dan oshmaydigan
+    bo'laklarga bo'lib, bir necha marta LLM'ga murojaat qilib yig'adi. Bu
+    katta (masalan 25 ta) savol to'plamini so'rasak ham JSON kesilib qolish
+    yoki formatning buzilish xavfini kamaytiradi."""
+    all_questions = []
+    remaining = count
+    while remaining > 0 and len(all_questions) < count:
+        batch_size = min(remaining, MAX_QUESTIONS_PER_LLM_CALL)
+        try:
+            batch = _generate_history_quiz_batch_sync(batch_size)
+        except Exception as e:
+            logger.exception("Savol partiyasini generatsiya qilishda xatolik: %s", e)
+            batch = []
+        all_questions.extend(batch)
+        remaining -= batch_size
+    return all_questions[:count]
+
+
 def _build_history_question_view(quiz: dict, idx: int):
     """Berilgan indeksdagi savol uchun matn va inline tugmalarni tayyorlaydi."""
     q = quiz["questions"][idx]
@@ -389,8 +413,83 @@ def _build_history_question_view(quiz: dict, idx: int):
         for i, opt in enumerate(q["options"])
     ]
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-    text = f"📜 <b>Savol {idx + 1}/{total}:</b>\n\n{q['question']}"
+    mode_label = "🎓 Sertifikat testi" if quiz.get("mode") == "certificate" else "📜 Tarix savoli"
+    text = f"{mode_label} — <b>{idx + 1}/{total}:</b>\n\n{q['question']}"
     return text, keyboard
+
+
+# --- Sertifikat rasmi (Pillow orqali) -----------------------------------
+
+# Dockerfile'da o'rnatilgan "fonts-dejavu-core" paketi shu manzilga shrift qo'yadi.
+FONT_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+FONT_REGULAR_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+
+def _load_font(path: str, size: int):
+    """Shrift faylini yuklaydi; agar topilmasa (masalan lokal Windows/Mac muhitida
+    ishga tushirilsa), PIL'ning standart shriftiga o'tadi — bot yiqilib qolmaydi."""
+    try:
+        return ImageFont.truetype(path, size)
+    except Exception:
+        return ImageFont.load_default()
+
+
+def _generate_certificate_image_sync(full_name: str, score: int, total: int, percentage: int) -> str:
+    """Pillow yordamida chiroyli sertifikat rasmini (PNG) yaratadi va fayl
+    yo'lini qaytaradi."""
+    width, height = 1400, 990
+    bg_color = (253, 249, 240)
+    border_gold = (191, 155, 48)
+    text_dark = (40, 40, 60)
+    text_gray = (110, 110, 120)
+
+    img = Image.new("RGB", (width, height), bg_color)
+    draw = ImageDraw.Draw(img)
+
+    # Tashqi va ichki dekorativ ramka
+    draw.rectangle([30, 30, width - 30, height - 30], outline=border_gold, width=8)
+    draw.rectangle([55, 55, width - 55, height - 55], outline=border_gold, width=2)
+
+    font_title = _load_font(FONT_BOLD_PATH, 74)
+    font_subtitle = _load_font(FONT_REGULAR_PATH, 30)
+    font_name = _load_font(FONT_BOLD_PATH, 52)
+    font_body = _load_font(FONT_REGULAR_PATH, 30)
+    font_score = _load_font(FONT_BOLD_PATH, 40)
+    font_footer = _load_font(FONT_REGULAR_PATH, 22)
+
+    def center_text(y, text, font, fill):
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        draw.text(((width - text_width) / 2, y), text, font=font, fill=fill)
+
+    center_text(120, "SERTIFIKAT", font_title, border_gold)
+    center_text(215, "Tarix bilimlari bo'yicha yutuqlar sertifikati", font_subtitle, text_gray)
+
+    draw.line([(300, 290), (width - 300, 290)], fill=border_gold, width=2)
+
+    center_text(350, "Ushbu sertifikat quyidagi shaxsga topshiriladi:", font_body, text_dark)
+    center_text(410, full_name, font_name, text_dark)
+
+    draw.line([(400, 500), (width - 400, 500)], fill=border_gold, width=1)
+
+    center_text(
+        560,
+        f"IELTS Speaking AI Examiner Bot tomonidan tashkil etilgan {total} savolli",
+        font_body,
+        text_dark,
+    )
+    center_text(605, "tarix bo'yicha sertifikat testidan muvaffaqiyatli o'tgani uchun.", font_body, text_dark)
+
+    center_text(690, f"Natija: {score}/{total} ({percentage}%)", font_score, border_gold)
+
+    date_str = datetime.now().strftime("%d.%m.%Y")
+    center_text(770, f"Sana: {date_str}", font_body, text_gray)
+
+    center_text(height - 90, "IELTS Speaking AI Examiner Bot", font_footer, text_gray)
+
+    out_path = os.path.join(TEMP_DIR, f"certificate_{secrets.token_hex(6)}.png")
+    img.save(out_path, "PNG")
+    return out_path
 
 
 # --- Oddiy erkin suhbat (Free Chat) -------------------------------------
@@ -474,6 +573,7 @@ WELCOME_TEXT = (
     "• Har bir javobingiz avtomatik tinglanadi va tahlil qilinadi.\n"
     "• Testni istalgan vaqtda /stop bilan to'xtatishingiz mumkin.\n\n"
     "🎲 Bonus: /tarix buyrug'i bilan ketma-ket 10 ta tarix savolidan iborat viktorina o'ynashingiz mumkin!\n"
+    "🎓 /sertifikat bilan esa 25 ta savolli test topshirib, natijangiz yetarli bo'lsa sertifikat olishingiz mumkin!\n"
     "💬 Yoki menga oddiygina yozing (yoki ovozli xabar yuboring) — hech qanday maxsus "
     "buyruqsiz erkin suhbatlashishimiz mumkin!\n\n"
     "🚀 Boshlash uchun /test buyrug'ini yuboring!"
@@ -556,7 +656,49 @@ async def cmd_tarix(message: Message):
         "questions": questions,
         "idx": 0,
         "score": 0,
+        "mode": "quiz",
     }
+
+    text, keyboard = _build_history_question_view(active_history_quizzes[message.from_user.id], 0)
+    await prep_msg.edit_text(text, reply_markup=keyboard)
+
+
+@dp.message(Command("sertifikat"))
+async def cmd_sertifikat(message: Message):
+    f"""Ketma-ket {CERTIFICATE_QUIZ_LENGTH} ta tarix savolidan iborat "sertifikat testi"ni
+    boshlaydi. Agar natija {CERTIFICATE_PASS_PERCENT}% dan yuqori bo'lsa, test yakunida
+    foydalanuvchiga rasmli (PNG) sertifikat yuboriladi."""
+    prep_msg = await message.answer(
+        f"⏳ Sertifikat testi uchun {CERTIFICATE_QUIZ_LENGTH} ta savol tayyorlanmoqda... "
+        "(bu biroz vaqt olishi mumkin, iltimos kuting)"
+    )
+
+    try:
+        questions = await asyncio.to_thread(_generate_history_quiz_set_sync, CERTIFICATE_QUIZ_LENGTH)
+        if len(questions) < CERTIFICATE_QUIZ_LENGTH // 2:
+            # Agar savollarning yarmidan ko'pi generatsiya qilinmagan bo'lsa,
+            # test sifatsiz bo'lib qolmasligi uchun xatolik deb hisoblaymiz.
+            raise ValueError(f"Yetarli savol generatsiya qilinmadi: {len(questions)}")
+    except Exception as e:
+        logger.exception("Sertifikat testini generatsiya qilishda xatolik: %s", e)
+        await prep_msg.edit_text("❌ Savollarni tayyorlashda xatolik yuz berdi. Iltimos /sertifikat bilan qayta urinib ko'ring.")
+        return
+
+    active_history_quizzes[message.from_user.id] = {
+        "questions": questions,
+        "idx": 0,
+        "score": 0,
+        "mode": "certificate",
+    }
+
+    intro = (
+        f"🎓 <b>Sertifikat testi boshlandi!</b>\n\n"
+        f"Jami {len(questions)} ta savol. Agar natijangiz "
+        f"<b>{CERTIFICATE_PASS_PERCENT}%</b> yoki undan yuqori bo'lsa, "
+        "test yakunida shaxsiy sertifikat rasmini olasiz.\n\n"
+        "Omad!"
+    )
+    await message.answer(intro)
 
     text, keyboard = _build_history_question_view(active_history_quizzes[message.from_user.id], 0)
     await prep_msg.edit_text(text, reply_markup=keyboard)
@@ -582,6 +724,8 @@ async def handle_history_answer(callback: CallbackQuery):
     q = quiz["questions"][idx]
     correct_index = q["correct_index"]
     letters = ["A", "B", "C", "D", "E", "F"]
+    mode = quiz.get("mode", "quiz")
+    mode_emoji = "🎓" if mode == "certificate" else "📜"
 
     is_correct = selected_index == correct_index
     if is_correct:
@@ -593,7 +737,7 @@ async def handle_history_answer(callback: CallbackQuery):
         result_line = f"❌ <b>Noto'g'ri.</b> To'g'ri javob: <b>{correct_letter}) {correct_option}</b>"
 
     explanation = q.get("explanation", "")
-    final_text = f"📜 <b>Savol {idx + 1}/{total}:</b>\n\n{q['question']}\n\n{result_line}"
+    final_text = f"{mode_emoji} <b>Savol {idx + 1}/{total}:</b>\n\n{q['question']}\n\n{result_line}"
     if explanation:
         final_text += f"\n\n💡 <i>{explanation}</i>"
 
@@ -611,24 +755,68 @@ async def handle_history_answer(callback: CallbackQuery):
         # Keyingi savolni yangi xabar sifatida yuboramiz
         next_text, next_keyboard = _build_history_question_view(quiz, quiz["idx"])
         await callback.message.answer(next_text, reply_markup=next_keyboard)
-    else:
-        score = quiz["score"]
-        percentage = round((score / total) * 100)
-        if percentage >= 80:
-            verdict = "🏆 Ajoyib natija! Tarixni juda yaxshi bilasiz."
-        elif percentage >= 50:
-            verdict = "👍 Yomon emas! Yana mashq qilsangiz yanada yaxshi bo'ladi."
-        else:
-            verdict = "📚 Tarixni ko'proq o'qishga arziydi, lekin harakat qildingiz!"
+        return
 
-        summary = (
-            f"🏁 <b>Viktorina yakunlandi!</b>\n\n"
-            f"🎯 Natijangiz: <b>{score}/{total}</b> ({percentage}%)\n\n"
-            f"{verdict}\n\n"
-            "🔁 Yana boshlash uchun /tarix yuboring."
-        )
-        await callback.message.answer(summary)
-        active_history_quizzes.pop(user_id, None)
+    # --- Test yakunlandi ---
+    score = quiz["score"]
+    percentage = round((score / total) * 100)
+    active_history_quizzes.pop(user_id, None)
+
+    if mode == "certificate":
+        if percentage >= CERTIFICATE_PASS_PERCENT:
+            full_name = callback.from_user.full_name or callback.from_user.username or "Foydalanuvchi"
+            await callback.message.answer(
+                f"🏁 <b>Sertifikat testi yakunlandi!</b>\n\n"
+                f"🎯 Natijangiz: <b>{score}/{total}</b> ({percentage}%)\n\n"
+                "🎉 Tabriklaymiz! Sertifikatingiz tayyorlanmoqda..."
+            )
+            cert_path = None
+            try:
+                cert_path = await asyncio.to_thread(
+                    _generate_certificate_image_sync, full_name, score, total, percentage
+                )
+                await callback.message.answer_photo(
+                    FSInputFile(cert_path),
+                    caption=(
+                        f"🎓 <b>Tabriklaymiz, {full_name}!</b>\n"
+                        f"Siz {total} savoldan {score} tasiga to'g'ri javob berib, "
+                        f"({percentage}%) sertifikatga sazovor bo'ldingiz!"
+                    ),
+                )
+            except Exception as e:
+                logger.exception("Sertifikat rasmini yaratish/yuborishda xatolik: %s", e)
+                await callback.message.answer("⚠️ Sertifikat rasmini yaratishda xatolik yuz berdi, lekin natijangiz hisobga olindi.")
+            finally:
+                if cert_path and os.path.exists(cert_path):
+                    try:
+                        os.remove(cert_path)
+                    except OSError:
+                        pass
+        else:
+            await callback.message.answer(
+                f"🏁 <b>Sertifikat testi yakunlandi!</b>\n\n"
+                f"🎯 Natijangiz: <b>{score}/{total}</b> ({percentage}%)\n\n"
+                f"😔 Afsuski, sertifikat olish uchun kamida {CERTIFICATE_PASS_PERCENT}% kerak. "
+                "Ko'proq mashq qilib, yana urinib ko'ring!\n\n"
+                "🔁 Qayta urinish uchun /sertifikat yuboring."
+            )
+        return
+
+    # Oddiy /tarix viktorinasi yakuni
+    if percentage >= 80:
+        verdict = "🏆 Ajoyib natija! Tarixni juda yaxshi bilasiz."
+    elif percentage >= 50:
+        verdict = "👍 Yomon emas! Yana mashq qilsangiz yanada yaxshi bo'ladi."
+    else:
+        verdict = "📚 Tarixni ko'proq o'qishga arziydi, lekin harakat qildingiz!"
+
+    summary = (
+        f"🏁 <b>Viktorina yakunlandi!</b>\n\n"
+        f"🎯 Natijangiz: <b>{score}/{total}</b> ({percentage}%)\n\n"
+        f"{verdict}\n\n"
+        "🔁 Yana boshlash uchun /tarix, sertifikat testi uchun /sertifikat yuboring."
+    )
+    await callback.message.answer(summary)
 
 
 @dp.message(Command("test"))
@@ -968,6 +1156,7 @@ async def setup_bot_commands():
         BotCommand(command="start", description="Botni boshlash va yo'riqnoma"),
         BotCommand(command="test", description="Yangi IELTS Speaking mock testini boshlash"),
         BotCommand(command="tarix", description="10 ta ketma-ket tarix savoli viktorinasi"),
+        BotCommand(command="sertifikat", description="25 ta savolli sertifikat testi"),
         BotCommand(command="stats", description="Bot statistikasini ko'rish"),
         BotCommand(command="stop", description="Joriy testni to'xtatish / suhbatni tozalash"),
     ]
