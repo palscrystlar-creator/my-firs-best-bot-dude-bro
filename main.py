@@ -393,6 +393,30 @@ def _build_history_question_view(quiz: dict, idx: int):
     return text, keyboard
 
 
+# --- Oddiy erkin suhbat (Free Chat) -------------------------------------
+
+CHAT_HISTORY_LIMIT = 20  # oxirgi N ta xabar (foydalanuvchi+bot) kontekstda saqlanadi
+
+CHAT_SYSTEM_PROMPT = (
+    "Siz do'stona, samimiy va foydali suhbatdosh yordamchisiz. Foydalanuvchi "
+    "qaysi tilda yozsa, o'sha tilda javob bering (odatda o'zbek tilida). "
+    "Javoblaringiz qisqa va tabiiy bo'lsin, keraksiz cho'zilib ketmang, "
+    "lekin savolga to'liq va foydali javob bering."
+)
+
+
+def _generate_chat_reply_sync(history: list) -> str:
+    """Groq (LLM) orqali erkin suhbat uchun tabiiy javob generatsiya qiladi.
+    `history` — {"role": "user"/"assistant", "content": str} lar ro'yxati."""
+    messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}] + history
+    completion = groq_client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=messages,
+        temperature=0.8,
+    )
+    return completion.choices[0].message.content.strip()
+
+
 def _text_to_speech_ogg_sync(text: str, out_path_ogg: str) -> str:
     """gTTS bilan matnni ovozga aylantiradi va Telegram voice uchun
     ogg/opus formatiga konvertatsiya qiladi."""
@@ -449,7 +473,9 @@ WELCOME_TEXT = (
     "• Savollarga faqat <b>ovozli xabar (voice)</b> bilan javob bering.\n"
     "• Har bir javobingiz avtomatik tinglanadi va tahlil qilinadi.\n"
     "• Testni istalgan vaqtda /stop bilan to'xtatishingiz mumkin.\n\n"
-    "🎲 Bonus: /tarix buyrug'i bilan ketma-ket 10 ta tarix savolidan iborat viktorina o'ynashingiz mumkin!\n\n"
+    "🎲 Bonus: /tarix buyrug'i bilan ketma-ket 10 ta tarix savolidan iborat viktorina o'ynashingiz mumkin!\n"
+    "💬 Yoki menga oddiygina yozing (yoki ovozli xabar yuboring) — hech qanday maxsus "
+    "buyruqsiz erkin suhbatlashishimiz mumkin!\n\n"
     "🚀 Boshlash uchun /test buyrug'ini yuboring!"
 )
 
@@ -463,9 +489,13 @@ async def cmd_start(message: Message, state: FSMContext):
 @dp.message(Command("stop"))
 async def cmd_stop(message: Message, state: FSMContext):
     current = await state.get_state()
+
     if current is None:
-        await message.answer("⚠️ Hozircha faol test mavjud emas.")
+        # Faol imtihon yo'q, lekin suhbat xotirasi bo'lishi mumkin — uni tozalaymiz.
+        await state.set_data({})
+        await message.answer("🔄 Suhbat xotirasi tozalandi. Yangidan yozishingiz mumkin, yoki /test bilan imtihon boshlang.")
         return
+
     await state.clear()
     cleanup_user_dir(message.from_user.id)
     await message.answer("🛑 Test to'xtatildi. Qayta boshlash uchun /test yuboring.")
@@ -795,10 +825,89 @@ async def handle_wrong_content_type(message: Message):
     await message.answer("🎙 Iltimos, javobingizni faqat <b>ovozli xabar (voice)</b> shaklida yuboring.")
 
 
-# Holatdan tashqarida yuborilgan har qanday boshqa xabar
+# --- ODDIY SUHBAT (Default Chat) ----------------------------------------
+# Imtihon holatidan tashqarida yuborilgan har qanday matnli yoki ovozli
+# xabar — hech qanday maxsus buyruq (masalan /chat) talab qilinmaydi,
+# bot avtomatik ravishda erkin suhbatdosh sifatida javob beradi.
+
+@dp.message(F.text)
+async def handle_default_chat_text(message: Message, state: FSMContext):
+    if message.text.startswith("/"):
+        await message.answer(
+            "❓ Bunday buyruqni tanimadim. Lekin menga oddiygina yozsangiz — "
+            "suhbatlashishga tayyorman!"
+        )
+        return
+
+    data = await state.get_data()
+    history = data.get("chat_history", [])
+    history.append({"role": "user", "content": message.text})
+
+    await bot.send_chat_action(message.chat.id, "typing")
+
+    try:
+        reply = await asyncio.to_thread(_generate_chat_reply_sync, history)
+    except Exception as e:
+        logger.exception("Suhbat javobini generatsiya qilishda xatolik: %s", e)
+        await message.answer("❌ Javob berishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
+        return
+
+    history.append({"role": "assistant", "content": reply})
+    await state.update_data(chat_history=history[-CHAT_HISTORY_LIMIT:])
+    await message.answer(reply)
+
+
+@dp.message(F.voice)
+async def handle_default_chat_voice(message: Message, state: FSMContext):
+    """Imtihondan tashqarida yuborilgan ovozli xabarni matnga aylantirib,
+    xuddi yozma xabardek suhbat javobini beradi."""
+    user_dir = _user_dir(message.from_user.id)
+    ogg_path = os.path.join(user_dir, f"chat_voice_{message.voice.file_unique_id}.ogg")
+
+    try:
+        file = await bot.get_file(message.voice.file_id)
+        await bot.download_file(file.file_path, destination=ogg_path)
+        transcript = await asyncio.to_thread(_transcribe_sync, ogg_path)
+    except Exception as e:
+        logger.exception("Suhbatda ovozni tanib olishda xatolik: %s", e)
+        await message.answer("❌ Ovozli xabarni tushunishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
+        return
+    finally:
+        if os.path.exists(ogg_path):
+            try:
+                os.remove(ogg_path)
+            except OSError:
+                pass
+
+    if not transcript:
+        await message.answer("⚠️ Ovozingizda nutq aniqlanmadi. Iltimos, aniqroq gapirib qayta yuboring.")
+        return
+
+    data = await state.get_data()
+    history = data.get("chat_history", [])
+    history.append({"role": "user", "content": transcript})
+
+    await bot.send_chat_action(message.chat.id, "typing")
+
+    try:
+        reply = await asyncio.to_thread(_generate_chat_reply_sync, history)
+    except Exception as e:
+        logger.exception("Suhbat javobini generatsiya qilishda xatolik: %s", e)
+        await message.answer("❌ Javob berishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
+        return
+
+    history.append({"role": "assistant", "content": reply})
+    await state.update_data(chat_history=history[-CHAT_HISTORY_LIMIT:])
+    await message.answer(f"🎙 <i>Siz aytdingiz:</i> {transcript}\n\n{reply}")
+
+
+# Boshqa hech qaysi handlerga to'g'ri kelmagan xabar turlari (sticker, rasm va h.k.)
 @dp.message()
 async def handle_fallback(message: Message):
-    await message.answer("ℹ️ Test boshlash uchun /test, to'xtatish uchun /stop buyrug'ini yuboring.")
+    await message.answer(
+        "ℹ️ Menga oddiy matn yoki ovozli xabar yuborishingiz mumkin — suhbatlashamiz. "
+        "IELTS testi uchun /test, to'xtatish uchun /stop buyrug'ini yuboring."
+    )
 
 
 # --------------------------------------------------------------------------
@@ -860,7 +969,7 @@ async def setup_bot_commands():
         BotCommand(command="test", description="Yangi IELTS Speaking mock testini boshlash"),
         BotCommand(command="tarix", description="10 ta ketma-ket tarix savoli viktorinasi"),
         BotCommand(command="stats", description="Bot statistikasini ko'rish"),
-        BotCommand(command="stop", description="Joriy testni to'xtatish"),
+        BotCommand(command="stop", description="Joriy testni to'xtatish / suhbatni tozalash"),
     ]
     await bot.set_my_commands(commands)
     logger.info("Bot buyruqlar menyusi o'rnatildi.")
