@@ -822,9 +822,14 @@ async def on_startup(app: web.Application):
 
 
 async def on_shutdown(app: web.Application):
-    await bot.delete_webhook()
+    # MUHIM: bu yerda bot.delete_webhook() CHAQIRILMAYDI!
+    # Render rolling-deploy paytida eski va yangi instance bir necha soniya
+    # bir vaqtda ishlab turishi mumkin. Agar shu yerda webhook o'chirilsa,
+    # eski (o'chayotgan) instance yangi instance endigina o'rnatgan
+    # webhookni o'chirib yuboradi va bot butunlay javob bermay qoladi.
+    # Shuning uchun shutdown paytida faqat bot sessiyasini yopamiz, xolos.
     await bot.session.close()
-    logger.info("Webhook o'chirildi, bot sessiyasi yopildi.")
+    logger.info("Bot sessiyasi yopildi (webhook tegilmadi).")
 
 
 def create_app() -> web.Application:
