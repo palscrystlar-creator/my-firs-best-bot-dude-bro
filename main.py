@@ -114,6 +114,9 @@ UPSTASH_REDIS_REST_URL = os.getenv("UPSTASH_REDIS_REST_URL")
 UPSTASH_REDIS_REST_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN")
 BOT_USERS_SET_KEY = "ielts_bot:unique_users"
 BOT_STARTS_COUNTER_KEY = "ielts_bot:total_starts"
+LEADERBOARD_TARIX_KEY = "ielts_bot:leaderboard:tarix"
+LEADERBOARD_CERT_KEY = "ielts_bot:leaderboard:sertifikat"
+LEADERBOARD_TOP_N = 10
 # Ixtiyoriy: /stats buyrug'ini faqat shu Telegram user_id egasiga cheklash uchun.
 # Agar bo'sh qoldirilsa, /stats hamma uchun ochiq bo'ladi.
 ADMIN_USER_ID = os.getenv("ADMIN_USER_ID")
@@ -158,6 +161,67 @@ async def track_user(user_id: int):
         await redis_client.incr(BOT_STARTS_COUNTER_KEY)
     except Exception as e:
         logger.warning("Redis orqali statistika yozishda xatolik: %s", e)
+
+
+async def update_leaderboard(leaderboard_key: str, user_id: int, percentage: int):
+    """Foydalanuvchining shu leaderboard'dagi eng yaxshi natijasini saqlaydi
+    (faqat oldingi natijasidan yuqori bo'lsagina yangilanadi)."""
+    if redis_client is None:
+        return
+    try:
+        current = await redis_client.zscore(leaderboard_key, str(user_id))
+        current_val = float(current) if current is not None else -1.0
+        if percentage > current_val:
+            await redis_client.zadd(leaderboard_key, {str(user_id): float(percentage)})
+    except Exception as e:
+        logger.warning("Reyting jadvalini yangilashda xatolik: %s", e)
+
+
+async def get_leaderboard_entries(leaderboard_key: str, top_n: int = LEADERBOARD_TOP_N):
+    """Leaderboard'dagi barcha yozuvlarni o'qib, eng yuqori foizdan pastga
+    saralab, TOP N tasini qaytaradi: [(user_id_str, percentage_float), ...]."""
+    if redis_client is None:
+        return []
+    try:
+        raw = await redis_client.zrange(leaderboard_key, 0, -1, withscores=True)
+    except Exception as e:
+        logger.warning("Reyting jadvalini o'qishda xatolik: %s", e)
+        return []
+
+    pairs = []
+    if raw:
+        # Upstash Redis python klienti (member, score) juftliklari yoki tekis
+        # ro'yxat ([member, score, member, score, ...]) qaytarishi mumkin —
+        # ikkalasini ham to'g'ri qayta ishlaymiz.
+        if isinstance(raw[0], (list, tuple)):
+            pairs = [(m, float(s)) for m, s in raw]
+        else:
+            it = iter(raw)
+            pairs = [(m, float(s)) for m, s in zip(it, it)]
+
+    pairs.sort(key=lambda item: item[1], reverse=True)
+    return pairs[:top_n]
+
+
+async def format_leaderboard_text(title: str, leaderboard_key: str) -> str:
+    """Leaderboard uchun tayyor, foydalanuvchi ismlari bilan formatlangan
+    matnni qaytaradi. Ismlarni Telegram'dan (bot.get_chat) real vaqtda oladi."""
+    entries = await get_leaderboard_entries(leaderboard_key)
+    if not entries:
+        return f"{title}\n\nHozircha natijalar yo'q. Birinchi bo'lib test yeching!"
+
+    medals = ["🥇", "🥈", "🥉"]
+    lines = [title, ""]
+    for i, (user_id_str, score) in enumerate(entries):
+        try:
+            chat = await bot.get_chat(int(user_id_str))
+            name = chat.full_name or (f"@{chat.username}" if chat.username else f"Foydalanuvchi {user_id_str}")
+        except Exception:
+            name = f"Foydalanuvchi {user_id_str}"
+        prefix = medals[i] if i < len(medals) else f"{i + 1}."
+        lines.append(f"{prefix} {name} — <b>{int(score)}%</b>")
+
+    return "\n".join(lines)
 
 
 class UserTrackingMiddleware(BaseMiddleware):
@@ -574,6 +638,7 @@ WELCOME_TEXT = (
     "• Testni istalgan vaqtda /stop bilan to'xtatishingiz mumkin.\n\n"
     "🎲 Bonus: /tarix buyrug'i bilan ketma-ket 10 ta tarix savolidan iborat viktorina o'ynashingiz mumkin!\n"
     "🎓 /sertifikat bilan esa 25 ta savolli test topshirib, natijangiz yetarli bo'lsa sertifikat olishingiz mumkin!\n"
+    "🏆 /reyting bilan eng yaxshi natijalar jadvalini ko'rishingiz mumkin!\n"
     "💬 Yoki menga oddiygina yozing (yoki ovozli xabar yuboring) — hech qanday maxsus "
     "buyruqsiz erkin suhbatlashishimiz mumkin!\n\n"
     "🚀 Boshlash uchun /test buyrug'ini yuboring!"
@@ -633,6 +698,31 @@ async def cmd_stats(message: Message):
         f"👥 Jami noyob foydalanuvchilar: <b>{total_users}</b>\n"
         f"📨 Jami murojaatlar (xabar/tugma): <b>{total_starts}</b>"
     )
+
+
+@dp.message(Command("reyting"))
+async def cmd_reyting(message: Message):
+    """Tarix viktorinasi (/tarix) va sertifikat testi (/sertifikat) uchun
+    alohida TOP 10 reyting jadvalini ko'rsatadi."""
+    if redis_client is None:
+        await message.answer(
+            "⚠️ Reyting xizmati sozlanmagan.\n\n"
+            "UPSTASH_REDIS_REST_URL va UPSTASH_REDIS_REST_TOKEN "
+            "environment variable'larini qo'shing."
+        )
+        return
+
+    await bot.send_chat_action(message.chat.id, "typing")
+
+    tarix_text = await format_leaderboard_text(
+        "🏆 <b>Tarix viktorinasi reytingi</b> (TOP 10)", LEADERBOARD_TARIX_KEY
+    )
+    cert_text = await format_leaderboard_text(
+        "🎓 <b>Sertifikat testi reytingi</b> (TOP 10)", LEADERBOARD_CERT_KEY
+    )
+
+    await message.answer(tarix_text)
+    await message.answer(cert_text)
 
 
 @dp.message(Command("tarix"))
@@ -763,6 +853,8 @@ async def handle_history_answer(callback: CallbackQuery):
     active_history_quizzes.pop(user_id, None)
 
     if mode == "certificate":
+        await update_leaderboard(LEADERBOARD_CERT_KEY, user_id, percentage)
+
         if percentage >= CERTIFICATE_PASS_PERCENT:
             full_name = callback.from_user.full_name or callback.from_user.username or "Foydalanuvchi"
             await callback.message.answer(
@@ -780,7 +872,8 @@ async def handle_history_answer(callback: CallbackQuery):
                     caption=(
                         f"🎓 <b>Tabriklaymiz, {full_name}!</b>\n"
                         f"Siz {total} savoldan {score} tasiga to'g'ri javob berib, "
-                        f"({percentage}%) sertifikatga sazovor bo'ldingiz!"
+                        f"({percentage}%) sertifikatga sazovor bo'ldingiz!\n\n"
+                        "🏆 Reytingni /reyting orqali ko'rishingiz mumkin."
                     ),
                 )
             except Exception as e:
@@ -803,6 +896,8 @@ async def handle_history_answer(callback: CallbackQuery):
         return
 
     # Oddiy /tarix viktorinasi yakuni
+    await update_leaderboard(LEADERBOARD_TARIX_KEY, user_id, percentage)
+
     if percentage >= 80:
         verdict = "🏆 Ajoyib natija! Tarixni juda yaxshi bilasiz."
     elif percentage >= 50:
@@ -814,7 +909,8 @@ async def handle_history_answer(callback: CallbackQuery):
         f"🏁 <b>Viktorina yakunlandi!</b>\n\n"
         f"🎯 Natijangiz: <b>{score}/{total}</b> ({percentage}%)\n\n"
         f"{verdict}\n\n"
-        "🔁 Yana boshlash uchun /tarix, sertifikat testi uchun /sertifikat yuboring."
+        "🔁 Yana boshlash uchun /tarix, sertifikat testi uchun /sertifikat, "
+        "reytingni ko'rish uchun /reyting yuboring."
     )
     await callback.message.answer(summary)
 
@@ -1158,6 +1254,7 @@ async def setup_bot_commands():
         BotCommand(command="tarix", description="10 ta ketma-ket tarix savoli viktorinasi"),
         BotCommand(command="sertifikat", description="25 ta savolli sertifikat testi"),
         BotCommand(command="stats", description="Bot statistikasini ko'rish"),
+        BotCommand(command="reyting", description="TOP 10 reyting jadvalini ko'rish"),
         BotCommand(command="stop", description="Joriy testni to'xtatish / suhbatni tozalash"),
     ]
     await bot.set_my_commands(commands)
