@@ -39,12 +39,13 @@ import logging
 import tempfile
 import shutil
 import secrets
+import base64
 from datetime import datetime
 
 from aiogram import Bot, Dispatcher, F, BaseMiddleware
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import Command, CommandStart, StateFilter
+from aiogram.filters import Command, CommandStart, StateFilter, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -55,6 +56,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     BotCommand,
+    WebAppInfo,
 )
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
@@ -224,6 +226,123 @@ async def format_leaderboard_text(title: str, leaderboard_key: str) -> str:
     return "\n".join(lines)
 
 
+# --- Dashboard kontenti (Reading / Listening / Grammar) -------------------
+# Barcha kontent Upstash Redis'da saqlanadi (Render fayl tizimi vaqtinchalik
+# bo'lgani uchun). Har bir tur uchun alohida Redis Hash ishlatiladi:
+#   ielts_bot:content:<type>            -> {id: json_string}
+#   ielts_bot:content:<type>:counter    -> keyingi id uchun hisoblagich
+# Listening uchun audio fayl Telegram'ning o'zida saqlanadi (file_id orqali) —
+# alohida fayl xosting kerak emas, chunki Telegram file_id'lar doimiy amal qiladi.
+
+CONTENT_TYPES = ("reading", "listening", "grammar")
+
+
+def _content_hash_key(content_type: str) -> str:
+    return f"ielts_bot:content:{content_type}"
+
+
+def _content_counter_key(content_type: str) -> str:
+    return f"ielts_bot:content:{content_type}:counter"
+
+
+async def get_next_content_id(content_type: str) -> int:
+    new_id = await redis_client.incr(_content_counter_key(content_type))
+    return int(new_id)
+
+
+async def save_content_item(content_type: str, item_id: int, item: dict):
+    await redis_client.hset(_content_hash_key(content_type), str(item_id), json.dumps(item))
+
+
+async def delete_content_item(content_type: str, item_id: int) -> bool:
+    if redis_client is None:
+        return False
+    try:
+        removed = await redis_client.hdel(_content_hash_key(content_type), str(item_id))
+        return bool(removed)
+    except Exception as e:
+        logger.warning("Kontentni o'chirishda xatolik: %s", e)
+        return False
+
+
+async def list_content_items(content_type: str) -> list:
+    """Berilgan turdagi barcha kontentni [{"id": int, ...item fields...}, ...]
+    ko'rinishida qaytaradi, id bo'yicha o'sish tartibida saralangan."""
+    if redis_client is None:
+        return []
+    try:
+        raw = await redis_client.hgetall(_content_hash_key(content_type))
+    except Exception as e:
+        logger.warning("Kontent ro'yxatini o'qishda xatolik: %s", e)
+        return []
+
+    if not raw:
+        return []
+
+    items = []
+    for field_id, value in raw.items():
+        try:
+            item = json.loads(value)
+            item["id"] = int(field_id)
+            items.append(item)
+        except (ValueError, TypeError, json.JSONDecodeError):
+            continue
+
+    items.sort(key=lambda x: x["id"])
+    return items
+
+
+async def get_content_item(content_type: str, item_id: int) -> dict | None:
+    if redis_client is None:
+        return None
+    try:
+        raw = await redis_client.hget(_content_hash_key(content_type), str(item_id))
+    except Exception as e:
+        logger.warning("Kontentni o'qishda xatolik: %s", e)
+        return None
+    if raw is None:
+        return None
+    try:
+        item = json.loads(raw)
+        item["id"] = item_id
+        return item
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return None
+
+
+def _parse_admin_questions_text(text: str) -> list | None:
+    """Admin yuborgan savollar matnini tahlil qiladi. Har bir qator:
+    'Savol | Variant A | Variant B | Variant C | Variant D | to'g'ri raqam(1-4)'
+    formatida bo'lishi kerak. Agar admin savol qo'shmoqchi bo'lmasa,
+    'yo'q' / 'yoq' / 'no' / '-' deb yozishi mumkin — bo'sh ro'yxat qaytadi.
+    Format xato bo'lsa None qaytadi (chaqiruvchi xatolik haqida xabar beradi)."""
+    stripped = text.strip()
+    if stripped.lower() in ("yo'q", "yoq", "yo`q", "no", "-", "yo'q."):
+        return []
+
+    questions = []
+    for line in stripped.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) != 6:
+            return None
+        question_text, opt_a, opt_b, opt_c, opt_d, correct_str = parts
+        try:
+            correct_num = int(correct_str)
+        except ValueError:
+            return None
+        if not (1 <= correct_num <= 4) or not question_text or not all([opt_a, opt_b, opt_c, opt_d]):
+            return None
+        questions.append({
+            "question": question_text,
+            "options": [opt_a, opt_b, opt_c, opt_d],
+            "correct_index": correct_num - 1,
+        })
+    return questions
+
+
 class UserTrackingMiddleware(BaseMiddleware):
     """Har bir kiruvchi xabar/tugma bosilishida foydalanuvchini fon rejimida
     (asosiy jarayonni kutdirmasdan) statistikaga qo'shib boradi."""
@@ -251,6 +370,17 @@ class ExamStates(StatesGroup):
 
 class EnglishPracticeStates(StatesGroup):
     practicing = State()
+
+
+class AdminContentStates(StatesGroup):
+    reading_title = State()
+    reading_body = State()
+    reading_questions = State()
+    listening_title = State()
+    listening_audio = State()
+    listening_questions = State()
+    grammar_title = State()
+    grammar_body = State()
 
 
 # --------------------------------------------------------------------------
@@ -678,6 +808,7 @@ WELCOME_TEXT = (
     "🎓 /sertifikat bilan esa 25 ta savolli test topshirib, natijangiz yetarli bo'lsa sertifikat olishingiz mumkin!\n"
     "🏆 /reyting bilan eng yaxshi natijalar jadvalini ko'rishingiz mumkin!\n"
     "🇬🇧 /english bilan ingliz tilida erkin suhbatlashib, xatolaringizni tuzatib olishingiz mumkin!\n"
+    "🎓 /dashboard bilan esa Profil, Reading, Listening va Grammar bo'limlariga ega shaxsiy oynani ochishingiz mumkin!\n"
     "💬 Yoki menga oddiygina yozing (yoki ovozli xabar yuboring) — hech qanday maxsus "
     "buyruqsiz erkin suhbatlashishimiz mumkin!\n\n"
     "🚀 Boshlash uchun /test buyrug'ini yuboring!"
@@ -769,6 +900,20 @@ async def cmd_reyting(message: Message):
     await message.answer(cert_text)
 
 
+@dp.message(Command("dashboard"))
+async def cmd_dashboard(message: Message):
+    """Dashboard Mini App'ni ochadi: Profil, Reading, Listening, Grammar bo'limlari."""
+    url = f"{WEBHOOK_BASE_URL.rstrip('/')}/miniapp/dashboard?uid={message.from_user.id}"
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="🎓 Dashboard'ni ochish", web_app=WebAppInfo(url=url))]]
+    )
+    await message.answer(
+        "🎓 <b>IELTS Dashboard</b>\n\n"
+        "Profilingiz, Reading, Listening va Grammar materiallarini shu yerdan ko'rishingiz mumkin:",
+        reply_markup=keyboard,
+    )
+
+
 @dp.message(Command("english"))
 async def cmd_english(message: Message, state: FSMContext):
     """Ingliz tili mashq rejimini yoqadi — bot ingliz tilida yozadi,
@@ -848,7 +993,211 @@ async def handle_english_practice_voice(message: Message, state: FSMContext):
     await message.answer(f"🎙 <i>You said:</i> {transcript}\n\n{reply}")
 
 
-@dp.message(Command("tarix"))
+# --- Admin: Dashboard kontentini boshqarish (Reading/Listening/Grammar) --
+
+def _is_admin(user_id: int) -> bool:
+    return bool(ADMIN_USER_ID) and str(user_id) == str(ADMIN_USER_ID)
+
+
+async def _require_admin_and_redis(message: Message) -> bool:
+    """Agar foydalanuvchi admin bo'lmasa yoki Redis ulanmagan bo'lsa, mos
+    xabar yuborib False qaytaradi (chaqiruvchi funksiya to'xtashi kerak)."""
+    if not ADMIN_USER_ID:
+        await message.answer(
+            "⚠️ ADMIN_USER_ID sozlanmagan. Kontent qo'shish uchun avval "
+            "Render'da ADMIN_USER_ID environment variable'ini sozlang."
+        )
+        return False
+    if not _is_admin(message.from_user.id):
+        await message.answer("⛔ Bu buyruq faqat bot egasi (admin) uchun.")
+        return False
+    if redis_client is None:
+        await message.answer("⚠️ Kontent xizmati sozlanmagan (Upstash Redis ulanmagan).")
+        return False
+    return True
+
+
+QUESTIONS_FORMAT_HELP = (
+    "Endi savollarni yuboring (ixtiyoriy). Har bir savolni alohida qatorga, "
+    "quyidagi formatda yozing:\n\n"
+    "<code>Savol matni | Variant A | Variant B | Variant C | Variant D | to'g'ri raqam</code>\n\n"
+    "Masalan:\n"
+    "<code>What is the capital of France? | London | Paris | Rome | Berlin | 2</code>\n\n"
+    "Bir nechta savolni bir nechta qatorda yuborishingiz mumkin. "
+    "Agar savol qo'shmoqchi bo'lmasangiz, shunchaki <b>yo'q</b> deb yozing."
+)
+
+
+@dp.message(Command("add_reading"))
+async def cmd_add_reading(message: Message, state: FSMContext):
+    if not await _require_admin_and_redis(message):
+        return
+    await state.set_state(AdminContentStates.reading_title)
+    await message.answer("📖 <b>Yangi Reading materiali</b>\n\nSarlavhasini yuboring:")
+
+
+@dp.message(AdminContentStates.reading_title, F.text)
+async def admin_reading_title(message: Message, state: FSMContext):
+    await state.update_data(title=message.text.strip())
+    await state.set_state(AdminContentStates.reading_body)
+    await message.answer("Endi o'qish matnini (passage) to'liq yuboring:")
+
+
+@dp.message(AdminContentStates.reading_body, F.text)
+async def admin_reading_body(message: Message, state: FSMContext):
+    await state.update_data(body=message.text.strip())
+    await state.set_state(AdminContentStates.reading_questions)
+    await message.answer(QUESTIONS_FORMAT_HELP)
+
+
+@dp.message(AdminContentStates.reading_questions, F.text)
+async def admin_reading_questions(message: Message, state: FSMContext):
+    questions = _parse_admin_questions_text(message.text)
+    if questions is None:
+        await message.answer("❌ Format noto'g'ri. Iltimos, yuqoridagi formatga qayta amal qilib yuboring, yoki 'yo'q' deb yozing.")
+        return
+
+    data = await state.get_data()
+    item_id = await get_next_content_id("reading")
+    await save_content_item("reading", item_id, {
+        "title": data["title"],
+        "body": data["body"],
+        "questions": questions,
+    })
+    await state.clear()
+    await message.answer(
+        f"✅ Reading materiali qo'shildi! (ID: {item_id})\n"
+        f"📝 Savollar soni: {len(questions)}"
+    )
+
+
+@dp.message(Command("add_grammar"))
+async def cmd_add_grammar(message: Message, state: FSMContext):
+    if not await _require_admin_and_redis(message):
+        return
+    await state.set_state(AdminContentStates.grammar_title)
+    await message.answer("📚 <b>Yangi Grammar/Article materiali</b>\n\nSarlavhasini yuboring:")
+
+
+@dp.message(AdminContentStates.grammar_title, F.text)
+async def admin_grammar_title(message: Message, state: FSMContext):
+    await state.update_data(title=message.text.strip())
+    await state.set_state(AdminContentStates.grammar_body)
+    await message.answer("Endi maqola/qoidalar matnini to'liq yuboring:")
+
+
+@dp.message(AdminContentStates.grammar_body, F.text)
+async def admin_grammar_body(message: Message, state: FSMContext):
+    data = await state.get_data()
+    item_id = await get_next_content_id("grammar")
+    await save_content_item("grammar", item_id, {
+        "title": data["title"],
+        "body": message.text.strip(),
+    })
+    await state.clear()
+    await message.answer(f"✅ Grammar/Article materiali qo'shildi! (ID: {item_id})")
+
+
+@dp.message(Command("add_listening"))
+async def cmd_add_listening(message: Message, state: FSMContext):
+    if not await _require_admin_and_redis(message):
+        return
+    await state.set_state(AdminContentStates.listening_title)
+    await message.answer("🎧 <b>Yangi Listening materiali</b>\n\nSarlavhasini yuboring:")
+
+
+@dp.message(AdminContentStates.listening_title, F.text)
+async def admin_listening_title(message: Message, state: FSMContext):
+    await state.update_data(title=message.text.strip())
+    await state.set_state(AdminContentStates.listening_audio)
+    await message.answer("Endi audio faylni yuboring (voice yoki audio fayl sifatida):")
+
+
+@dp.message(AdminContentStates.listening_audio, F.voice)
+async def admin_listening_audio_voice(message: Message, state: FSMContext):
+    await state.update_data(file_id=message.voice.file_id, file_kind="voice")
+    await state.set_state(AdminContentStates.listening_questions)
+    await message.answer(QUESTIONS_FORMAT_HELP)
+
+
+@dp.message(AdminContentStates.listening_audio, F.audio)
+async def admin_listening_audio_file(message: Message, state: FSMContext):
+    await state.update_data(file_id=message.audio.file_id, file_kind="audio")
+    await state.set_state(AdminContentStates.listening_questions)
+    await message.answer(QUESTIONS_FORMAT_HELP)
+
+
+@dp.message(AdminContentStates.listening_audio)
+async def admin_listening_audio_invalid(message: Message):
+    await message.answer("🎧 Iltimos, audio faylni voice yoki audio ko'rinishida yuboring.")
+
+
+@dp.message(AdminContentStates.listening_questions, F.text)
+async def admin_listening_questions(message: Message, state: FSMContext):
+    questions = _parse_admin_questions_text(message.text)
+    if questions is None:
+        await message.answer("❌ Format noto'g'ri. Iltimos, yuqoridagi formatga qayta amal qilib yuboring, yoki 'yo'q' deb yozing.")
+        return
+
+    data = await state.get_data()
+    item_id = await get_next_content_id("listening")
+    await save_content_item("listening", item_id, {
+        "title": data["title"],
+        "file_id": data["file_id"],
+        "file_kind": data["file_kind"],
+        "questions": questions,
+    })
+    await state.clear()
+    await message.answer(
+        f"✅ Listening materiali qo'shildi! (ID: {item_id})\n"
+        f"📝 Savollar soni: {len(questions)}"
+    )
+
+
+@dp.message(Command("content_list"))
+async def cmd_content_list(message: Message):
+    if not await _require_admin_and_redis(message):
+        return
+
+    lines = ["📂 <b>Barcha dashboard kontenti</b>\n"]
+    for content_type, label in (("reading", "📖 Reading"), ("listening", "🎧 Listening"), ("grammar", "📚 Grammar")):
+        items = await list_content_items(content_type)
+        lines.append(f"{label} ({len(items)} ta):")
+        if not items:
+            lines.append("  — bo'sh —")
+        else:
+            for item in items:
+                q_count = len(item.get("questions", [])) if "questions" in item else None
+                suffix = f" ({q_count} savol)" if q_count else ""
+                lines.append(f"  #{item['id']} — {item.get('title', 'nomsiz')}{suffix}")
+        lines.append("")
+
+    lines.append("O'chirish uchun: /delete_content &lt;tur&gt; &lt;id&gt; (masalan: /delete_content reading 3)")
+    await message.answer("\n".join(lines))
+
+
+@dp.message(Command("delete_content"))
+async def cmd_delete_content(message: Message, command: CommandObject):
+    if not await _require_admin_and_redis(message):
+        return
+
+    args = (command.args or "").split()
+    if len(args) != 2 or args[0] not in CONTENT_TYPES or not args[1].isdigit():
+        await message.answer(
+            "Foydalanish: <code>/delete_content &lt;reading|listening|grammar&gt; &lt;id&gt;</code>\n"
+            "Masalan: <code>/delete_content reading 3</code>"
+        )
+        return
+
+    content_type, item_id_str = args[0], args[1]
+    deleted = await delete_content_item(content_type, int(item_id_str))
+    if deleted:
+        await message.answer(f"🗑 {content_type} #{item_id_str} o'chirildi.")
+    else:
+        await message.answer(f"⚠️ {content_type} #{item_id_str} topilmadi.")
+
+
+
 async def cmd_tarix(message: Message):
     f"""Ketma-ket {HISTORY_QUIZ_LENGTH} ta tasodifiy tarix savolidan iborat viktorina
     sessiyasini boshlaydi. Bu funksiya IELTS imtihon holatidan (FSM state) mustaqil
@@ -1318,7 +1667,406 @@ async def handle_fallback(message: Message):
 
 
 # --------------------------------------------------------------------------
-# 7) AIOHTTP WEB SERVER — HAM HEALTH-CHECK, HAM TELEGRAM WEBHOOK
+# 7) DASHBOARD MINI APP (Telegram WebApp) — Profil, Reading, Listening, Grammar
+# --------------------------------------------------------------------------
+
+DASHBOARD_HTML = """<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>IELTS Dashboard</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: #0f1220; --card: #171b2e; --accent: #6c8bff; --accent2: #ff6cab;
+    --text: #eef0ff; --muted: #9aa0c0; --good: #52d68a; --bad: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 80px;
+  }
+  header { padding: 18px 20px 10px; text-align: center; }
+  header h1 { font-size: 19px; margin: 0; }
+  #tabs {
+    position: sticky; top: 0; z-index: 10; display: flex; background: var(--bg);
+    border-bottom: 1px solid #262b48; padding: 0 8px;
+  }
+  .tab {
+    flex: 1; text-align: center; padding: 12px 4px; font-size: 13px; color: var(--muted);
+    cursor: pointer; border-bottom: 2px solid transparent;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  #content { padding: 16px; }
+  .card {
+    background: var(--card); border-radius: 14px; padding: 16px; margin-bottom: 12px;
+  }
+  .card h3 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 4px 0; color: var(--muted); font-size: 13px; }
+  .pill {
+    display: inline-block; background: #262b48; color: var(--muted); font-size: 11px;
+    padding: 3px 9px; border-radius: 999px; margin-top: 6px;
+  }
+  button.primary {
+    background: linear-gradient(90deg, var(--accent), var(--accent2)); color: white;
+    border: none; border-radius: 10px; padding: 10px 18px; font-size: 14px;
+    font-weight: 600; cursor: pointer; margin-top: 10px;
+  }
+  button.secondary {
+    background: #262b48; color: var(--text); border: none; border-radius: 10px;
+    padding: 10px 18px; font-size: 14px; cursor: pointer; margin-top: 10px; margin-right: 8px;
+  }
+  .option-btn {
+    display: block; width: 100%; text-align: left; background: #1f2440; color: var(--text);
+    border: 1px solid #2e3358; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+    font-size: 14px; cursor: pointer;
+  }
+  .option-btn.correct { background: rgba(82,214,138,0.18); border-color: var(--good); }
+  .option-btn.wrong { background: rgba(255,107,107,0.18); border-color: var(--bad); }
+  .body-text { white-space: pre-wrap; line-height: 1.6; font-size: 14px; color: var(--text); }
+  #back-btn { color: var(--accent); font-size: 13px; cursor: pointer; margin-bottom: 12px; display: inline-block; }
+  .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #262b48; font-size: 13px; }
+  .stat-row:last-child { border-bottom: none; }
+  .loading { text-align: center; color: var(--muted); padding: 40px 0; font-size: 13px; }
+  audio { width: 100%; margin-top: 10px; }
+</style>
+</head>
+<body>
+<header><h1>🎓 IELTS Dashboard</h1></header>
+<div id="tabs">
+  <div class="tab active" data-tab="profile">👤 Profil</div>
+  <div class="tab" data-tab="reading">📖 Reading</div>
+  <div class="tab" data-tab="listening">🎧 Listening</div>
+  <div class="tab" data-tab="grammar">📚 Grammar</div>
+</div>
+<div id="content"><div class="loading">Yuklanmoqda…</div></div>
+
+<script>
+(function () {
+  const tg = window.Telegram ? window.Telegram.WebApp : null;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  const params = new URLSearchParams(window.location.search);
+  let uid = params.get("uid") || "anonymous";
+  try {
+    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+      uid = String(tg.initDataUnsafe.user.id);
+    }
+  } catch (e) {}
+
+  const contentEl = document.getElementById("content");
+  const tabs = document.querySelectorAll(".tab");
+  let currentTab = "profile";
+
+  tabs.forEach((t) => {
+    t.addEventListener("click", () => {
+      tabs.forEach((x) => x.classList.remove("active"));
+      t.classList.add("active");
+      currentTab = t.dataset.tab;
+      render(currentTab);
+    });
+  });
+
+  function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  async function fetchJSON(url, opts) {
+    const resp = await fetch(url, opts);
+    return await resp.json();
+  }
+
+  async function render(tab) {
+    contentEl.innerHTML = '<div class="loading">Yuklanmoqda…</div>';
+    if (tab === "profile") return renderProfile();
+    if (tab === "reading") return renderList("reading");
+    if (tab === "listening") return renderList("listening");
+    if (tab === "grammar") return renderList("grammar");
+  }
+
+  async function renderProfile() {
+    try {
+      const data = await fetchJSON("/api/dashboard/profile?uid=" + encodeURIComponent(uid));
+      let html = '<div class="card"><h3>' + escapeHtml(data.name || "Foydalanuvchi") + '</h3>';
+      html += '<div class="stat-row"><span>🏆 Tarix viktorinasi (eng yaxshi)</span><span>' + (data.tarix_best !== null ? data.tarix_best + '%' : '—') + '</span></div>';
+      html += '<div class="stat-row"><span>🎓 Sertifikat testi (eng yaxshi)</span><span>' + (data.cert_best !== null ? data.cert_best + '%' : '—') + '</span></div>';
+      html += '<div class="stat-row"><span>📖 Reading testlari yechilgan</span><span>' + data.reading_done + '</span></div>';
+      html += '<div class="stat-row"><span>🎧 Listening testlari yechilgan</span><span>' + data.listening_done + '</span></div>';
+      if (data.tarix_rank) html += '<div class="stat-row"><span>Tarix reytingidagi o\'rni</span><span>#' + data.tarix_rank + '</span></div>';
+      if (data.cert_rank) html += '<div class="stat-row"><span>Sertifikat reytingidagi o\'rni</span><span>#' + data.cert_rank + '</span></div>';
+      html += '</div>';
+      contentEl.innerHTML = html;
+    } catch (e) {
+      contentEl.innerHTML = '<div class="loading">Xatolik yuz berdi.</div>';
+    }
+  }
+
+  async function renderList(type) {
+    try {
+      const items = await fetchJSON("/api/dashboard/content/" + type);
+      if (!items.length) {
+        contentEl.innerHTML = '<div class="loading">Hozircha kontent yo\'q.</div>';
+        return;
+      }
+      let html = "";
+      items.forEach((item) => {
+        html += '<div class="card" data-id="' + item.id + '">';
+        html += '<h3>' + escapeHtml(item.title) + '</h3>';
+        if (item.has_questions) html += '<span class="pill">📝 ' + item.question_count + ' ta savol</span>';
+        else html += '<span class="pill">O\'qish/tinglash uchun</span>';
+        html += '<br><button class="primary" onclick="window.__openItem(\'' + type + '\',' + item.id + ')">Ochish</button>';
+        html += '</div>';
+      });
+      contentEl.innerHTML = html;
+    } catch (e) {
+      contentEl.innerHTML = '<div class="loading">Xatolik yuz berdi.</div>';
+    }
+  }
+
+  window.__openItem = async function (type, id) {
+    contentEl.innerHTML = '<div class="loading">Yuklanmoqda…</div>';
+    const item = await fetchJSON("/api/dashboard/content/" + type + "/" + id);
+
+    let html = '<div id="back-btn" onclick="window.__back(\'' + type + '\')">← Orqaga</div>';
+    html += '<div class="card"><h3>' + escapeHtml(item.title) + '</h3>';
+    if (item.body) html += '<div class="body-text">' + escapeHtml(item.body) + '</div>';
+    if (type === "listening") {
+      html += '<audio controls src="/api/dashboard/audio/' + id + '"></audio>';
+    }
+    html += '</div>';
+
+    if (item.questions && item.questions.length) {
+      html += '<div id="quiz-area"></div>';
+      contentEl.innerHTML = html;
+      renderQuiz(type, id, item.questions);
+    } else {
+      contentEl.innerHTML = html;
+    }
+  };
+
+  window.__back = function (type) { render(type); };
+
+  function renderQuiz(type, id, questions) {
+    const quizArea = document.getElementById("quiz-area");
+    const answers = new Array(questions.length).fill(null);
+    let currentQ = 0;
+
+    function renderQuestion() {
+      const q = questions[currentQ];
+      let html = '<div class="card"><p>Savol ' + (currentQ + 1) + '/' + questions.length + '</p>';
+      html += '<h3>' + escapeHtml(q.question) + '</h3>';
+      q.options.forEach((opt, i) => {
+        html += '<button class="option-btn" data-i="' + i + '">' + escapeHtml(opt) + '</button>';
+      });
+      html += '</div>';
+      quizArea.innerHTML = html;
+      quizArea.querySelectorAll(".option-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          answers[currentQ] = parseInt(btn.dataset.i, 10);
+          currentQ++;
+          if (currentQ < questions.length) renderQuestion();
+          else submitQuiz();
+        });
+      });
+    }
+
+    async function submitQuiz() {
+      quizArea.innerHTML = '<div class="loading">Baholanmoqda…</div>';
+      const result = await fetchJSON("/api/dashboard/content/" + type + "/" + id + "/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: uid, answers: answers }),
+      });
+      let html = '<div class="card"><h3>🏁 Natija: ' + result.score + '/' + result.total + ' (' + result.percentage + '%)</h3>';
+      html += '<button class="secondary" onclick="window.__back(\'' + type + '\')">Ro\'yxatga qaytish</button>';
+      html += '</div>';
+      quizArea.innerHTML = html;
+    }
+
+    renderQuestion();
+  }
+
+  render(currentTab);
+})();
+</script>
+</body>
+</html>
+"""
+
+
+async def dashboard_page(request: web.Request):
+    return web.Response(text=DASHBOARD_HTML, content_type="text/html")
+
+
+async def api_dashboard_profile(request: web.Request):
+    uid = request.query.get("uid", "")
+    name = "Foydalanuvchi"
+    try:
+        chat = await bot.get_chat(int(uid))
+        name = chat.full_name or (f"@{chat.username}" if chat.username else name)
+    except Exception:
+        pass
+
+    tarix_best = None
+    cert_best = None
+    tarix_rank = None
+    cert_rank = None
+
+    if redis_client is not None:
+        try:
+            score = await redis_client.zscore(LEADERBOARD_TARIX_KEY, uid)
+            if score is not None:
+                tarix_best = int(float(score))
+                entries = await get_leaderboard_entries(LEADERBOARD_TARIX_KEY, top_n=10_000)
+                for i, (member, _) in enumerate(entries):
+                    if member == uid:
+                        tarix_rank = i + 1
+                        break
+        except Exception as e:
+            logger.warning("Profil (tarix) o'qishda xatolik: %s", e)
+
+        try:
+            score = await redis_client.zscore(LEADERBOARD_CERT_KEY, uid)
+            if score is not None:
+                cert_best = int(float(score))
+                entries = await get_leaderboard_entries(LEADERBOARD_CERT_KEY, top_n=10_000)
+                for i, (member, _) in enumerate(entries):
+                    if member == uid:
+                        cert_rank = i + 1
+                        break
+        except Exception as e:
+            logger.warning("Profil (sertifikat) o'qishda xatolik: %s", e)
+
+    reading_done = 0
+    listening_done = 0
+    if redis_client is not None:
+        try:
+            reading_done = await redis_client.scard(f"ielts_bot:done:reading:{uid}") or 0
+            listening_done = await redis_client.scard(f"ielts_bot:done:listening:{uid}") or 0
+        except Exception as e:
+            logger.warning("Profil (done-sets) o'qishda xatolik: %s", e)
+
+    return web.json_response({
+        "name": name,
+        "tarix_best": tarix_best,
+        "cert_best": cert_best,
+        "tarix_rank": tarix_rank,
+        "cert_rank": cert_rank,
+        "reading_done": int(reading_done),
+        "listening_done": int(listening_done),
+    })
+
+
+async def api_dashboard_content_list(request: web.Request):
+    content_type = request.match_info.get("type")
+    if content_type not in CONTENT_TYPES:
+        return web.json_response({"error": "unknown content type"}, status=404)
+
+    items = await list_content_items(content_type)
+    result = []
+    for item in items:
+        questions = item.get("questions", [])
+        result.append({
+            "id": item["id"],
+            "title": item.get("title", ""),
+            "has_questions": bool(questions),
+            "question_count": len(questions),
+        })
+    return web.json_response(result)
+
+
+async def api_dashboard_content_detail(request: web.Request):
+    content_type = request.match_info.get("type")
+    if content_type not in CONTENT_TYPES:
+        return web.json_response({"error": "unknown content type"}, status=404)
+
+    try:
+        item_id = int(request.match_info.get("id"))
+    except ValueError:
+        return web.json_response({"error": "invalid id"}, status=400)
+
+    item = await get_content_item(content_type, item_id)
+    if item is None:
+        return web.json_response({"error": "not found"}, status=404)
+
+    # Diqqat: to'g'ri javob indekslari (correct_index) MIJOZGA yuborilmaydi —
+    # aks holda foydalanuvchi brauzer orqali to'g'ri javoblarni ko'rib olishi mumkin.
+    safe_questions = [
+        {"question": q["question"], "options": q["options"]}
+        for q in item.get("questions", [])
+    ]
+
+    return web.json_response({
+        "id": item_id,
+        "title": item.get("title", ""),
+        "body": item.get("body"),
+        "questions": safe_questions,
+    })
+
+
+async def api_dashboard_content_submit(request: web.Request):
+    content_type = request.match_info.get("type")
+    if content_type not in CONTENT_TYPES:
+        return web.json_response({"error": "unknown content type"}, status=404)
+
+    try:
+        item_id = int(request.match_info.get("id"))
+        body = await request.json()
+        uid = str(body.get("uid", "anonymous"))
+        user_answers = body.get("answers", [])
+    except Exception:
+        return web.json_response({"error": "invalid request"}, status=400)
+
+    item = await get_content_item(content_type, item_id)
+    if item is None:
+        return web.json_response({"error": "not found"}, status=404)
+
+    questions = item.get("questions", [])
+    total = len(questions)
+    score = 0
+    for i, q in enumerate(questions):
+        if i < len(user_answers) and user_answers[i] == q.get("correct_index"):
+            score += 1
+
+    percentage = round((score / total) * 100) if total else 0
+
+    if redis_client is not None:
+        try:
+            await redis_client.sadd(f"ielts_bot:done:{content_type}:{uid}", str(item_id))
+        except Exception as e:
+            logger.warning("Done-set yozishda xatolik: %s", e)
+
+    return web.json_response({"score": score, "total": total, "percentage": percentage})
+
+
+async def api_dashboard_audio(request: web.Request):
+    """Listening kontenti uchun audio faylni Telegram'dan (file_id orqali)
+    olib, brauzerga proxy qiladi — bot tokenini mijozga hech qachon ochmaydi."""
+    try:
+        item_id = int(request.match_info.get("id"))
+    except ValueError:
+        return web.Response(status=400)
+
+    item = await get_content_item("listening", item_id)
+    if item is None or "file_id" not in item:
+        return web.Response(status=404)
+
+    try:
+        file = await bot.get_file(item["file_id"])
+        buf = await bot.download_file(file.file_path)
+        data = buf.read()
+    except Exception as e:
+        logger.exception("Audio proxy xatolik: %s", e)
+        return web.Response(status=500)
+
+    return web.Response(body=data, content_type="audio/ogg")
+
+
+# --------------------------------------------------------------------------
+# 8) AIOHTTP WEB SERVER — HEALTH-CHECK, TELEGRAM WEBHOOK, DASHBOARD MINI APP
 #    (Render "Web Service" doim ochiq portni talab qiladi; shu server orqali
 #    Telegram to'g'ridan-to'g'ri /webhook manziliga yangilanish yuboradi)
 # --------------------------------------------------------------------------
@@ -1352,6 +2100,14 @@ def create_app() -> web.Application:
     app = web.Application()
     app.router.add_get("/", health)
 
+    # Dashboard Mini App — sahifa va API endpointlari
+    app.router.add_get("/miniapp/dashboard", dashboard_page)
+    app.router.add_get("/api/dashboard/profile", api_dashboard_profile)
+    app.router.add_get("/api/dashboard/content/{type}", api_dashboard_content_list)
+    app.router.add_get("/api/dashboard/content/{type}/{id}", api_dashboard_content_detail)
+    app.router.add_post("/api/dashboard/content/{type}/{id}/submit", api_dashboard_content_submit)
+    app.router.add_get("/api/dashboard/audio/{id}", api_dashboard_audio)
+
     SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
@@ -1366,7 +2122,7 @@ def create_app() -> web.Application:
 
 
 # --------------------------------------------------------------------------
-# 8) BOT BUYRUQLAR MENYUSI (Telegram'da "/" bosilganda avtomatik chiqadigan
+# 9) BOT BUYRUQLAR MENYUSI (Telegram'da "/" bosilganda avtomatik chiqadigan
 #    ro'yxat — foydalanuvchi "/ta" deb yozsa, mos buyruqlar filtrlanib ko'rsatiladi)
 # --------------------------------------------------------------------------
 
@@ -1379,6 +2135,7 @@ async def setup_bot_commands():
         BotCommand(command="stats", description="Bot statistikasini ko'rish"),
         BotCommand(command="reyting", description="TOP 10 reyting jadvalini ko'rish"),
         BotCommand(command="english", description="Ingliz tili mashq rejimi (xatolarni tuzatadi)"),
+        BotCommand(command="dashboard", description="Dashboard: Profil, Reading, Listening, Grammar"),
         BotCommand(command="stop", description="Joriy testni to'xtatish / suhbatni tozalash"),
     ]
     await bot.set_my_commands(commands)
