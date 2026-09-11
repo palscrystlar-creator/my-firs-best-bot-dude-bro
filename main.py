@@ -118,6 +118,8 @@ BOT_USERS_SET_KEY = "ielts_bot:unique_users"
 BOT_STARTS_COUNTER_KEY = "ielts_bot:total_starts"
 LEADERBOARD_TARIX_KEY = "ielts_bot:leaderboard:tarix"
 LEADERBOARD_CERT_KEY = "ielts_bot:leaderboard:sertifikat"
+LEADERBOARD_READING_KEY = "ielts_bot:leaderboard:reading"
+LEADERBOARD_LISTENING_KEY = "ielts_bot:leaderboard:listening"
 LEADERBOARD_TOP_N = 10
 # Ixtiyoriy: /stats buyrug'ini faqat shu Telegram user_id egasiga cheklash uchun.
 # Agar bo'sh qoldirilsa, /stats hamma uchun ochiq bo'ladi.
@@ -601,6 +603,116 @@ def _generate_history_quiz_set_sync(count: int) -> list:
     return all_questions[:count]
 
 
+# --- Authentik IELTS Reading/Listening testlari (AI generatsiya) --------
+
+READING_TEST_QUESTIONS_COUNT = 6
+LISTENING_TEST_QUESTIONS_COUNT = 5
+
+READING_TOPICS = [
+    "climate change and the environment",
+    "the history of a scientific discovery",
+    "urbanization and city planning",
+    "animal behavior and wildlife conservation",
+    "the impact of technology on society",
+    "ancient civilizations and archaeology",
+    "renewable energy sources",
+    "psychology and human behavior",
+    "space exploration",
+    "economic globalization",
+]
+
+LISTENING_TOPICS = [
+    "a conversation about booking accommodation",
+    "a university lecture about a scientific topic",
+    "a conversation between a student and a course advisor",
+    "a guided tour description of a museum or landmark",
+    "a phone conversation about arranging an event",
+    "a workplace conversation about a project",
+    "a conversation about renting an apartment",
+    "an informational talk about a community service",
+]
+
+
+def _generate_reading_test_sync() -> dict:
+    """Groq (LLM) orqali IELTS Academic Reading uslubidagi original passage
+    va unga oid ko'p variantli (ABCD) savollarni generatsiya qiladi."""
+    import random
+    topic = random.choice(READING_TOPICS)
+    prompt = (
+        "You are an IELTS test material writer. Write an original IELTS Academic Reading "
+        f"passage (300-400 words) about {topic}, in a formal academic style similar to real "
+        f"IELTS Reading passages. Then write {READING_TEST_QUESTIONS_COUNT} multiple-choice "
+        "comprehension questions about the passage.\n\n"
+        "Respond ONLY with valid JSON in this exact format, no extra text:\n"
+        "{\n"
+        '  "passage": "the full passage text",\n'
+        '  "questions": [\n'
+        "    {\n"
+        '      "question": "question text",\n'
+        '      "options": ["A", "B", "C", "D"],\n'
+        '      "correct_index": 0,\n'
+        '      "explanation": "brief explanation of the correct answer"\n'
+        "    }\n"
+        f"    // ... total {READING_TEST_QUESTIONS_COUNT} questions\n"
+        "  ]\n"
+        "}"
+    )
+    completion = groq_client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.9,
+        response_format={"type": "json_object"},
+    )
+    data = json.loads(completion.choices[0].message.content)
+    questions = [
+        q for q in data.get("questions", [])
+        if isinstance(q.get("options"), list) and len(q["options"]) >= 2
+        and isinstance(q.get("correct_index"), int) and 0 <= q["correct_index"] < len(q["options"])
+        and q.get("question")
+    ]
+    return {"passage": data.get("passage", ""), "questions": questions[:READING_TEST_QUESTIONS_COUNT]}
+
+
+def _generate_listening_test_sync() -> dict:
+    """Groq (LLM) orqali IELTS Listening uslubidagi original skript (dialog/monolog)
+    va unga oid ko'p variantli (ABCD) savollarni generatsiya qiladi."""
+    import random
+    topic = random.choice(LISTENING_TOPICS)
+    prompt = (
+        "You are an IELTS test material writer. Write an original IELTS Listening script "
+        f"(150-250 words) about {topic}, written as natural spoken dialogue or narration "
+        f"suitable to be read aloud. Then write {LISTENING_TEST_QUESTIONS_COUNT} multiple-choice "
+        "comprehension questions about the script content.\n\n"
+        "Respond ONLY with valid JSON in this exact format, no extra text:\n"
+        "{\n"
+        '  "script": "the full spoken script text, plain narration without speaker labels",\n'
+        '  "questions": [\n'
+        "    {\n"
+        '      "question": "question text",\n'
+        '      "options": ["A", "B", "C", "D"],\n'
+        '      "correct_index": 0,\n'
+        '      "explanation": "brief explanation of the correct answer"\n'
+        "    }\n"
+        f"    // ... total {LISTENING_TEST_QUESTIONS_COUNT} questions\n"
+        "  ]\n"
+        "}"
+    )
+    completion = groq_client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.9,
+        response_format={"type": "json_object"},
+    )
+    data = json.loads(completion.choices[0].message.content)
+    questions = [
+        q for q in data.get("questions", [])
+        if isinstance(q.get("options"), list) and len(q["options"]) >= 2
+        and isinstance(q.get("correct_index"), int) and 0 <= q["correct_index"] < len(q["options"])
+        and q.get("question")
+    ]
+    return {"script": data.get("script", ""), "questions": questions[:LISTENING_TEST_QUESTIONS_COUNT]}
+
+
 def _build_history_question_view(quiz: dict, idx: int):
     """Berilgan indeksdagi savol uchun matn va inline tugmalarni tayyorlaydi."""
     q = quiz["questions"][idx]
@@ -611,7 +723,13 @@ def _build_history_question_view(quiz: dict, idx: int):
         for i, opt in enumerate(q["options"])
     ]
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-    mode_label = "🎓 Sertifikat testi" if quiz.get("mode") == "certificate" else "📜 Tarix savoli"
+    mode_labels = {
+        "certificate": "🎓 Sertifikat testi",
+        "quiz": "📜 Tarix savoli",
+        "reading": "📖 Reading testi",
+        "listening": "🎧 Listening testi",
+    }
+    mode_label = mode_labels.get(quiz.get("mode"), "📜 Savol")
     text = f"{mode_label} — <b>{idx + 1}/{total}:</b>\n\n{q['question']}"
     return text, keyboard
 
@@ -806,6 +924,7 @@ WELCOME_TEXT = (
     "• Testni istalgan vaqtda /stop bilan to'xtatishingiz mumkin.\n\n"
     "🎲 Bonus: /tarix buyrug'i bilan ketma-ket 10 ta tarix savolidan iborat viktorina o'ynashingiz mumkin!\n"
     "🎓 /sertifikat bilan esa 25 ta savolli test topshirib, natijangiz yetarli bo'lsa sertifikat olishingiz mumkin!\n"
+    "📖 /reading_test va 🎧 /listening_test bilan AI generatsiya qilgan haqiqiy IELTS uslubidagi Reading/Listening testlarini yechishingiz mumkin!\n"
     "🏆 /reyting bilan eng yaxshi natijalar jadvalini ko'rishingiz mumkin!\n"
     "🇬🇧 /english bilan ingliz tilida erkin suhbatlashib, xatolaringizni tuzatib olishingiz mumkin!\n"
     "🎓 /dashboard bilan esa Profil, Reading, Listening va Grammar bo'limlariga ega shaxsiy oynani ochishingiz mumkin!\n"
@@ -895,9 +1014,17 @@ async def cmd_reyting(message: Message):
     cert_text = await format_leaderboard_text(
         "🎓 <b>Sertifikat testi reytingi</b> (TOP 10)", LEADERBOARD_CERT_KEY
     )
+    reading_text = await format_leaderboard_text(
+        "📖 <b>Reading testi reytingi</b> (TOP 10)", LEADERBOARD_READING_KEY
+    )
+    listening_text = await format_leaderboard_text(
+        "🎧 <b>Listening testi reytingi</b> (TOP 10)", LEADERBOARD_LISTENING_KEY
+    )
 
     await message.answer(tarix_text)
     await message.answer(cert_text)
+    await message.answer(reading_text)
+    await message.answer(listening_text)
 
 
 @dp.message(Command("dashboard"))
@@ -1266,6 +1393,93 @@ async def cmd_sertifikat(message: Message):
     await prep_msg.edit_text(text, reply_markup=keyboard)
 
 
+@dp.message(Command("reading_test"))
+async def cmd_reading_test(message: Message):
+    """AI orqali original IELTS Academic Reading uslubidagi passage va
+    savollarni generatsiya qilib, testni boshlaydi."""
+    prep_msg = await message.answer("⏳ Reading testi tayyorlanmoqda... (bu biroz vaqt olishi mumkin)")
+
+    try:
+        data = await asyncio.to_thread(_generate_reading_test_sync)
+        questions = data["questions"]
+        passage = data["passage"]
+        if not questions or not passage:
+            raise ValueError("Reading testi to'liq generatsiya qilinmadi")
+    except Exception as e:
+        logger.exception("Reading testini generatsiya qilishda xatolik: %s", e)
+        await prep_msg.edit_text("❌ Testni tayyorlashda xatolik yuz berdi. Iltimos /reading_test bilan qayta urinib ko'ring.")
+        return
+
+    active_history_quizzes[message.from_user.id] = {
+        "questions": questions,
+        "idx": 0,
+        "score": 0,
+        "mode": "reading",
+    }
+
+    try:
+        await prep_msg.delete()
+    except Exception:
+        pass
+
+    await message.answer(f"📖 <b>Reading Passage</b>\n\n{passage}")
+    await message.answer(f"Endi quyidagi {len(questions)} ta savolga javob bering:")
+
+    text, keyboard = _build_history_question_view(active_history_quizzes[message.from_user.id], 0)
+    await message.answer(text, reply_markup=keyboard)
+
+
+@dp.message(Command("listening_test"))
+async def cmd_listening_test(message: Message):
+    """AI orqali original IELTS Listening uslubidagi skript generatsiya qilib,
+    uni ovozga aylantirib yuboradi va savollar bilan testni boshlaydi."""
+    prep_msg = await message.answer("⏳ Listening testi tayyorlanmoqda... (bu biroz vaqt olishi mumkin)")
+
+    try:
+        data = await asyncio.to_thread(_generate_listening_test_sync)
+        questions = data["questions"]
+        script = data["script"]
+        if not questions or not script:
+            raise ValueError("Listening testi to'liq generatsiya qilinmadi")
+    except Exception as e:
+        logger.exception("Listening testini generatsiya qilishda xatolik: %s", e)
+        await prep_msg.edit_text("❌ Testni tayyorlashda xatolik yuz berdi. Iltimos /listening_test bilan qayta urinib ko'ring.")
+        return
+
+    active_history_quizzes[message.from_user.id] = {
+        "questions": questions,
+        "idx": 0,
+        "score": 0,
+        "mode": "listening",
+    }
+
+    try:
+        await prep_msg.delete()
+    except Exception:
+        pass
+
+    user_dir = _user_dir(message.from_user.id)
+    ogg_path = os.path.join(user_dir, f"listening_test_{secrets.token_hex(6)}.ogg")
+    try:
+        await asyncio.to_thread(_text_to_speech_ogg_sync, script, ogg_path)
+        await message.answer("🎧 <b>Listening — tinglang va savollarga javob bering:</b>")
+        await message.answer_voice(FSInputFile(ogg_path))
+    except Exception as e:
+        logger.exception("Listening audio yaratishda xatolik: %s", e)
+        await message.answer("⚠️ Audio yaratib bo'lmadi, lekin matn asosida davom etamiz:\n\n" + script)
+    finally:
+        if os.path.exists(ogg_path):
+            try:
+                os.remove(ogg_path)
+            except OSError:
+                pass
+
+    await message.answer(f"Endi quyidagi {len(questions)} ta savolga javob bering:")
+
+    text, keyboard = _build_history_question_view(active_history_quizzes[message.from_user.id], 0)
+    await message.answer(text, reply_markup=keyboard)
+
+
 @dp.callback_query(F.data.startswith("histans:"))
 async def handle_history_answer(callback: CallbackQuery):
     user_id = callback.from_user.id
@@ -1365,6 +1579,30 @@ async def handle_history_answer(callback: CallbackQuery):
                 "Ko'proq mashq qilib, yana urinib ko'ring!\n\n"
                 "🔁 Qayta urinish uchun /sertifikat yuboring."
             )
+        return
+
+    if mode in ("reading", "listening"):
+        leaderboard_key = LEADERBOARD_READING_KEY if mode == "reading" else LEADERBOARD_LISTENING_KEY
+        await update_leaderboard(leaderboard_key, user_id, percentage)
+
+        icon = "📖" if mode == "reading" else "🎧"
+        label = "Reading" if mode == "reading" else "Listening"
+        next_cmd = "/reading_test" if mode == "reading" else "/listening_test"
+
+        if percentage >= 80:
+            verdict = "🏆 Ajoyib natija!"
+        elif percentage >= 50:
+            verdict = "👍 Yomon emas, yana mashq qiling!"
+        else:
+            verdict = "📚 Ko'proq mashq qilish kerak."
+
+        summary = (
+            f"🏁 <b>{icon} {label} testi yakunlandi!</b>\n\n"
+            f"🎯 Natijangiz: <b>{score}/{total}</b> ({percentage}%)\n\n"
+            f"{verdict}\n\n"
+            f"🔁 Yangi test uchun {next_cmd}, reytingni ko'rish uchun /reyting yuboring."
+        )
+        await callback.message.answer(summary)
         return
 
     # Oddiy /tarix viktorinasi yakuni
@@ -2132,6 +2370,8 @@ async def setup_bot_commands():
         BotCommand(command="test", description="Yangi IELTS Speaking mock testini boshlash"),
         BotCommand(command="tarix", description="10 ta ketma-ket tarix savoli viktorinasi"),
         BotCommand(command="sertifikat", description="25 ta savolli sertifikat testi"),
+        BotCommand(command="reading_test", description="AI generatsiya qilgan IELTS Reading testi"),
+        BotCommand(command="listening_test", description="AI generatsiya qilgan IELTS Listening testi"),
         BotCommand(command="stats", description="Bot statistikasini ko'rish"),
         BotCommand(command="reyting", description="TOP 10 reyting jadvalini ko'rish"),
         BotCommand(command="english", description="Ingliz tili mashq rejimi (xatolarni tuzatadi)"),
