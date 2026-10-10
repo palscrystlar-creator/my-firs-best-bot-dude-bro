@@ -125,6 +125,19 @@ LEADERBOARD_TOP_N = 10
 # Agar bo'sh qoldirilsa, /stats hamma uchun ochiq bo'ladi.
 ADMIN_USER_ID = os.getenv("ADMIN_USER_ID")
 
+# --- Majburiy obuna (kanal) ----------------------------------------------
+# REQUIRED_CHANNEL — kanal username'i (masalan "@mening_kanalim") yoki
+# raqamli ID (masalan "-1001234567890"). Bo'sh qoldirilsa, tekshiruv o'chirilgan.
+# MUHIM: bot shu kanalda ADMIN bo'lishi shart, aks holda a'zolikni tekshira olmaydi.
+REQUIRED_CHANNEL = (os.getenv("REQUIRED_CHANNEL") or "").strip()
+if REQUIRED_CHANNEL and not REQUIRED_CHANNEL.startswith(("@", "-")):
+    REQUIRED_CHANNEL = "@" + REQUIRED_CHANNEL
+# Kanalga o'tish tugmasi uchun havola. Username bo'lsa avtomatik yasaladi;
+# yopiq kanal bo'lsa, taklif havolasini REQUIRED_CHANNEL_LINK orqali bering.
+REQUIRED_CHANNEL_LINK = (os.getenv("REQUIRED_CHANNEL_LINK") or "").strip()
+if not REQUIRED_CHANNEL_LINK and REQUIRED_CHANNEL.startswith("@"):
+    REQUIRED_CHANNEL_LINK = f"https://t.me/{REQUIRED_CHANNEL[1:]}"
+
 # --------------------------------------------------------------------------
 # 2) LOGGING
 # --------------------------------------------------------------------------
@@ -358,6 +371,98 @@ class UserTrackingMiddleware(BaseMiddleware):
 
 dp.message.outer_middleware(UserTrackingMiddleware())
 dp.callback_query.outer_middleware(UserTrackingMiddleware())
+
+
+# --- Majburiy obuna tekshiruvi -------------------------------------------
+
+CHECK_SUB_CALLBACK = "checksub"
+_SUBSCRIBED_STATUSES = {"creator", "administrator", "member"}
+
+
+async def is_user_subscribed(user_id: int) -> bool:
+    """Foydalanuvchi REQUIRED_CHANNEL a'zosimi, tekshiradi. Agar tekshirib bo'lmasa
+    (masalan bot kanalda admin emas), botni butunlay bloklab qo'ymaslik uchun
+    True qaytaradi va xatolikni logga yozadi."""
+    try:
+        member = await bot.get_chat_member(chat_id=REQUIRED_CHANNEL, user_id=user_id)
+        status = getattr(member.status, "value", member.status)
+        return status in _SUBSCRIBED_STATUSES
+    except Exception as e:
+        logger.warning(
+            "Obunani tekshirib bo'lmadi (bot kanalda admin ekanini va "
+            "REQUIRED_CHANNEL to'g'riligini tekshiring): %s", e
+        )
+        return True
+
+
+def _subscribe_keyboard() -> InlineKeyboardMarkup:
+    rows = []
+    if REQUIRED_CHANNEL_LINK:
+        rows.append([InlineKeyboardButton(text="📢 Kanalga obuna bo'lish", url=REQUIRED_CHANNEL_LINK)])
+    rows.append([InlineKeyboardButton(text="✅ Tekshirish", callback_data=CHECK_SUB_CALLBACK)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+SUBSCRIBE_TEXT = (
+    "📢 <b>Botdan foydalanish uchun kanalimizga obuna bo'ling!</b>\n\n"
+    "1️⃣ Pastdagi tugma orqali kanalga o'ting va obuna bo'ling.\n"
+    "2️⃣ Keyin <b>✅ Tekshirish</b> tugmasini bosing."
+)
+
+
+class SubscriptionMiddleware(BaseMiddleware):
+    """Foydalanuvchi kanalga obuna bo'lmaguncha botning hech bir buyrug'iga
+    ruxsat bermaydi — faqat obuna bo'lish va tekshirish tugmalarini ko'rsatadi."""
+
+    async def __call__(self, handler, event, data):
+        if not REQUIRED_CHANNEL:
+            return await handler(event, data)
+
+        user = getattr(event, "from_user", None)
+        if user is None or user.is_bot:
+            return await handler(event, data)
+
+        # Admin har doim o'tkaziladi
+        if ADMIN_USER_ID and str(user.id) == str(ADMIN_USER_ID):
+            return await handler(event, data)
+
+        # "Tekshirish" tugmasi o'zining handleriga o'tishi kerak
+        if isinstance(event, CallbackQuery) and event.data == CHECK_SUB_CALLBACK:
+            return await handler(event, data)
+
+        if await is_user_subscribed(user.id):
+            return await handler(event, data)
+
+        if isinstance(event, CallbackQuery):
+            await event.answer("Avval kanalga obuna bo'ling!", show_alert=True)
+            if event.message:
+                try:
+                    await event.message.answer(SUBSCRIBE_TEXT, reply_markup=_subscribe_keyboard())
+                except Exception:
+                    pass
+        elif isinstance(event, Message):
+            await event.answer(SUBSCRIBE_TEXT, reply_markup=_subscribe_keyboard())
+        return None
+
+
+# Har bir xabar va tugma bosilishida (handlerlardan oldin) ishlaydi.
+dp.message.outer_middleware(SubscriptionMiddleware())
+dp.callback_query.outer_middleware(SubscriptionMiddleware())
+
+
+@dp.callback_query(F.data == CHECK_SUB_CALLBACK)
+async def handle_check_subscription(callback: CallbackQuery):
+    if not REQUIRED_CHANNEL or await is_user_subscribed(callback.from_user.id):
+        await callback.answer("✅ Rahmat! Obuna tasdiqlandi.", show_alert=False)
+        try:
+            await callback.message.edit_text(
+                "✅ <b>Obuna tasdiqlandi!</b>\n\n"
+                "Endi botdan to'liq foydalanishingiz mumkin. Boshlash uchun /start yuboring."
+            )
+        except Exception:
+            pass
+    else:
+        await callback.answer("❌ Siz hali obuna bo'lmagansiz. Avval kanalga obuna bo'ling.", show_alert=True)
 
 
 # --------------------------------------------------------------------------
