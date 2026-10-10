@@ -40,7 +40,8 @@ import tempfile
 import shutil
 import secrets
 import base64
-from datetime import datetime
+import html
+from datetime import datetime, timedelta, timezone
 
 from aiogram import Bot, Dispatcher, F, BaseMiddleware
 from aiogram.client.default import DefaultBotProperties
@@ -116,7 +117,7 @@ UPSTASH_REDIS_REST_URL = os.getenv("UPSTASH_REDIS_REST_URL")
 UPSTASH_REDIS_REST_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN")
 BOT_USERS_SET_KEY = "ielts_bot:unique_users"
 BOT_STARTS_COUNTER_KEY = "ielts_bot:total_starts"
-LEADERBOARD_TARIX_KEY = "ielts_bot:leaderboard:tarix"
+LEADERBOARD_QUIZ_KEY = "ielts_bot:leaderboard:quiz"
 LEADERBOARD_CERT_KEY = "ielts_bot:leaderboard:sertifikat"
 LEADERBOARD_READING_KEY = "ielts_bot:leaderboard:reading"
 LEADERBOARD_LISTENING_KEY = "ielts_bot:leaderboard:listening"
@@ -611,48 +612,72 @@ def _generate_final_report_sync(answers: list) -> dict:
     return {"text": feedback_text, "averages": averages, "overall_band": overall}
 
 
-# --- Tarixdan ketma-ket savollar (History Quiz Session) ----------------
+# --- Universal viktorina (istalgan fan bo'yicha) -------------------------
 
-# Har bir foydalanuvchining hozirgi faol tarix viktorina sessiyasini saqlab turadi.
-# user_id -> {"questions": [...], "idx": int, "score": int, "mode": "quiz"|"certificate"}
-active_history_quizzes: dict[int, dict] = {}
+# Har bir foydalanuvchining hozirgi faol viktorina sessiyasini saqlab turadi.
+# user_id -> {"questions": [...], "idx": int, "score": int, "mode": str, "subject": str}
+active_quizzes: dict[int, dict] = {}
 
-HISTORY_QUIZ_LENGTH = 10
+QUIZ_LENGTH = 10
 CERTIFICATE_QUIZ_LENGTH = 25
 CERTIFICATE_PASS_PERCENT = 70  # sertifikat olish uchun kerakli minimal foiz
 MAX_QUESTIONS_PER_LLM_CALL = 10  # bitta so'rovda ishonchli generatsiya qilinadigan maksimal savol soni
 
-HISTORY_TOPICS = [
-    "jahon tarixi",
-    "O'zbekiston tarixi",
-    "qadimgi Sharq tarixi",
-    "O'rta asrlar tarixi",
-    "Buyuk ipak yo'li",
-    "Amir Temur va Temuriylar davri",
-    "Ikkinchi jahon urushi",
-    "qadimgi Yunoniston va Rim",
-    "Mustaqillik davri O'zbekiston tarixi",
-    "buyuk geografik kashfiyotlar",
+# (emoji, nomi, LLM uchun mavzu tavsifi)
+SUBJECTS = [
+    ("🌍", "Geografiya", "geografiya: mamlakatlar, shaharlar, tabiat hodisalari, rekordlar"),
+    ("🔬", "Fizika", "fizika: kundalik hayotdagi hodisalar, mashhur olimlar, kashfiyotlar"),
+    ("🧪", "Kimyo", "kimyo: elementlar, moddalar, qiziqarli reaksiyalar"),
+    ("🧬", "Biologiya", "biologiya: hayvonlar, o'simliklar, inson tanasi"),
+    ("➗", "Matematika", "matematika: mantiqiy masalalar, qiziqarli faktlar, oddiy hisoblar"),
+    ("💻", "Texnologiya va IT", "texnologiya: internet, dasturlash, sun'iy intellekt, gadjetlar"),
+    ("📚", "Adabiyot va madaniyat", "adabiyot, mashhur yozuvchilar va asarlar, madaniyat, an'analar"),
+    ("🎨", "San'at va musiqa", "san'at, rassomlar, musiqa, kino"),
+    ("🚀", "Koinot", "astronomiya va koinot: sayyoralar, yulduzlar, kosmik missiyalar"),
+    ("💰", "Iqtisodiyot va moliya", "iqtisodiyot, pul, biznes, shaxsiy moliya asoslari"),
+    ("🧠", "Psixologiya", "psixologiya: xotira, e'tibor, odatlar, qiziqarli tajribalar"),
+    ("⚽", "Sport", "sport: tarmoqlar, rekordlar, mashhur sportchilar, qoidalar"),
+    ("🥗", "Salomatlik va ovqatlanish", "salomatlik, ovqatlanish, vitaminlar, uyqu va sog'lom odatlar"),
+    ("🌐", "Ingliz tili", "ingliz tili: grammatika, lug'at, frazal fe'llar, idiomalar"),
 ]
+SUBJECT_BY_NAME = {name: (emoji, desc) for emoji, name, desc in SUBJECTS}
 
 
-def _generate_history_quiz_batch_sync(count: int) -> list:
-    """Groq (LLM) orqali bir-biriga o'xshamaydigan `count` ta tarix savolidan
-    iborat BITTA to'plamni bitta so'rovda JSON ko'rinishida generatsiya qiladi.
+def _generate_quiz_batch_sync(count: int, subject_name: str | None = None) -> list:
+    """Groq (LLM) orqali `count` ta ko'p variantli (ABCD) savolni bitta so'rovda
+    JSON ko'rinishida generatsiya qiladi. `subject_name` berilsa shu fandan,
+    berilmasa aralash (har safar tasodifiy tanlangan bir nechta fandan) bo'ladi.
     `count` MAX_QUESTIONS_PER_LLM_CALL dan oshmasligi kerak (ishonchlilik uchun)."""
-    topics_str = ", ".join(HISTORY_TOPICS)
+    import random
+
+    if subject_name and subject_name in SUBJECT_BY_NAME:
+        scope = f"Fan: {SUBJECT_BY_NAME[subject_name][1]}."
+        is_english = subject_name == "Ingliz tili"
+    else:
+        picked = random.sample(SUBJECTS, k=min(4, len(SUBJECTS)))
+        scope = "Quyidagi fanlardan aralash savollar tuzing: " + "; ".join(p[2] for p in picked) + "."
+        is_english = False
+
+    language_rule = (
+        "Savollar va variantlar INGLIZ tilida bo'lsin, izoh (explanation) esa o'zbek tilida."
+        if is_english
+        else "Savol, variantlar va izoh o'zbek tilida bo'lsin."
+    )
+
     prompt = (
-        "Siz tarix fanidan qiziqarli viktorina (trivia) savollari tuzuvchi mutaxassissiz. "
-        f"Quyidagi mavzular doirasida bir-biriga o'xshamaydigan, xilma-xil {count} ta savol tuzing: "
-        f"{topics_str}. Har bir savol turli mavzu va faktlarga oid bo'lsin, takrorlanmasin. "
+        "Siz qiziqarli, zeriktirmaydigan viktorina (trivia) savollari tuzuvchi mutaxassissiz. "
+        f"{scope} Bir-biriga o'xshamaydigan, xilma-xil {count} ta savol tuzing. "
+        "Savollar qiziqarli, hayotiy va aniq bir to'g'ri javobli bo'lsin; juda quruq yoki "
+        "bahsli savollardan qoching. Tarix fanidan savol bermang. "
+        f"{language_rule} "
         "Javobni FAQAT quyidagi JSON formatida qaytaring, boshqa hech qanday matn qo'shmang:\n"
         "{\n"
         '  "questions": [\n'
         "    {\n"
-        '      "question": "savol matni o\'zbek tilida",\n'
+        '      "question": "savol matni",\n'
         '      "options": ["variant A", "variant B", "variant C", "variant D"],\n'
         '      "correct_index": 0,\n'
-        '      "explanation": "to\'g\'ri javobning qisqa (1-2 gapli) izohi o\'zbek tilida"\n'
+        '      "explanation": "to\'g\'ri javobning qisqa (1-2 gapli) izohi"\n'
         "    }\n"
         f"    // ... jami {count} ta shunday obyekt\n"
         "  ]\n"
@@ -667,11 +692,15 @@ def _generate_history_quiz_batch_sync(count: int) -> list:
         response_format={"type": "json_object"},
     )
     data = json.loads(completion.choices[0].message.content)
-    questions = data.get("questions", [])
+    return _filter_valid_questions(data.get("questions", []))[:count]
 
-    # Faqat to'g'ri formatdagi savollarni qoldiramiz (LLM xato format bersa ham bot yiqilmasin)
+
+def _filter_valid_questions(questions: list) -> list:
+    """Faqat to'g'ri formatdagi savollarni qoldiradi (LLM xato format bersa ham bot yiqilmasin)."""
     valid = []
-    for q in questions:
+    for q in questions or []:
+        if not isinstance(q, dict):
+            continue
         options = q.get("options")
         correct_index = q.get("correct_index")
         if (
@@ -682,25 +711,28 @@ def _generate_history_quiz_batch_sync(count: int) -> list:
             and q.get("question")
         ):
             valid.append(q)
-    return valid[:count]
+    return valid
 
 
-def _generate_history_quiz_set_sync(count: int) -> list:
+def _generate_quiz_set_sync(count: int, subject_name: str | None = None) -> list:
     """Kerakli umumiy savol sonini MAX_QUESTIONS_PER_LLM_CALL dan oshmaydigan
     bo'laklarga bo'lib, bir necha marta LLM'ga murojaat qilib yig'adi. Bu
     katta (masalan 25 ta) savol to'plamini so'rasak ham JSON kesilib qolish
     yoki formatning buzilish xavfini kamaytiradi."""
     all_questions = []
     remaining = count
-    while remaining > 0 and len(all_questions) < count:
+    attempts = 0
+    max_attempts = (count // MAX_QUESTIONS_PER_LLM_CALL) + 3
+    while remaining > 0 and attempts < max_attempts:
+        attempts += 1
         batch_size = min(remaining, MAX_QUESTIONS_PER_LLM_CALL)
         try:
-            batch = _generate_history_quiz_batch_sync(batch_size)
+            batch = _generate_quiz_batch_sync(batch_size, subject_name)
         except Exception as e:
             logger.exception("Savol partiyasini generatsiya qilishda xatolik: %s", e)
             batch = []
         all_questions.extend(batch)
-        remaining -= batch_size
+        remaining = count - len(all_questions)
     return all_questions[:count]
 
 
@@ -814,23 +846,24 @@ def _generate_listening_test_sync() -> dict:
     return {"script": data.get("script", ""), "questions": questions[:LISTENING_TEST_QUESTIONS_COUNT]}
 
 
-def _build_history_question_view(quiz: dict, idx: int):
+def _build_quiz_question_view(quiz: dict, idx: int):
     """Berilgan indeksdagi savol uchun matn va inline tugmalarni tayyorlaydi."""
     q = quiz["questions"][idx]
     total = len(quiz["questions"])
     letters = ["A", "B", "C", "D", "E", "F"]
     buttons = [
-        [InlineKeyboardButton(text=f"{letters[i]}) {opt}", callback_data=f"histans:{i}")]
+        [InlineKeyboardButton(text=f"{letters[i]}) {opt}", callback_data=f"qans:{i}")]
         for i, opt in enumerate(q["options"])
     ]
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     mode_labels = {
         "certificate": "🎓 Sertifikat testi",
-        "quiz": "📜 Tarix savoli",
+        "quiz": quiz.get("subject") or "🧩 Viktorina",
+        "daily": "📅 Kunlik test",
         "reading": "📖 Reading testi",
         "listening": "🎧 Listening testi",
     }
-    mode_label = mode_labels.get(quiz.get("mode"), "📜 Savol")
+    mode_label = mode_labels.get(quiz.get("mode"), "🧩 Savol")
     text = f"{mode_label} — <b>{idx + 1}/{total}:</b>\n\n{q['question']}"
     return text, keyboard
 
@@ -880,7 +913,7 @@ def _generate_certificate_image_sync(full_name: str, score: int, total: int, per
         draw.text(((width - text_width) / 2, y), text, font=font, fill=fill)
 
     center_text(120, "SERTIFIKAT", font_title, border_gold)
-    center_text(215, "Tarix bilimlari bo'yicha yutuqlar sertifikati", font_subtitle, text_gray)
+    center_text(215, "Bilim va yutuqlar sertifikati", font_subtitle, text_gray)
 
     draw.line([(300, 290), (width - 300, 290)], fill=border_gold, width=2)
 
@@ -895,7 +928,7 @@ def _generate_certificate_image_sync(full_name: str, score: int, total: int, per
         font_body,
         text_dark,
     )
-    center_text(605, "tarix bo'yicha sertifikat testidan muvaffaqiyatli o'tgani uchun.", font_body, text_dark)
+    center_text(605, "umumiy bilim sertifikat testidan muvaffaqiyatli o'tgani uchun.", font_body, text_dark)
 
     center_text(690, f"Natija: {score}/{total} ({percentage}%)", font_score, border_gold)
 
@@ -914,10 +947,12 @@ def _generate_certificate_image_sync(full_name: str, score: int, total: int, per
 CHAT_HISTORY_LIMIT = 20  # oxirgi N ta xabar (foydalanuvchi+bot) kontekstda saqlanadi
 
 CHAT_SYSTEM_PROMPT = (
-    "Siz do'stona, samimiy va foydali suhbatdosh yordamchisiz. Foydalanuvchi "
-    "qaysi tilda yozsa, o'sha tilda javob bering (odatda o'zbek tilida). "
-    "Javoblaringiz qisqa va tabiiy bo'lsin, keraksiz cho'zilib ketmang, "
-    "lekin savolga to'liq va foydali javob bering."
+    "Siz aqlli, samimiy va quvnoq universal yordamchisiz: istalgan mavzuda (fan, hayot, "
+    "o'qish, ish, texnologiya, ingliz tili va boshqalar) odam bilan gaplashasiz. "
+    "Foydalanuvchi qaysi tilda yozsa, o'sha tilda javob bering (odatda o'zbek tilida). "
+    "Javoblar qisqa, aniq va tabiiy bo'lsin, zerikarli yoki rasmiy dars o'qiyotgandek emas — "
+    "do'stona, ba'zan yengil hazil va mos emoji bilan. Keraksiz cho'zmang, lekin savolga "
+    "to'liq va foydali javob bering. Aniq bilmagan narsangizni to'qimang, shuni ochiq ayting."
 )
 
 
@@ -1014,24 +1049,22 @@ def cleanup_user_dir(user_id: int):
 # --------------------------------------------------------------------------
 
 WELCOME_TEXT = (
-    "👋 <b>Assalomu alaykum!</b>\n\n"
-    "Men <b>IELTS Speaking AI Examiner</b> botiman. Men sizga to'liq IELTS Speaking "
-    "Mock testini o'tkazib beraman: Part 1, Part 2 va Part 3, so'ngra batafsil "
-    "baholash (Fluency, Lexical Resource, Grammar, Pronunciation, Overall Band Score) "
-    "bilan natija beraman.\n\n"
-    "📌 <b>Qoidalar:</b>\n"
-    "• Savollarga faqat <b>ovozli xabar (voice)</b> bilan javob bering.\n"
-    "• Har bir javobingiz avtomatik tinglanadi va tahlil qilinadi.\n"
-    "• Testni istalgan vaqtda /stop bilan to'xtatishingiz mumkin.\n\n"
-    "🎲 Bonus: /tarix buyrug'i bilan ketma-ket 10 ta tarix savolidan iborat viktorina o'ynashingiz mumkin!\n"
-    "🎓 /sertifikat bilan esa 25 ta savolli test topshirib, natijangiz yetarli bo'lsa sertifikat olishingiz mumkin!\n"
-    "📖 /reading_test va 🎧 /listening_test bilan AI generatsiya qilgan haqiqiy IELTS uslubidagi Reading/Listening testlarini yechishingiz mumkin!\n"
-    "🏆 /reyting bilan eng yaxshi natijalar jadvalini ko'rishingiz mumkin!\n"
-    "🇬🇧 /english bilan ingliz tilida erkin suhbatlashib, xatolaringizni tuzatib olishingiz mumkin!\n"
-    "🎓 /dashboard bilan esa Profil, Reading, Listening va Grammar bo'limlariga ega shaxsiy oynani ochishingiz mumkin!\n"
-    "💬 Yoki menga oddiygina yozing (yoki ovozli xabar yuboring) — hech qanday maxsus "
-    "buyruqsiz erkin suhbatlashishimiz mumkin!\n\n"
-    "🚀 Boshlash uchun /test buyrug'ini yuboring!"
+    "👋 <b>Salom! Men universal yordamchi botman.</b>\n\n"
+    "Menga istalgan narsani yozing yoki ovozli xabar yuboring — savol bering, "
+    "maslahat so'rang, shunchaki gaplashing. Buyruq shart emas 💬\n\n"
+    "🧩 <b>Bilim va o'yin</b>\n"
+    "/quiz — istalgan fandan viktorina (fanni o'zingiz tanlaysiz)\n"
+    "/teaser — miya jumboqlari va topishmoqlar\n"
+    "/kunlik — bugungi fan, qiziqarli fakt va test\n"
+    "/sertifikat — 25 savolli test, natija yaxshi bo'lsa sertifikat\n"
+    "/reyting — eng yaxshilar jadvali\n\n"
+    "🇬🇧 <b>Ingliz tili va IELTS</b>\n"
+    "/english — ingliz tilida suhbat, xatolaringizni tuzatib boraman\n"
+    "/test — IELTS Speaking mock testi (ovozli javoblar)\n"
+    "/reading_test, /listening_test — IELTS uslubidagi testlar\n"
+    "/dashboard — profil va o'quv materiallari\n\n"
+    "🔔 Har kuni ertalab yangi fan va ingliz tili maslahati yuboraman — o'chirish: /xabarnoma\n"
+    "🛑 Jarayonni to'xtatish: /stop"
 )
 
 
@@ -1045,10 +1078,17 @@ async def cmd_start(message: Message, state: FSMContext):
 async def cmd_stop(message: Message, state: FSMContext):
     current = await state.get_state()
 
+    # Davom etayotgan viktorina/test (Quiz, Kunlik, Reading, Listening, Sertifikat) va jumboqni ham to'xtatamiz
+    quiz_stopped = active_quizzes.pop(message.from_user.id, None) is not None
+    active_teasers.pop(message.from_user.id, None)
+
     if current is None:
         # Faol imtihon yo'q, lekin suhbat xotirasi bo'lishi mumkin — uni tozalaymiz.
         await state.set_data({})
-        await message.answer("🔄 Suhbat xotirasi tozalandi. Yangidan yozishingiz mumkin, yoki /test bilan imtihon boshlang.")
+        if quiz_stopped:
+            await message.answer("🛑 Viktorina to'xtatildi. Yangisini boshlash uchun /quiz yuboring.")
+        else:
+            await message.answer("🔄 Suhbat xotirasi tozalandi. Yangidan yozishingiz mumkin, yoki /quiz bilan viktorina boshlang.")
         return
 
     if current == EnglishPracticeStates.practicing.state:
@@ -1097,8 +1137,8 @@ async def cmd_stats(message: Message):
 
 @dp.message(Command("reyting"))
 async def cmd_reyting(message: Message):
-    """Tarix viktorinasi (/tarix) va sertifikat testi (/sertifikat) uchun
-    alohida TOP 10 reyting jadvalini ko'rsatadi."""
+    """Viktorina (/quiz), sertifikat (/sertifikat), Reading va Listening testlari uchun
+    alohida TOP 10 reyting jadvallarini ko'rsatadi."""
     if redis_client is None:
         await message.answer(
             "⚠️ Reyting xizmati sozlanmagan.\n\n"
@@ -1109,8 +1149,8 @@ async def cmd_reyting(message: Message):
 
     await bot.send_chat_action(message.chat.id, "typing")
 
-    tarix_text = await format_leaderboard_text(
-        "🏆 <b>Tarix viktorinasi reytingi</b> (TOP 10)", LEADERBOARD_TARIX_KEY
+    quiz_text = await format_leaderboard_text(
+        "🏆 <b>Viktorina reytingi</b> (TOP 10)", LEADERBOARD_QUIZ_KEY
     )
     cert_text = await format_leaderboard_text(
         "🎓 <b>Sertifikat testi reytingi</b> (TOP 10)", LEADERBOARD_CERT_KEY
@@ -1122,7 +1162,7 @@ async def cmd_reyting(message: Message):
         "🎧 <b>Listening testi reytingi</b> (TOP 10)", LEADERBOARD_LISTENING_KEY
     )
 
-    await message.answer(tarix_text)
+    await message.answer(quiz_text)
     await message.answer(cert_text)
     await message.answer(reading_text)
     await message.answer(listening_text)
@@ -1426,36 +1466,473 @@ async def cmd_delete_content(message: Message, command: CommandObject):
 
 
 
-async def cmd_tarix(message: Message):
-    f"""Ketma-ket {HISTORY_QUIZ_LENGTH} ta tasodifiy tarix savolidan iborat viktorina
-    sessiyasini boshlaydi. Bu funksiya IELTS imtihon holatidan (FSM state) mustaqil
-    ishlaydi — imtihon davomida ham chaqirish mumkin, chunki alohida
-    (active_history_quizzes) xotirada saqlanadi va exam FSM ma'lumotlariga tegmaydi."""
-    prep_msg = await message.answer(f"⏳ {HISTORY_QUIZ_LENGTH} ta tarix savoli tayyorlanmoqda...")
+def _quiz_subject_keyboard() -> InlineKeyboardMarkup:
+    """Fan tanlash tugmalari (2 ustunli) + 'Tasodifiy' tugmasi."""
+    rows, row = [], []
+    for i, (emoji, name, _desc) in enumerate(SUBJECTS):
+        row.append(InlineKeyboardButton(text=f"{emoji} {name}", callback_data=f"qzsub:{i}"))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton(text="🎲 Tasodifiy (aralash)", callback_data="qzsub:r")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+@dp.message(Command("quiz"))
+async def cmd_quiz(message: Message):
+    f"""Istalgan fandan {QUIZ_LENGTH} ta savollik viktorina. Foydalanuvchi fanni tugma bilan
+    tanlaydi. IELTS imtihon holatidan (FSM) mustaqil, alohida (active_quizzes) xotirada ishlaydi."""
+    await message.answer(
+        "🧩 <b>Qaysi fandan viktorina o'ynaymiz?</b>\n\n"
+        f"Fan tanlang — men {QUIZ_LENGTH} ta qiziqarli savol beraman:",
+        reply_markup=_quiz_subject_keyboard(),
+    )
+
+
+@dp.callback_query(F.data.startswith("qzsub:"))
+async def handle_quiz_subject(callback: CallbackQuery):
+    choice = callback.data.split(":", 1)[1]
+    if choice == "r":
+        subject_name, label = None, "🎲 Aralash viktorina"
+    else:
+        try:
+            emoji, name, _desc = SUBJECTS[int(choice)]
+        except (ValueError, IndexError):
+            await callback.answer("Xatolik yuz berdi.", show_alert=True)
+            return
+        subject_name, label = name, f"{emoji} {name}"
+
+    await callback.answer()
+    try:
+        await callback.message.edit_text(f"⏳ {label}: {QUIZ_LENGTH} ta savol tayyorlanmoqda...")
+    except Exception:
+        pass
 
     try:
-        questions = await asyncio.to_thread(_generate_history_quiz_set_sync, HISTORY_QUIZ_LENGTH)
+        questions = await asyncio.to_thread(_generate_quiz_set_sync, QUIZ_LENGTH, subject_name)
         if not questions:
             raise ValueError("Yaroqli savollar generatsiya qilinmadi")
     except Exception as e:
-        logger.exception("Tarix viktorinasini generatsiya qilishda xatolik: %s", e)
-        await prep_msg.edit_text("❌ Savollarni tayyorlashda xatolik yuz berdi. Iltimos /tarix bilan qayta urinib ko'ring.")
+        logger.exception("Viktorinani generatsiya qilishda xatolik: %s", e)
+        try:
+            await callback.message.edit_text("❌ Savollarni tayyorlashda xatolik yuz berdi. Iltimos /quiz bilan qayta urinib ko'ring.")
+        except Exception:
+            pass
         return
 
-    active_history_quizzes[message.from_user.id] = {
+    user_id = callback.from_user.id
+    active_quizzes[user_id] = {
         "questions": questions,
         "idx": 0,
         "score": 0,
         "mode": "quiz",
+        "subject": label,
+    }
+    text, keyboard = _build_quiz_question_view(active_quizzes[user_id], 0)
+    try:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+    except Exception:
+        await callback.message.answer(text, reply_markup=keyboard)
+
+
+
+# --- Miya jumboqlari (Brain Teasers) -------------------------------------
+
+# user_id -> {"puzzle": str, "hint": str, "answer": str, "explanation": str, "kind": str}
+active_teasers: dict[int, dict] = {}
+
+TEASER_KINDS = [
+    "topishmoq (an'anaviy o'zbek topishmoqlari uslubida)",
+    "mantiqiy masala (matematik hisoblash talab qilmaydigan)",
+    "so'z o'yini yoki harflar bilan bog'liq jumboq",
+    "raqamlar ketma-ketligi yoki oddiy matematik jumboq",
+    "kutilmagan javobli (lateral thinking) qisqa hikoya-jumboq",
+    "kundalik hayotdagi 'aldamchi' savol (javobi sodda, lekin birdan o'ylab bo'lmaydi)",
+]
+
+
+def _generate_teaser_sync() -> dict:
+    """Groq (LLM) orqali bitta original miya jumboqini (jumboq, maslahat, javob, izoh)
+    JSON ko'rinishida generatsiya qiladi. Turi har safar tasodifiy tanlanadi."""
+    import random
+
+    kind = random.choice(TEASER_KINDS)
+    prompt = (
+        "Siz qiziqarli, zerikarsiz miya jumboqlari (brain teasers) ixtirochisisiz. "
+        f"Turi: {kind}. Bitta original, aniq javobli, o'ylantiradigan jumboq tuzing. "
+        "Jumboq 1-4 gapdan oshmasin. Javob qisqa va bir ma'noli bo'lsin. "
+        "Hammasi o'zbek tilida bo'lsin. "
+        "Javobni FAQAT quyidagi JSON formatida qaytaring, boshqa hech qanday matn qo'shmang:\n"
+        "{\n"
+        '  "puzzle": "jumboq matni",\n'
+        '  "hint": "javobni oshkor qilmaydigan qisqa maslahat",\n'
+        '  "answer": "qisqa javob",\n'
+        '  "explanation": "nega aynan shu javob ekanini 1-2 gapda tushuntiring"\n'
+        "}"
+    )
+    completion = groq_client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=1.0,
+        response_format={"type": "json_object"},
+    )
+    data = json.loads(completion.choices[0].message.content)
+    if not (data.get("puzzle") and data.get("answer")):
+        raise ValueError("Jumboq to'liq generatsiya qilinmadi")
+    data["kind"] = kind
+    return data
+
+
+def _teaser_keyboard(show_answer: bool = False) -> InlineKeyboardMarkup:
+    if show_answer:
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Yangi jumboq", callback_data="tz:new")],
+        ])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="💡 Maslahat", callback_data="tz:hint"),
+            InlineKeyboardButton(text="✅ Javobni ko'rish", callback_data="tz:ans"),
+        ],
+        [InlineKeyboardButton(text="🔄 Boshqa jumboq", callback_data="tz:new")],
+    ])
+
+
+async def _send_new_teaser(chat_message: Message, user_id: int):
+    """Yangi jumboq generatsiya qilib, shu chatga yuboradi."""
+    await bot.send_chat_action(chat_message.chat.id, "typing")
+    try:
+        teaser = await asyncio.to_thread(_generate_teaser_sync)
+    except Exception as e:
+        logger.exception("Jumboq generatsiya qilishda xatolik: %s", e)
+        await chat_message.answer("❌ Jumboq tayyorlashda xatolik yuz berdi. /teaser bilan qayta urinib ko'ring.")
+        return
+    active_teasers[user_id] = teaser
+    await chat_message.answer(
+        f"🧠 <b>Miya jumboqi</b>\n\n{html.escape(str(teaser['puzzle']))}\n\n<i>O'ylab ko'ring, so'ng tugmalardan foydalaning 👇</i>",
+        reply_markup=_teaser_keyboard(),
+    )
+
+
+@dp.message(Command("teaser"))
+async def cmd_teaser(message: Message):
+    await _send_new_teaser(message, message.from_user.id)
+
+
+@dp.callback_query(F.data.startswith("tz:"))
+async def handle_teaser_action(callback: CallbackQuery):
+    action = callback.data.split(":", 1)[1]
+    user_id = callback.from_user.id
+
+    if action == "new":
+        await callback.answer()
+        await _send_new_teaser(callback.message, user_id)
+        return
+
+    teaser = active_teasers.get(user_id)
+    if not teaser:
+        await callback.answer("Bu jumboq eskirgan. /teaser bilan yangisini oling.", show_alert=True)
+        return
+
+    if action == "hint":
+        await callback.answer("💡 " + teaser.get("hint", "Maslahat yo'q"), show_alert=True)
+        return
+
+    if action == "ans":
+        await callback.answer()
+        text = (
+            f"🧠 <b>Miya jumboqi</b>\n\n{html.escape(str(teaser['puzzle']))}\n\n"
+            f"✅ <b>Javob:</b> {html.escape(str(teaser['answer']))}\n"
+            f"💬 <i>{html.escape(str(teaser.get('explanation', '')))}</i>"
+        )
+        try:
+            await callback.message.edit_text(text, reply_markup=_teaser_keyboard(show_answer=True))
+        except Exception:
+            await callback.message.answer(text, reply_markup=_teaser_keyboard(show_answer=True))
+        return
+
+    await callback.answer()
+
+
+
+# --- Kunlik fan + ingliz tili maslahati ----------------------------------
+# Har kuni (Toshkent vaqti bilan) navbatdagi fan tanlanadi: qiziqarli fakt,
+# 5 ta savollik test va ingliz tilidan foydali maslahat. Kontent kuniga BIR marta
+# generatsiya qilinib Redis'da saqlanadi — hamma foydalanuvchi bir xil narsani
+# oladi va LLM'ga ortiqcha murojaat bo'lmaydi.
+
+UZ_TZ = timezone(timedelta(hours=5))  # O'zbekiston (UTC+5, yozgi vaqt yo'q)
+DAILY_PUSH_ENABLED = os.getenv("DAILY_PUSH_ENABLED", "1") != "0"
+DAILY_PUSH_HOUR = int(os.getenv("DAILY_PUSH_HOUR", "9"))  # shu soatdan keyin (Toshkent vaqti) yuboriladi
+DAILY_PUSH_WINDOW_HOURS = 6  # bot kech yoqilsa ham, shu oynadan keyin o'sha kun uchun yubormaydi
+DAILY_QUIZ_QUESTIONS = 5
+DAILY_OPTOUT_KEY = "ielts_bot:daily_optout"
+DAILY_SENT_KEY_PREFIX = "ielts_bot:daily_sent:"
+DAILY_CONTENT_KEY_PREFIX = "ielts_bot:daily_content:"
+
+ENGLISH_TIP_KINDS = [
+    "grammatika qoidasi (oddiy va aniq)",
+    "foydali frazal fe'l (phrasal verb)",
+    "mashhur idioma (iboralar)",
+    "o'zbek tilida so'zlovchilar ko'p qiladigan xato",
+    "mavzuli 5 ta yangi so'z",
+    "talaffuz bo'yicha maslahat",
+    "rasmiy va norasmiy ifodalar farqi",
+    "kundalik suhbatda ishlatiladigan tayyor iboralar",
+]
+
+_daily_cache: dict[str, dict] = {}
+_daily_lock = asyncio.Lock()
+
+
+def _today_str() -> str:
+    return datetime.now(UZ_TZ).strftime("%Y-%m-%d")
+
+
+def _llm_json_sync(prompt: str, temperature: float = 0.9) -> dict:
+    completion = groq_client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+        response_format={"type": "json_object"},
+    )
+    return json.loads(completion.choices[0].message.content)
+
+
+def _generate_daily_content_sync(date_str: str) -> dict:
+    """Berilgan kun uchun kontent yaratadi: fan (sana bo'yicha navbatlanadi),
+    qiziqarli fakt, 5 ta savol va ingliz tili maslahati."""
+    ordinal = datetime.strptime(date_str, "%Y-%m-%d").date().toordinal()
+    emoji, subject_name, desc = SUBJECTS[ordinal % len(SUBJECTS)]
+    tip_kind = ENGLISH_TIP_KINDS[ordinal % len(ENGLISH_TIP_KINDS)]
+
+    fact_data = _llm_json_sync(
+        f"{desc} bo'yicha juda qiziqarli, kam ma'lum va ishonchli bitta fakt yozing. "
+        "2-3 gap, o'zbek tilida, odamni hayratlantiradigan bo'lsin. "
+        'Javobni FAQAT JSON formatida qaytaring: {"fact": "..."}'
+    )
+    fact = (fact_data.get("fact") or "").strip()
+    if not fact:
+        raise ValueError("Kunlik fakt generatsiya qilinmadi")
+
+    try:
+        questions = _generate_quiz_batch_sync(DAILY_QUIZ_QUESTIONS, subject_name)
+    except Exception as e:
+        logger.exception("Kunlik savollarni generatsiya qilishda xatolik: %s", e)
+        questions = []
+
+    tip = None
+    try:
+        tip_data = _llm_json_sync(
+            "Siz ingliz tili o'qituvchisisiz. O'zbek tilida so'zlovchilar uchun bugungi "
+            f"qisqa va foydali maslahat yozing. Mavzu turi: {tip_kind}. "
+            "Tushuntirishni o'zbek tilida bering, misollarni esa ingliz tilida (o'zbekcha tarjimasi bilan) yozing. "
+            "3-5 ta qisqa misol bering. Umumiy hajm 80-130 so'z bo'lsin. "
+            'Javobni FAQAT JSON formatida qaytaring: {"title": "...", "explanation": "...", '
+            '"examples": ["English sentence — o\'zbekcha tarjima", "..."]}'
+        )
+        if tip_data.get("title") and tip_data.get("explanation"):
+            tip = {
+                "title": tip_data["title"],
+                "explanation": tip_data["explanation"],
+                "examples": [str(x) for x in (tip_data.get("examples") or [])][:6],
+            }
+    except Exception as e:
+        logger.exception("Kunlik ingliz tili maslahatini generatsiya qilishda xatolik: %s", e)
+
+    return {
+        "date": date_str,
+        "subject": f"{emoji} {subject_name}",
+        "fact": fact,
+        "questions": questions,
+        "tip": tip,
     }
 
-    text, keyboard = _build_history_question_view(active_history_quizzes[message.from_user.id], 0)
-    await prep_msg.edit_text(text, reply_markup=keyboard)
+
+async def get_daily_content() -> dict | None:
+    """Bugungi kunlik kontentni qaytaradi: avval xotiradan, keyin Redis'dan,
+    yo'q bo'lsa yangi generatsiya qilib saqlaydi."""
+    date_str = _today_str()
+    cached = _daily_cache.get(date_str)
+    if cached:
+        return cached
+
+    async with _daily_lock:
+        cached = _daily_cache.get(date_str)
+        if cached:
+            return cached
+
+        key = DAILY_CONTENT_KEY_PREFIX + date_str
+        if redis_client is not None:
+            try:
+                raw = await redis_client.get(key)
+                if raw:
+                    if isinstance(raw, bytes):
+                        raw = raw.decode("utf-8")
+                    content = json.loads(raw)
+                    _daily_cache.clear()
+                    _daily_cache[date_str] = content
+                    return content
+            except Exception as e:
+                logger.warning("Kunlik kontentni Redis'dan o'qishda xatolik: %s", e)
+
+        try:
+            content = await asyncio.to_thread(_generate_daily_content_sync, date_str)
+        except Exception as e:
+            logger.exception("Kunlik kontentni generatsiya qilishda xatolik: %s", e)
+            return None
+
+        if redis_client is not None:
+            try:
+                await redis_client.set(key, json.dumps(content), ex=172800)
+            except Exception as e:
+                logger.warning("Kunlik kontentni Redis'ga yozishda xatolik: %s", e)
+
+        _daily_cache.clear()
+        _daily_cache[date_str] = content
+        return content
+
+
+def _format_daily_text(content: dict) -> str:
+    e = html.escape
+    parts = [
+        f"📅 <b>Bugungi fan: {e(content['subject'])}</b>",
+        f"💡 <b>Bilasizmi?</b>\n{e(content['fact'])}",
+    ]
+    tip = content.get("tip")
+    if tip:
+        tip_text = f"🇬🇧 <b>Kunlik ingliz tili: {e(tip['title'])}</b>\n{e(tip['explanation'])}"
+        if tip.get("examples"):
+            tip_text += "\n\n" + "\n".join(f"▫️ {e(x)}" for x in tip["examples"])
+        parts.append(tip_text)
+    return "\n\n".join(parts)
+
+
+def _daily_keyboard(content: dict) -> InlineKeyboardMarkup | None:
+    n = len(content.get("questions") or [])
+    if not n:
+        return None
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"🎯 Kunlik testni boshlash ({n} savol)", callback_data="daily:start")],
+    ])
+
+
+@dp.message(Command("kunlik"))
+async def cmd_kunlik(message: Message):
+    prep_msg = await message.answer("⏳ Bugungi kontent tayyorlanmoqda...")
+    content = await get_daily_content()
+    if not content:
+        await prep_msg.edit_text("❌ Bugungi kontentni tayyorlab bo'lmadi. Birozdan keyin /kunlik bilan qayta urinib ko'ring.")
+        return
+    await prep_msg.edit_text(_format_daily_text(content), reply_markup=_daily_keyboard(content))
+
+
+@dp.callback_query(F.data == "daily:start")
+async def handle_daily_start(callback: CallbackQuery):
+    await callback.answer()
+    content = await get_daily_content()
+    questions = (content or {}).get("questions") or []
+    if not questions:
+        await callback.message.answer("⚠️ Bugungi test hozir mavjud emas. Boshqa viktorina uchun /quiz yuboring.")
+        return
+    user_id = callback.from_user.id
+    active_quizzes[user_id] = {
+        "questions": [dict(q) for q in questions],
+        "idx": 0,
+        "score": 0,
+        "mode": "daily",
+        "subject": content["subject"],
+    }
+    text, keyboard = _build_quiz_question_view(active_quizzes[user_id], 0)
+    await callback.message.answer(text, reply_markup=keyboard)
+
+
+@dp.message(Command("xabarnoma"))
+async def cmd_xabarnoma(message: Message):
+    """Kunlik avtomatik xabarni (har kuni ertalab fan + ingliz tili maslahati) yoqadi/o'chiradi."""
+    if redis_client is None:
+        await message.answer("⚠️ Bu xizmat hozir sozlanmagan.")
+        return
+    uid = str(message.from_user.id)
+    try:
+        opted_out = await redis_client.sismember(DAILY_OPTOUT_KEY, uid)
+        if opted_out:
+            await redis_client.srem(DAILY_OPTOUT_KEY, uid)
+            await message.answer("🔔 Kunlik xabarlar <b>yoqildi</b>. Har kuni yangi fan va ingliz tili maslahatini olasiz!")
+        else:
+            await redis_client.sadd(DAILY_OPTOUT_KEY, uid)
+            await message.answer("🔕 Kunlik xabarlar <b>o'chirildi</b>. Qayta yoqish uchun yana /xabarnoma yuboring.\n\nKunlik kontentni /kunlik orqali o'zingiz ham ochishingiz mumkin.")
+    except Exception as e:
+        logger.exception("Xabarnoma sozlamasida xatolik: %s", e)
+        await message.answer("❌ Xatolik yuz berdi. Keyinroq qayta urinib ko'ring.")
+
+
+async def broadcast_daily_content(content: dict) -> tuple[int, int]:
+    """Kunlik kontentni barcha foydalanuvchilarga (o'chirib qo'yganlardan tashqari) yuboradi.
+    (yuborildi, xato) sonini qaytaradi. Telegram limitiga tushmaslik uchun sekin yuboradi."""
+    from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
+
+    users = await redis_client.smembers(BOT_USERS_SET_KEY) or []
+    optouts = set(str(x) for x in (await redis_client.smembers(DAILY_OPTOUT_KEY) or []))
+    text = _format_daily_text(content) + "\n\n<i>Kunlik xabarni o'chirish: /xabarnoma</i>"
+    keyboard = _daily_keyboard(content)
+
+    sent = failed = 0
+    for uid in users:
+        uid = str(uid)
+        if uid in optouts:
+            continue
+        try:
+            try:
+                await bot.send_message(int(uid), text, reply_markup=keyboard)
+            except TelegramRetryAfter as e:
+                await asyncio.sleep(e.retry_after + 1)
+                await bot.send_message(int(uid), text, reply_markup=keyboard)
+            sent += 1
+        except TelegramForbiddenError:
+            failed += 1  # foydalanuvchi botni bloklagan
+        except Exception as e:
+            failed += 1
+            logger.warning("Kunlik xabar yuborilmadi (%s): %s", uid, e)
+        await asyncio.sleep(0.06)  # ~16 xabar/soniya — Telegram limitidan past
+    return sent, failed
+
+
+async def daily_broadcast_loop():
+    """Fon vazifasi: har 5 daqiqada tekshiradi; Toshkent vaqti bilan belgilangan soatdan
+    keyin bugun uchun xabar hali yuborilmagan bo'lsa, bir marta yuboradi. Qayta yuborilishining
+    oldi Redis'dagi 'bugun yuborilgan' belgisi (SET NX) bilan olinadi — deploy paytida ikki
+    instance bir vaqtda ishlasa ham xabar takrorlanmaydi."""
+    logger.info("Kunlik xabar vazifasi ishga tushdi (soat %02d:00, Toshkent vaqti).", DAILY_PUSH_HOUR)
+    while True:
+        try:
+            now = datetime.now(UZ_TZ)
+            in_window = DAILY_PUSH_HOUR <= now.hour < DAILY_PUSH_HOUR + DAILY_PUSH_WINDOW_HOURS
+            if in_window and redis_client is not None:
+                today = _today_str()
+                sent_key = DAILY_SENT_KEY_PREFIX + today
+                claimed = await redis_client.set(sent_key, "1", nx=True, ex=172800)
+                if claimed:
+                    content = await get_daily_content()
+                    if not content:
+                        # Kontent yo'q — keyingi urinish uchun belgini qaytaramiz
+                        await redis_client.delete(sent_key)
+                        logger.warning("Kunlik xabar: kontent tayyor emas, 5 daqiqadan keyin qayta uriniladi.")
+                    else:
+                        sent, failed = await broadcast_daily_content(content)
+                        logger.info("Kunlik xabar yuborildi: %s ta, xato: %s ta.", sent, failed)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.exception("Kunlik xabar vazifasida xatolik: %s", e)
+        await asyncio.sleep(300)
+
 
 
 @dp.message(Command("sertifikat"))
 async def cmd_sertifikat(message: Message):
-    f"""Ketma-ket {CERTIFICATE_QUIZ_LENGTH} ta tarix savolidan iborat "sertifikat testi"ni
+    f"""Ketma-ket {CERTIFICATE_QUIZ_LENGTH} ta aralash fanlardan iborat "sertifikat testi"ni
     boshlaydi. Agar natija {CERTIFICATE_PASS_PERCENT}% dan yuqori bo'lsa, test yakunida
     foydalanuvchiga rasmli (PNG) sertifikat yuboriladi."""
     prep_msg = await message.answer(
@@ -1464,7 +1941,7 @@ async def cmd_sertifikat(message: Message):
     )
 
     try:
-        questions = await asyncio.to_thread(_generate_history_quiz_set_sync, CERTIFICATE_QUIZ_LENGTH)
+        questions = await asyncio.to_thread(_generate_quiz_set_sync, CERTIFICATE_QUIZ_LENGTH)
         if len(questions) < CERTIFICATE_QUIZ_LENGTH // 2:
             # Agar savollarning yarmidan ko'pi generatsiya qilinmagan bo'lsa,
             # test sifatsiz bo'lib qolmasligi uchun xatolik deb hisoblaymiz.
@@ -1474,7 +1951,7 @@ async def cmd_sertifikat(message: Message):
         await prep_msg.edit_text("❌ Savollarni tayyorlashda xatolik yuz berdi. Iltimos /sertifikat bilan qayta urinib ko'ring.")
         return
 
-    active_history_quizzes[message.from_user.id] = {
+    active_quizzes[message.from_user.id] = {
         "questions": questions,
         "idx": 0,
         "score": 0,
@@ -1490,7 +1967,7 @@ async def cmd_sertifikat(message: Message):
     )
     await message.answer(intro)
 
-    text, keyboard = _build_history_question_view(active_history_quizzes[message.from_user.id], 0)
+    text, keyboard = _build_quiz_question_view(active_quizzes[message.from_user.id], 0)
     await prep_msg.edit_text(text, reply_markup=keyboard)
 
 
@@ -1511,7 +1988,7 @@ async def cmd_reading_test(message: Message):
         await prep_msg.edit_text("❌ Testni tayyorlashda xatolik yuz berdi. Iltimos /reading_test bilan qayta urinib ko'ring.")
         return
 
-    active_history_quizzes[message.from_user.id] = {
+    active_quizzes[message.from_user.id] = {
         "questions": questions,
         "idx": 0,
         "score": 0,
@@ -1526,7 +2003,7 @@ async def cmd_reading_test(message: Message):
     await message.answer(f"📖 <b>Reading Passage</b>\n\n{passage}")
     await message.answer(f"Endi quyidagi {len(questions)} ta savolga javob bering:")
 
-    text, keyboard = _build_history_question_view(active_history_quizzes[message.from_user.id], 0)
+    text, keyboard = _build_quiz_question_view(active_quizzes[message.from_user.id], 0)
     await message.answer(text, reply_markup=keyboard)
 
 
@@ -1547,7 +2024,7 @@ async def cmd_listening_test(message: Message):
         await prep_msg.edit_text("❌ Testni tayyorlashda xatolik yuz berdi. Iltimos /listening_test bilan qayta urinib ko'ring.")
         return
 
-    active_history_quizzes[message.from_user.id] = {
+    active_quizzes[message.from_user.id] = {
         "questions": questions,
         "idx": 0,
         "score": 0,
@@ -1577,17 +2054,17 @@ async def cmd_listening_test(message: Message):
 
     await message.answer(f"Endi quyidagi {len(questions)} ta savolga javob bering:")
 
-    text, keyboard = _build_history_question_view(active_history_quizzes[message.from_user.id], 0)
+    text, keyboard = _build_quiz_question_view(active_quizzes[message.from_user.id], 0)
     await message.answer(text, reply_markup=keyboard)
 
 
-@dp.callback_query(F.data.startswith("histans:"))
-async def handle_history_answer(callback: CallbackQuery):
+@dp.callback_query(F.data.startswith("qans:"))
+async def handle_quiz_answer(callback: CallbackQuery):
     user_id = callback.from_user.id
-    quiz = active_history_quizzes.get(user_id)
+    quiz = active_quizzes.get(user_id)
 
     if not quiz:
-        await callback.answer("⏱ Bu sessiya tugagan yoki muddati o'tgan. Yangi test uchun /tarix yuboring.", show_alert=True)
+        await callback.answer("⏱ Bu sessiya tugagan yoki muddati o'tgan. Yangi test uchun /quiz yuboring.", show_alert=True)
         return
 
     try:
@@ -1602,7 +2079,7 @@ async def handle_history_answer(callback: CallbackQuery):
     correct_index = q["correct_index"]
     letters = ["A", "B", "C", "D", "E", "F"]
     mode = quiz.get("mode", "quiz")
-    mode_emoji = "🎓" if mode == "certificate" else "📜"
+    mode_emoji = {"certificate": "🎓", "reading": "📖", "listening": "🎧", "daily": "📅"}.get(mode, "🧩")
 
     is_correct = selected_index == correct_index
     if is_correct:
@@ -1630,14 +2107,14 @@ async def handle_history_answer(callback: CallbackQuery):
 
     if quiz["idx"] < total:
         # Keyingi savolni yangi xabar sifatida yuboramiz
-        next_text, next_keyboard = _build_history_question_view(quiz, quiz["idx"])
+        next_text, next_keyboard = _build_quiz_question_view(quiz, quiz["idx"])
         await callback.message.answer(next_text, reply_markup=next_keyboard)
         return
 
     # --- Test yakunlandi ---
     score = quiz["score"]
     percentage = round((score / total) * 100)
-    active_history_quizzes.pop(user_id, None)
+    active_quizzes.pop(user_id, None)
 
     if mode == "certificate":
         await update_leaderboard(LEADERBOARD_CERT_KEY, user_id, percentage)
@@ -1706,21 +2183,36 @@ async def handle_history_answer(callback: CallbackQuery):
         await callback.message.answer(summary)
         return
 
-    # Oddiy /tarix viktorinasi yakuni
-    await update_leaderboard(LEADERBOARD_TARIX_KEY, user_id, percentage)
+    if mode == "daily":
+        if percentage >= 80:
+            verdict = "🏆 Zo'r! Bugungi fanni yaxshi bilar ekansiz."
+        elif percentage >= 50:
+            verdict = "👍 Yaxshi, ertaga yangi fan sizni kutadi!"
+        else:
+            verdict = "📚 Hechqisi yo'q — yangi narsa o'rganish ham yutuq!"
+        await callback.message.answer(
+            f"🏁 <b>Kunlik test yakunlandi!</b>\n\n"
+            f"🎯 Natijangiz: <b>{score}/{total}</b> ({percentage}%)\n\n"
+            f"{verdict}\n\n"
+            "🧩 Yana o'ynash uchun /quiz, jumboq uchun /teaser yuboring."
+        )
+        return
+
+    # Oddiy /quiz viktorinasi yakuni
+    await update_leaderboard(LEADERBOARD_QUIZ_KEY, user_id, percentage)
 
     if percentage >= 80:
-        verdict = "🏆 Ajoyib natija! Tarixni juda yaxshi bilasiz."
+        verdict = "🏆 Ajoyib natija! Bilimingiz juda yaxshi."
     elif percentage >= 50:
         verdict = "👍 Yomon emas! Yana mashq qilsangiz yanada yaxshi bo'ladi."
     else:
-        verdict = "📚 Tarixni ko'proq o'qishga arziydi, lekin harakat qildingiz!"
+        verdict = "📚 Ko'proq o'rganishga arziydi, lekin harakat qildingiz!"
 
     summary = (
         f"🏁 <b>Viktorina yakunlandi!</b>\n\n"
         f"🎯 Natijangiz: <b>{score}/{total}</b> ({percentage}%)\n\n"
         f"{verdict}\n\n"
-        "🔁 Yana boshlash uchun /tarix, sertifikat testi uchun /sertifikat, "
+        "🔁 Yana o'ynash uchun /quiz, sertifikat testi uchun /sertifikat, "
         "reytingni ko'rish uchun /reyting yuboring."
     )
     await callback.message.answer(summary)
@@ -2130,11 +2622,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     try {
       const data = await fetchJSON("/api/dashboard/profile?uid=" + encodeURIComponent(uid));
       let html = '<div class="card"><h3>' + escapeHtml(data.name || "Foydalanuvchi") + '</h3>';
-      html += '<div class="stat-row"><span>🏆 Tarix viktorinasi (eng yaxshi)</span><span>' + (data.tarix_best !== null ? data.tarix_best + '%' : '—') + '</span></div>';
+      html += '<div class="stat-row"><span>🏆 Viktorina (eng yaxshi)</span><span>' + (data.quiz_best !== null ? data.quiz_best + '%' : '—') + '</span></div>';
       html += '<div class="stat-row"><span>🎓 Sertifikat testi (eng yaxshi)</span><span>' + (data.cert_best !== null ? data.cert_best + '%' : '—') + '</span></div>';
       html += '<div class="stat-row"><span>📖 Reading testlari yechilgan</span><span>' + data.reading_done + '</span></div>';
       html += '<div class="stat-row"><span>🎧 Listening testlari yechilgan</span><span>' + data.listening_done + '</span></div>';
-      if (data.tarix_rank) html += '<div class="stat-row"><span>Tarix reytingidagi o\'rni</span><span>#' + data.tarix_rank + '</span></div>';
+      if (data.quiz_rank) html += '<div class="stat-row"><span>Viktorina reytingidagi o\'rni</span><span>#' + data.quiz_rank + '</span></div>';
       if (data.cert_rank) html += '<div class="stat-row"><span>Sertifikat reytingidagi o\'rni</span><span>#' + data.cert_rank + '</span></div>';
       html += '</div>';
       contentEl.innerHTML = html;
@@ -2249,23 +2741,23 @@ async def api_dashboard_profile(request: web.Request):
     except Exception:
         pass
 
-    tarix_best = None
+    quiz_best = None
     cert_best = None
-    tarix_rank = None
+    quiz_rank = None
     cert_rank = None
 
     if redis_client is not None:
         try:
-            score = await redis_client.zscore(LEADERBOARD_TARIX_KEY, uid)
+            score = await redis_client.zscore(LEADERBOARD_QUIZ_KEY, uid)
             if score is not None:
-                tarix_best = int(float(score))
-                entries = await get_leaderboard_entries(LEADERBOARD_TARIX_KEY, top_n=10_000)
+                quiz_best = int(float(score))
+                entries = await get_leaderboard_entries(LEADERBOARD_QUIZ_KEY, top_n=10_000)
                 for i, (member, _) in enumerate(entries):
                     if member == uid:
-                        tarix_rank = i + 1
+                        quiz_rank = i + 1
                         break
         except Exception as e:
-            logger.warning("Profil (tarix) o'qishda xatolik: %s", e)
+            logger.warning("Profil (viktorina) o'qishda xatolik: %s", e)
 
         try:
             score = await redis_client.zscore(LEADERBOARD_CERT_KEY, uid)
@@ -2290,9 +2782,9 @@ async def api_dashboard_profile(request: web.Request):
 
     return web.json_response({
         "name": name,
-        "tarix_best": tarix_best,
+        "quiz_best": quiz_best,
         "cert_best": cert_best,
-        "tarix_rank": tarix_rank,
+        "quiz_rank": quiz_rank,
         "cert_rank": cert_rank,
         "reading_done": int(reading_done),
         "listening_done": int(listening_done),
@@ -2423,6 +2915,15 @@ async def on_startup(app: web.Application):
     logger.info("Webhook o'rnatildi: %s", WEBHOOK_URL)
     await setup_bot_commands()
 
+    global _daily_task
+    if DAILY_PUSH_ENABLED and redis_client is not None:
+        _daily_task = asyncio.create_task(daily_broadcast_loop())
+    else:
+        logger.info("Kunlik avtomatik xabar o'chiq (DAILY_PUSH_ENABLED=0 yoki Redis ulanmagan).")
+
+
+_daily_task: "asyncio.Task | None" = None
+
 
 async def on_shutdown(app: web.Application):
     # MUHIM: bu yerda bot.delete_webhook() CHAQIRILMAYDI!
@@ -2431,6 +2932,8 @@ async def on_shutdown(app: web.Application):
     # eski (o'chayotgan) instance yangi instance endigina o'rnatgan
     # webhookni o'chirib yuboradi va bot butunlay javob bermay qoladi.
     # Shuning uchun shutdown paytida faqat bot sessiyasini yopamiz, xolos.
+    if _daily_task is not None:
+        _daily_task.cancel()
     await bot.session.close()
     logger.info("Bot sessiyasi yopildi (webhook tegilmadi).")
 
@@ -2467,17 +2970,20 @@ def create_app() -> web.Application:
 
 async def setup_bot_commands():
     commands = [
-        BotCommand(command="start", description="Botni boshlash va yo'riqnoma"),
-        BotCommand(command="test", description="Yangi IELTS Speaking mock testini boshlash"),
-        BotCommand(command="tarix", description="10 ta ketma-ket tarix savoli viktorinasi"),
-        BotCommand(command="sertifikat", description="25 ta savolli sertifikat testi"),
-        BotCommand(command="reading_test", description="AI generatsiya qilgan IELTS Reading testi"),
-        BotCommand(command="listening_test", description="AI generatsiya qilgan IELTS Listening testi"),
-        BotCommand(command="stats", description="Bot statistikasini ko'rish"),
-        BotCommand(command="reyting", description="TOP 10 reyting jadvalini ko'rish"),
-        BotCommand(command="english", description="Ingliz tili mashq rejimi (xatolarni tuzatadi)"),
-        BotCommand(command="dashboard", description="Dashboard: Profil, Reading, Listening, Grammar"),
-        BotCommand(command="stop", description="Joriy testni to'xtatish / suhbatni tozalash"),
+        BotCommand(command="start", description="Boshlash va barcha imkoniyatlar"),
+        BotCommand(command="quiz", description="Istalgan fandan viktorina"),
+        BotCommand(command="teaser", description="Miya jumboqlari va topishmoqlar"),
+        BotCommand(command="kunlik", description="Bugungi fan, fakt va ingliz tili maslahati"),
+        BotCommand(command="english", description="Ingliz tilida suhbat (xatolarni tuzatadi)"),
+        BotCommand(command="sertifikat", description="25 savolli sertifikat testi"),
+        BotCommand(command="reyting", description="TOP 10 reyting jadvallari"),
+        BotCommand(command="test", description="IELTS Speaking mock testi"),
+        BotCommand(command="reading_test", description="IELTS Reading testi"),
+        BotCommand(command="listening_test", description="IELTS Listening testi"),
+        BotCommand(command="dashboard", description="Profil va o'quv materiallari"),
+        BotCommand(command="xabarnoma", description="Kunlik xabarni yoqish/o'chirish"),
+        BotCommand(command="stats", description="Bot statistikasi"),
+        BotCommand(command="stop", description="Joriy jarayonni to'xtatish"),
     ]
     await bot.set_my_commands(commands)
     logger.info("Bot buyruqlar menyusi o'rnatildi.")
