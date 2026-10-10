@@ -422,10 +422,6 @@ class SubscriptionMiddleware(BaseMiddleware):
         if user is None or user.is_bot:
             return await handler(event, data)
 
-        # Admin har doim o'tkaziladi
-        if ADMIN_USER_ID and str(user.id) == str(ADMIN_USER_ID):
-            return await handler(event, data)
-
         # "Tekshirish" tugmasi o'zining handleriga o'tishi kerak
         if isinstance(event, CallbackQuery) and event.data == CHECK_SUB_CALLBACK:
             return await handler(event, data)
