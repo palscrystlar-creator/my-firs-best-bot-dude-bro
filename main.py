@@ -447,194 +447,6 @@ dp.message.outer_middleware(SubscriptionMiddleware())
 dp.callback_query.outer_middleware(SubscriptionMiddleware())
 
 
-# --- XP, daraja va 🔥 seriya ---------------------------------------------
-# Quiz/teaser handlerlariga tegmaydi: XPMiddleware ularning holatini kuzatib,
-# test tugaganda bitta marta XP beradi (Redis'ga ~3 ta buyruq).
-
-XP_USER_KEY_PREFIX = "ielts_bot:user:"
-XP_BOARD_KEY = "ielts_bot:xp_board"
-XP_PER_CORRECT = 2
-XP_COMPLETE_BONUS = {"quiz": 10, "daily": 15, "reading": 20, "listening": 20, "certificate": 40}
-XP_PERFECT_BONUS = 10
-XP_TEASER = 3
-XP_SPEAKING = 80
-XP_STREAK_BONUS_PER_DAY = 2   # har seriya kuni uchun, maksimum 10
-XP_STREAK_BONUS_MAX = 10
-
-# (kerakli XP, nomi)
-LEVELS = [
-    (0, "🌱 Yangi boshlovchi"),
-    (50, "📘 O'quvchi"),
-    (150, "🔍 Izlanuvchi"),
-    (350, "🧠 Bilimdon"),
-    (700, "⭐ Mohir"),
-    (1200, "🚀 Ekspert"),
-    (2000, "👑 Ustoz"),
-    (3500, "🏆 Afsona"),
-]
-
-
-def level_info(xp: int) -> dict:
-    """XP bo'yicha daraja raqami, nomi va keyingi darajagacha qolgan XP."""
-    idx = 0
-    for i, (need, _name) in enumerate(LEVELS):
-        if xp >= need:
-            idx = i
-    name = LEVELS[idx][1]
-    if idx + 1 < len(LEVELS):
-        nxt_need = LEVELS[idx + 1][0]
-        cur_need = LEVELS[idx][0]
-        span = nxt_need - cur_need
-        progress = (xp - cur_need) / span if span else 1.0
-        return {"level": idx + 1, "name": name, "next_need": nxt_need,
-                "left": nxt_need - xp, "progress": progress}
-    return {"level": idx + 1, "name": name, "next_need": None, "left": 0, "progress": 1.0}
-
-
-def _progress_bar(progress: float, width: int = 10) -> str:
-    filled = max(0, min(width, int(round(progress * width))))
-    return "🟩" * filled + "⬜" * (width - filled)
-
-
-def compute_streak(last_day: str, streak: int, today: str) -> int:
-    """Bugungi yangi seriya qiymatini hisoblaydi (bir kunda bir marta chaqiriladi)."""
-    if last_day == today:
-        return max(streak, 1)
-    try:
-        d_last = datetime.strptime(last_day, "%Y-%m-%d").date()
-        d_today = datetime.strptime(today, "%Y-%m-%d").date()
-        if (d_today - d_last).days == 1:
-            return streak + 1
-    except (ValueError, TypeError):
-        pass
-    return 1
-
-
-async def award_xp(user_id: int, base_xp: int, name: str = "") -> dict | None:
-    """XP beradi, seriyani yangilaydi. Natija: {gained, total, streak, new_day,
-    old_level, new_level, level_up, streak_bonus}. Redis yo'q bo'lsa None."""
-    if redis_client is None or base_xp <= 0:
-        return None
-    try:
-        key = f"{XP_USER_KEY_PREFIX}{user_id}"
-        data = await redis_client.hgetall(key) or {}
-        total_old = int(data.get("xp", 0) or 0)
-        last_day = str(data.get("last_day", "") or "")
-        streak_old = int(data.get("streak", 0) or 0)
-        best_old = int(data.get("best_streak", 0) or 0)
-        today = _today_str()
-
-        new_day = last_day != today
-        streak = compute_streak(last_day, streak_old, today)
-        streak_bonus = 0
-        if new_day:
-            streak_bonus = min(XP_STREAK_BONUS_MAX, streak * XP_STREAK_BONUS_PER_DAY)
-        gained = base_xp + streak_bonus
-        total = total_old + gained
-
-        mapping = {
-            "xp": total, "streak": streak, "last_day": today,
-            "best_streak": max(best_old, streak),
-        }
-        if name:
-            mapping["name"] = name[:40]
-        await redis_client.hset(key, values=mapping)
-        await redis_client.zadd(XP_BOARD_KEY, {str(user_id): total})
-
-        old_lv = level_info(total_old)["level"]
-        new_lv = level_info(total)
-        return {
-            "gained": gained, "total": total, "streak": streak, "new_day": new_day,
-            "streak_bonus": streak_bonus, "old_level": old_lv,
-            "new_level": new_lv["level"], "level_name": new_lv["name"],
-            "level_up": new_lv["level"] > old_lv,
-        }
-    except Exception as e:
-        logger.warning("XP berishda xatolik: %s", e)
-        return None
-
-
-def format_reward(res: dict, headline: str = "") -> str:
-    lines = []
-    if headline:
-        lines.append(headline)
-    lines.append(f"✨ <b>+{res['gained']} XP</b>  •  jami {res['total']} XP")
-    if res["new_day"]:
-        extra = f" (+{res['streak_bonus']} bonus)" if res["streak_bonus"] else ""
-        lines.append(f"🔥 Seriya: <b>{res['streak']} kun</b>{extra}")
-    if res["level_up"]:
-        lines.append(f"\n🎉 <b>YANGI DARAJA!</b> {res['level_name']} (Lv.{res['new_level']})")
-    return "\n".join(lines)
-
-
-class XPMiddleware(BaseMiddleware):
-    """Quiz/teaser tugaganini kuzatib XP beradi (handlerlarga tegmaydi)."""
-
-    async def __call__(self, handler, event, data):
-        if not isinstance(event, CallbackQuery) or not event.data:
-            return await handler(event, data)
-
-        user = event.from_user
-        cb = event.data
-        quiz = active_quizzes.get(user.id) if cb.startswith("qans:") else None
-        teaser = None
-        if cb == "tz:ans":
-            teaser = active_teasers.get(user.id)
-            if teaser is not None and teaser.get("_xp_given"):
-                teaser = None
-
-        result = await handler(event, data)
-
-        try:
-            if quiz is not None and active_quizzes.get(user.id) is not quiz \
-                    and quiz.get("idx", 0) >= len(quiz.get("questions", [])):
-                total = len(quiz["questions"])
-                score = quiz.get("score", 0)
-                mode = quiz.get("mode", "quiz")
-                xp = score * XP_PER_CORRECT + XP_COMPLETE_BONUS.get(mode, 10)
-                if total and score == total:
-                    xp += XP_PERFECT_BONUS
-                res = await award_xp(user.id, xp, user.full_name or "")
-                if res and event.message:
-                    head = "🏅 <b>Mukammal natija!</b>" if total and score == total else "🎯 <b>Mukofot</b>"
-                    await event.message.answer(format_reward(res, head) + "\n\n👤 Profilingiz: /profil")
-            elif teaser is not None and cb == "tz:ans":
-                teaser["_xp_given"] = True
-                res = await award_xp(user.id, XP_TEASER, user.full_name or "")
-                if res and event.message:
-                    await event.message.answer(format_reward(res))
-        except Exception as e:
-            logger.warning("XPMiddleware xatolik: %s", e)
-        return result
-
-
-dp.callback_query.outer_middleware(XPMiddleware())
-
-
-async def get_profile(user_id: int) -> dict:
-    data = {}
-    rank = None
-    if redis_client is not None:
-        try:
-            data = await redis_client.hgetall(f"{XP_USER_KEY_PREFIX}{user_id}") or {}
-            r = await redis_client.zrevrank(XP_BOARD_KEY, str(user_id))
-            rank = (int(r) + 1) if r is not None else None
-        except Exception as e:
-            logger.warning("Profilni o'qishda xatolik: %s", e)
-    xp = int(data.get("xp", 0) or 0)
-    streak = int(data.get("streak", 0) or 0)
-    last_day = str(data.get("last_day", "") or "")
-    # Kecha ham, bugun ham o'ynamagan bo'lsa — seriya uzilgan
-    try:
-        gap = (datetime.strptime(_today_str(), "%Y-%m-%d").date()
-               - datetime.strptime(last_day, "%Y-%m-%d").date()).days
-        if gap > 1:
-            streak = 0
-    except (ValueError, TypeError):
-        streak = 0
-    return {"xp": xp, "streak": streak, "best": int(data.get("best_streak", 0) or 0),
-            "rank": rank, "today_done": last_day == _today_str()}
-
 
 @dp.callback_query(F.data == CHECK_SUB_CALLBACK)
 async def handle_check_subscription(callback: CallbackQuery):
@@ -1246,9 +1058,7 @@ WELCOME_TEXT = (
     "/teaser — miya jumboqlari va topishmoqlar\n"
     "/kunlik — bugungi fan, qiziqarli fakt va test\n"
     "/sertifikat — 25 savolli test, natija yaxshi bo'lsa sertifikat\n"
-    "/reyting — eng yaxshilar jadvali\n"
-    "👤 /profil — XP, daraja va 🔥 seriyangiz\n"
-    "🏅 /top — XP bo'yicha TOP 10\n\n"
+    "/reyting — eng yaxshilar jadvali\n\n"
     "🇬🇧 <b>Ingliz tili va IELTS</b>\n"
     "/english — ingliz tilida suhbat, xatolaringizni tuzatib boraman\n"
     "/test — IELTS Speaking mock testi (ovozli javoblar)\n"
@@ -1263,58 +1073,6 @@ WELCOME_TEXT = (
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(WELCOME_TEXT)
-
-
-@dp.message(Command("profil"))
-async def cmd_profil(message: Message):
-    uid = message.from_user.id
-    if redis_client is None:
-        await message.answer("⚠️ Profil hozircha mavjud emas.")
-        return
-    p = await get_profile(uid)
-    lv = level_info(p["xp"])
-    name = html.escape(message.from_user.full_name or "Foydalanuvchi")
-    lines = [
-        f"👤 <b>{name}</b>",
-        "",
-        f"🎖 Daraja: <b>{lv['name']}</b> (Lv.{lv['level']})",
-        f"✨ XP: <b>{p['xp']}</b>",
-    ]
-    if lv["next_need"] is not None:
-        lines.append(f"{_progress_bar(lv['progress'])} {int(lv['progress'] * 100)}%")
-        lines.append(f"🎯 Keyingi darajagacha: <b>{lv['left']} XP</b>")
-    else:
-        lines.append("👑 Eng yuqori darajaga yetdingiz!")
-    lines.append("")
-    if p["streak"] > 0:
-        lines.append(f"🔥 Seriya: <b>{p['streak']} kun</b> (eng yaxshi: {max(p['best'], p['streak'])})")
-        if not p["today_done"]:
-            lines.append("⏰ Seriyani saqlash uchun bugun biror test yoki jumboq yeching!")
-    else:
-        lines.append("🔥 Seriya: 0 — bugun /quiz yoki /teaser bilan boshlang!")
-    if p["rank"]:
-        lines.append(f"🏅 XP reytingda o'rningiz: <b>#{p['rank']}</b>")
-    await message.answer("\n".join(lines))
-
-
-@dp.message(Command("top"))
-async def cmd_top(message: Message):
-    entries = await get_leaderboard_entries(XP_BOARD_KEY, 10)
-    if not entries:
-        await message.answer("🏅 Hali hech kim XP to'plamagan. Birinchi bo'ling — /quiz!")
-        return
-    medals = ["🥇", "🥈", "🥉"]
-    lines = ["🏅 <b>XP bo'yicha TOP 10</b>\n"]
-    for i, (member, score) in enumerate(entries, 1):
-        nm = None
-        try:
-            nm = await redis_client.hget(f"{XP_USER_KEY_PREFIX}{member}", "name")
-        except Exception:
-            pass
-        nm = html.escape(str(nm or f"ID {member}"))
-        icon = medals[i - 1] if i <= 3 else f"{i}."
-        lines.append(f"{icon} {nm} — <b>{int(float(score))} XP</b>")
-    await message.answer("\n".join(lines))
 
 
 @dp.message(Command("stop"))
@@ -2646,9 +2404,6 @@ async def handle_part3_voice(message: Message, state: FSMContext):
 
         await state.clear()
         cleanup_user_dir(message.from_user.id)
-        res = await award_xp(message.from_user.id, XP_SPEAKING, message.from_user.full_name or "")
-        if res:
-            await message.answer(format_reward(res, "🎤 <b>Speaking testi uchun mukofot</b>"))
         await message.answer("🔁 Yangi test uchun /test buyrug'ini yuboring.")
 
 
@@ -3223,8 +2978,6 @@ async def setup_bot_commands():
         BotCommand(command="english", description="Ingliz tilida suhbat (xatolarni tuzatadi)"),
         BotCommand(command="sertifikat", description="25 savolli sertifikat testi"),
         BotCommand(command="reyting", description="TOP 10 reyting jadvallari"),
-        BotCommand(command="profil", description="XP, daraja va seriyangiz"),
-        BotCommand(command="top", description="XP bo'yicha TOP 10"),
         BotCommand(command="test", description="IELTS Speaking mock testi"),
         BotCommand(command="reading_test", description="IELTS Reading testi"),
         BotCommand(command="listening_test", description="IELTS Listening testi"),
