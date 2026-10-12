@@ -58,6 +58,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     BotCommand,
     WebAppInfo,
+    Update,
 )
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
@@ -1073,10 +1074,106 @@ WELCOME_TEXT = (
 )
 
 
+# --- Asosiy menyu: 🔬 Ilm / 🇬🇧 Ingliz tili -------------------------------
+
+MENU_INTRO = (
+    "👋 <b>Salom! Men universal yordamchi botman.</b>\n\n"
+    "💬 Menga istalgan narsani yozing yoki ovozli xabar yuboring — savol bering, "
+    "gaplashing. Yoki pastdan yo'nalishni tanlang 👇"
+)
+
+# (emoji, matn, buyruq)
+MENU_SCIENCE = [
+    ("🧩", "Viktorina", "quiz"),
+    ("🧠", "Miya jumboqlari", "teaser"),
+    ("🔬", "Nima bo'ladi?", "nima"),
+    ("🕵️", "Yolg'onni top", "yolgon"),
+    ("🔮", "Men topaman", "topaman"),
+    ("📖", "Interaktiv hikoya", "hikoya"),
+    ("📅", "Kunlik fan va fakt", "kunlik"),
+    ("🎓", "Sertifikat testi", "sertifikat"),
+    ("🏆", "Reyting", "reyting"),
+]
+MENU_ENGLISH = [
+    ("💬", "Ingliz tilida suhbat", "english"),
+    ("🎤", "IELTS Speaking", "test"),
+    ("📖", "IELTS Reading", "reading_test"),
+    ("🎧", "IELTS Listening", "listening_test"),
+    ("📚", "Dashboard va materiallar", "dashboard"),
+]
+
+
+def _main_menu_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔬 Ilm yo'nalishi", callback_data="mn:sci")],
+        [InlineKeyboardButton(text="🇬🇧 Ingliz tili", callback_data="mn:eng")],
+        [InlineKeyboardButton(text="ℹ️ Barcha buyruqlar", callback_data="mn:all")],
+    ])
+
+
+def _submenu_keyboard(items: list) -> InlineKeyboardMarkup:
+    rows, row = [], []
+    for emoji, label, cmd in items:
+        row.append(InlineKeyboardButton(text=f"{emoji} {label}", callback_data=f"mn:run:{cmd}"))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="mn:home")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 @dp.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
-    await message.answer(WELCOME_TEXT)
+    await message.answer(MENU_INTRO, reply_markup=_main_menu_keyboard())
+
+
+@dp.message(Command("menu"))
+async def cmd_menu(message: Message):
+    await message.answer("📋 <b>Asosiy menyu</b> 👇", reply_markup=_main_menu_keyboard())
+
+
+@dp.callback_query(F.data.startswith("mn:"))
+async def handle_menu(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    action = parts[1] if len(parts) > 1 else ""
+    msg = callback.message
+
+    async def show(text: str, kb: InlineKeyboardMarkup):
+        try:
+            await msg.edit_text(text, reply_markup=kb)
+        except Exception:
+            await msg.answer(text, reply_markup=kb)
+
+    if action == "home":
+        await callback.answer()
+        await show("📋 <b>Asosiy menyu</b> 👇", _main_menu_keyboard())
+    elif action == "sci":
+        await callback.answer()
+        await show("🔬 <b>Ilm yo'nalishi</b>\n\nViktorinalar, jumboqlar va o'yinlar — tanlang 👇",
+                   _submenu_keyboard(MENU_SCIENCE))
+    elif action == "eng":
+        await callback.answer()
+        await show("🇬🇧 <b>Ingliz tili</b>\n\nSuhbat, IELTS testlari va materiallar — tanlang 👇",
+                   _submenu_keyboard(MENU_ENGLISH))
+    elif action == "all":
+        await callback.answer()
+        await show(WELCOME_TEXT, InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⬅️ Orqaga", callback_data="mn:home")]]))
+    elif action == "run" and len(parts) > 2:
+        cmd = parts[2]
+        allowed = {c for _e, _l, c in MENU_SCIENCE + MENU_ENGLISH}
+        if cmd not in allowed:
+            await callback.answer()
+            return
+        await callback.answer()
+        # Tugmani xuddi foydalanuvchi "/buyruq" yozgandek ishga tushiramiz
+        fake = msg.model_copy(update={"text": f"/{cmd}", "from_user": callback.from_user, "entities": None})
+        await dp.feed_update(bot, Update(update_id=0, message=fake))
+    else:
+        await callback.answer()
 
 
 @dp.message(Command("stop"))
@@ -3557,6 +3654,7 @@ def create_app() -> web.Application:
 
 async def setup_bot_commands():
     commands = [
+        BotCommand(command="menu", description="Asosiy menyu (Ilm / Ingliz tili)"),
         BotCommand(command="start", description="Boshlash va barcha imkoniyatlar"),
         BotCommand(command="quiz", description="Istalgan fandan viktorina"),
         BotCommand(command="teaser", description="Miya jumboqlari va topishmoqlar"),
