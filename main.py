@@ -1060,6 +1060,7 @@ WELCOME_TEXT = (
     "/kunlik — bugungi fan, qiziqarli fakt va test\n"
     "/hikoya — interaktiv hikoya: tanlovingiz yakunni o'zgartiradi 🎭\n"
     "/yolgon — 3 ta gapdan yolg'onini toping 🕵️\n"
+    "/nima — \"Nima bo'ladi?\" fan jumboqlari: taxmin qiling 🔬\n"
     "/sertifikat — 25 savolli test, natija yaxshi bo'lsa sertifikat\n"
     "/reyting — eng yaxshilar jadvali\n\n"
     "🇬🇧 <b>Ingliz tili va IELTS</b>\n"
@@ -1087,6 +1088,7 @@ async def cmd_stop(message: Message, state: FSMContext):
     active_teasers.pop(message.from_user.id, None)
     active_stories.pop(message.from_user.id, None)
     active_lies.pop(message.from_user.id, None)
+    active_what.pop(message.from_user.id, None)
     active_guess_games.pop(message.from_user.id, None)
 
     if current is None:
@@ -2119,6 +2121,126 @@ async def handle_lie_action(callback: CallbackQuery):
     except Exception:
         await callback.message.answer(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="➡️ Keyingisi", callback_data="lie:next")]]))
+
+
+# --- "Nima bo'ladi?" (/nima) ---------------------------------------------
+# Fan asosidagi qiziq vaziyat beriladi (masalan: "Suvga natriy tashlasangiz..."),
+# foydalanuvchi 3 ta variantdan nima bo'lishini taxmin qiladi, so'ng
+# ilmiy tushuntirish va hayratlanarli fakt ko'rsatiladi.
+
+_WHAT_TOPICS = [
+    "fizika", "kimyo", "biologiya", "kosmos va astronomiya", "inson tanasi",
+    "geologiya va Yer", "iqlim va ob-havo", "texnika va mexanika", "dengiz va okeanlar", "energiya va elektr",
+]
+active_what: dict[int, dict] = {}
+
+
+def _generate_what_sync(topic: str) -> dict:
+    data = _llm_json_sync(
+        f"Create a 'What would happen if...?' science riddle about: {topic}. Write in UZBEK (Latin script). "
+        "The scenario must be a vivid, concrete, scientifically answerable situation that makes people curious "
+        "(NOT dangerous-to-try instructions; no instructions for harming anyone). "
+        "Give exactly 3 plausible outcomes; exactly ONE is scientifically correct; the wrong ones must be tempting. "
+        "Randomize the position of the correct one. Explain the real science simply (2-3 sentences) and add one "
+        "mind-blowing related fact (1 sentence). Reply ONLY as JSON: "
+        '{"scenario": "...", "options": ["...","...","..."], "correct_index": 0, "explanation": "...", "wow": "..."}',
+        temperature=0.9,
+    )
+    opts = [str(x).strip() for x in (data.get("options") or []) if str(x).strip()]
+    idx = int(data.get("correct_index", -1))
+    scenario = str(data.get("scenario", "")).strip()
+    if len(opts) != 3 or idx not in (0, 1, 2) or not scenario:
+        raise ValueError("Noto'g'ri format")
+    return {"scenario": scenario, "options": opts, "correct_index": idx,
+            "explanation": str(data.get("explanation", "")).strip(),
+            "wow": str(data.get("wow", "")).strip(), "topic": topic}
+
+
+def _what_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="1️⃣", callback_data="wh:0"),
+        InlineKeyboardButton(text="2️⃣", callback_data="wh:1"),
+        InlineKeyboardButton(text="3️⃣", callback_data="wh:2"),
+    ]])
+
+
+async def _send_what_round(chat_message: Message, user_id: int):
+    import random
+    prev = active_what.get(user_id, {})
+    await bot.send_chat_action(chat_message.chat.id, "typing")
+    try:
+        rnd = await asyncio.to_thread(_generate_what_sync, random.choice(_WHAT_TOPICS))
+    except Exception as e:
+        logger.exception("'Nima bo'ladi' savolini yaratishda xatolik: %s", e)
+        await chat_message.answer("❌ Savol tayyorlanmadi. /nima bilan qayta urinib ko'ring.")
+        return
+    rnd["right"] = prev.get("right", 0)
+    rnd["total"] = prev.get("total", 0)
+    rnd["answered"] = False
+    active_what[user_id] = rnd
+    body = "\n\n".join(f"{i + 1}️⃣ {html.escape(t)}" for i, t in enumerate(rnd["options"]))
+    score = f"  •  🎯 {rnd['right']}/{rnd['total']}" if rnd["total"] else ""
+    await chat_message.answer(
+        f"🔬 <b>Nima bo'ladi?</b>{score}\n\n{html.escape(rnd['scenario'])}\n\n{body}\n\n<i>Sizningcha-chi? 👇</i>",
+        reply_markup=_what_keyboard(),
+    )
+
+
+@dp.message(Command("nima"))
+async def cmd_nima(message: Message, state: FSMContext):
+    if await state.get_state() is not None:
+        await message.answer("⏳ Avval joriy testni tugating yoki /stop yuboring.")
+        return
+    active_what.pop(message.from_user.id, None)
+    await _send_what_round(message, message.from_user.id)
+
+
+@dp.callback_query(F.data.startswith("wh:"))
+async def handle_what_action(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    action = callback.data.split(":", 1)[1]
+
+    if action == "next":
+        await callback.answer()
+        await _send_what_round(callback.message, user_id)
+        return
+
+    rnd = active_what.get(user_id)
+    if not rnd or rnd.get("answered"):
+        await callback.answer("Bu savol tugagan. /nima bilan yangisini oling.", show_alert=True)
+        return
+    try:
+        choice = int(action)
+    except ValueError:
+        await callback.answer()
+        return
+
+    rnd["answered"] = True
+    rnd["total"] += 1
+    good = rnd["correct_index"]
+    if choice == good:
+        rnd["right"] += 1
+        head = "🎉 <b>To'g'ri taxmin!</b>"
+        await callback.answer("🎉 To'g'ri!")
+    else:
+        head = "🤯 <b>Aksincha bo'ldi!</b>"
+        await callback.answer("Kutilmagan 🤯")
+
+    lines = []
+    for i, t in enumerate(rnd["options"]):
+        mark = "✅" if i == good else ("❌" if i == choice else "▫️")
+        lines.append(f"{mark} {i + 1}️⃣ {html.escape(t)}")
+    text = f"{head}\n\n" + "\n".join(lines)
+    if rnd["explanation"]:
+        text += f"\n\n🔎 <b>Ilm nima deydi:</b> {html.escape(rnd['explanation'])}"
+    if rnd["wow"]:
+        text += f"\n\n🤩 <i>{html.escape(rnd['wow'])}</i>"
+    text += f"\n\n🎯 Natijangiz: <b>{rnd['right']}/{rnd['total']}</b>"
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="➡️ Yana bitta", callback_data="wh:next")]])
+    try:
+        await callback.message.edit_text(text, reply_markup=kb)
+    except Exception:
+        await callback.message.answer(text, reply_markup=kb)
 
 
 # --- Kunlik fan + ingliz tili maslahati ----------------------------------
@@ -3441,6 +3563,7 @@ async def setup_bot_commands():
         BotCommand(command="topaman", description="Men o'ylagan narsani top (o'yin)"),
         BotCommand(command="hikoya", description="Interaktiv hikoya — yo'lni o'zingiz tanlang"),
         BotCommand(command="yolgon", description="3 ta gapdan yolg'onini toping"),
+        BotCommand(command="nima", description="Nima bo'ladi? Fan jumboqlari"),
         BotCommand(command="kunlik", description="Bugungi fan, fakt va ingliz tili maslahati"),
         BotCommand(command="english", description="Ingliz tilida suhbat (xatolarni tuzatadi)"),
         BotCommand(command="sertifikat", description="25 savolli sertifikat testi"),
