@@ -1056,7 +1056,9 @@ WELCOME_TEXT = (
     "🧩 <b>Bilim va o'yin</b>\n"
     "/quiz — istalgan fandan viktorina (fanni o'zingiz tanlaysiz)\n"
     "/teaser — miya jumboqlari va topishmoqlar\n"
+    "🔮 /topaman — siz o'ylagan narsani men topaman!\n"
     "/kunlik — bugungi fan, qiziqarli fakt va test\n"
+    "/hikoya — interaktiv hikoya: tanlovingiz yakunni o'zgartiradi 🎭\n"
     "/sertifikat — 25 savolli test, natija yaxshi bo'lsa sertifikat\n"
     "/reyting — eng yaxshilar jadvali\n\n"
     "🇬🇧 <b>Ingliz tili va IELTS</b>\n"
@@ -1082,6 +1084,8 @@ async def cmd_stop(message: Message, state: FSMContext):
     # Davom etayotgan viktorina/test (Quiz, Kunlik, Reading, Listening, Sertifikat) va jumboqni ham to'xtatamiz
     quiz_stopped = active_quizzes.pop(message.from_user.id, None) is not None
     active_teasers.pop(message.from_user.id, None)
+    active_stories.pop(message.from_user.id, None)
+    active_guess_games.pop(message.from_user.id, None)
 
     if current is None:
         # Faol imtihon yo'q, lekin suhbat xotirasi bo'lishi mumkin — uni tozalaymiz.
@@ -1655,6 +1659,346 @@ async def handle_teaser_action(callback: CallbackQuery):
 
     await callback.answer()
 
+
+
+# --- 🔮 "Men topaman" o'yini (Akinator uslubi) ----------------------------
+# Foydalanuvchi biror narsani o'ylaydi (shaxs, hayvon, narsa, qahramon...),
+# bot faqat Ha/Yo'q savollar berib, uni topishga harakat qiladi. Faqat tugmalar.
+
+GUESS_MAX_QUESTIONS = 20
+active_guess_games: dict[int, dict] = {}
+
+_GUESS_ANSWERS = {"y": "Ha", "n": "Yo'q", "m": "Ba'zan / bilmayman"}
+
+
+def _guess_step_sync(history: list, force_guess: bool, wrong_guesses: list) -> dict:
+    lines = "\n".join(f"{i + 1}. {q} -> {a}" for i, (q, a) in enumerate(history)) or "(hali savol berilmagan)"
+    wrong = ", ".join(wrong_guesses) if wrong_guesses else "yo'q"
+    prompt = (
+        "You are playing a 20-questions guessing game (like Akinator) in UZBEK (Latin script). "
+        "The player secretly thinks of something well-known: a famous person (real or fictional), "
+        "an animal, an object, a food, a place or a movie/cartoon character. "
+        "You ask ONE yes/no question at a time to narrow it down, then guess.\n\n"
+        f"Questions so far:\n{lines}\n\n"
+        f"Wrong guesses already made (never repeat them): {wrong}\n\n"
+        "Rules: start with broad questions (person/animal/object, real/fictional, alive/dead...) and get "
+        "more specific. Never repeat a question. Each question must be answerable with Yes/No. "
+        + ("You MUST make your final guess now. " if force_guess else
+           "Guess only when you are fairly confident (usually after 8+ questions). ")
+        + 'Reply ONLY with JSON: {"action": "ask", "question": "..."} or {"action": "guess", "guess": "..."} '
+        "(question and guess in Uzbek, short, friendly, may include one emoji)."
+    )
+    return _llm_json_sync(prompt, temperature=0.7)
+
+
+def _guess_answer_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Ha", callback_data="gs:y"),
+            InlineKeyboardButton(text="❌ Yo'q", callback_data="gs:n"),
+        ],
+        [InlineKeyboardButton(text="🤷 Ba'zan / bilmayman", callback_data="gs:m")],
+    ])
+
+
+def _guess_verdict_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🎯 Ha, to'g'ri!", callback_data="gs:win"),
+            InlineKeyboardButton(text="🙅 Yo'q, xato", callback_data="gs:lose"),
+        ],
+    ])
+
+
+def _guess_end_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔁 Yana o'ynash", callback_data="gs:new")],
+    ])
+
+
+async def _guess_next_step(target: Message, user_id: int):
+    """Keyingi savol yoki taxminni LLM'dan olib, foydalanuvchiga yuboradi."""
+    game = active_guess_games.get(user_id)
+    if not game:
+        return
+    game["busy"] = True
+    try:
+        n = len(game["history"])
+        force = n >= GUESS_MAX_QUESTIONS - 1
+        try:
+            step = await asyncio.to_thread(_guess_step_sync, game["history"], force, game["wrong"])
+        except Exception as e:
+            logger.exception("Guess o'yini LLM xatosi: %s", e)
+            active_guess_games.pop(user_id, None)
+            await target.answer("⚠️ Kechirasiz, xatolik yuz berdi. Qayta boshlash: /topaman")
+            return
+
+        if step.get("action") == "guess" and step.get("guess"):
+            game["last_guess"] = str(step["guess"])
+            await target.answer(
+                f"🔮 <b>Menimcha, siz o'ylagan narsa:</b>\n\n✨ <b>{html.escape(game['last_guess'])}</b>\n\nTopdimmi?",
+                reply_markup=_guess_verdict_keyboard(),
+            )
+        else:
+            question = str(step.get("question") or "Bu tirik mavjudotmi?")
+            game["last_question"] = question
+            await target.answer(
+                f"🔮 <b>Savol {n + 1}/{GUESS_MAX_QUESTIONS}</b>\n\n{html.escape(question)}",
+                reply_markup=_guess_answer_keyboard(),
+            )
+    finally:
+        game["busy"] = False
+
+
+async def _guess_start(target: Message, user_id: int):
+    active_guess_games[user_id] = {"history": [], "wrong": [], "busy": False}
+    await target.answer(
+        "🔮 <b>Men topaman!</b>\n\n"
+        "Biror narsani <b>o'ylang</b> — mashhur inson, hayvon, narsa, ovqat, multfilm qahramoni... "
+        "Hech qayerga yozmang, faqat xayolingizda tuting 🤫\n\n"
+        f"Men {GUESS_MAX_QUESTIONS} tagacha savol berib, topishga harakat qilaman. "
+        "Siz faqat tugmalarni bosasiz 👇"
+    )
+    await _guess_next_step(target, user_id)
+
+
+@dp.message(Command("topaman"))
+async def cmd_topaman(message: Message, state: FSMContext):
+    await state.clear()
+    await _guess_start(message, message.from_user.id)
+
+
+@dp.callback_query(F.data.startswith("gs:"))
+async def handle_guess_action(callback: CallbackQuery):
+    action = callback.data.split(":", 1)[1]
+    user_id = callback.from_user.id
+
+    if action == "new":
+        await callback.answer()
+        await _guess_start(callback.message, user_id)
+        return
+
+    game = active_guess_games.get(user_id)
+    if not game:
+        await callback.answer("Bu o'yin tugagan. Yangisi: /topaman", show_alert=True)
+        return
+    if game.get("busy"):
+        await callback.answer("⏳ Bir soniya, o'ylayapman...")
+        return
+
+    if action in _GUESS_ANSWERS:
+        game["history"].append((game.get("last_question", ""), _GUESS_ANSWERS[action]))
+        await callback.answer()
+        try:
+            await callback.message.edit_text(
+                f"🔮 {html.escape(game.get('last_question', ''))}\n\n👉 <b>{_GUESS_ANSWERS[action]}</b>",
+                reply_markup=None,
+            )
+        except Exception:
+            pass
+        await _guess_next_step(callback.message, user_id)
+        return
+
+    if action == "win":
+        n = len(game["history"])
+        guess = game.get("last_guess", "")
+        active_guess_games.pop(user_id, None)
+        await callback.answer("🎉")
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        await callback.message.answer(
+            f"🎉 <b>Yutdim!</b> Men {n} ta savolda <b>{html.escape(guess)}</b> ni topdim 😎\n\n"
+            "Yana o'ynaymizmi?",
+            reply_markup=_guess_end_keyboard(),
+        )
+        return
+
+    if action == "lose":
+        game["wrong"].append(game.get("last_guess", ""))
+        game["history"].append((f"Sizning o'ylaganingiz {game.get('last_guess', '')} mi?", "Yo'q"))
+        await callback.answer()
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        if len(game["history"]) >= GUESS_MAX_QUESTIONS or len(game["wrong"]) >= 3:
+            active_guess_games.pop(user_id, None)
+            await callback.message.answer(
+                "🏳️ <b>Yutqazdim!</b> Siz meni chalg'itdingiz 👏\n\nYana bir marta urinib ko'raymi?",
+                reply_markup=_guess_end_keyboard(),
+            )
+            return
+        await callback.message.answer("🤔 Hmm, xato qildim. Yana bir oz o'ylab ko'raman...")
+        await _guess_next_step(callback.message, user_id)
+        return
+
+    await callback.answer()
+
+
+# --- Interaktiv hikoya (/hikoya) -----------------------------------------
+# AI har qadamda sahna yozadi, foydalanuvchi 3 ta tugmadan birini tanlaydi —
+# tanlov hikoyani o'zgartiradi va oxirida o'ziga xos yakun bor.
+
+STORY_STEPS = 6
+STORY_GENRES = [
+    ("🕵️", "Detektiv", "detective mystery in a rainy old city"),
+    ("🚀", "Kosmos", "space adventure on a lost starship"),
+    ("🏰", "Fantaziya", "fantasy quest with magic and dragons"),
+    ("🧟", "Omon qolish", "survival story after a mysterious disaster"),
+    ("🏴\u200d☠️", "Qaroqchilar", "pirate treasure hunt on the open sea"),
+    ("⏳", "Vaqt sayohati", "time travel gone wrong"),
+]
+active_stories: dict[int, dict] = {}
+
+
+def _story_genre_keyboard() -> InlineKeyboardMarkup:
+    rows, row = [], []
+    for i, (emoji, name, _d) in enumerate(STORY_GENRES):
+        row.append(InlineKeyboardButton(text=f"{emoji} {name}", callback_data=f"st:g:{i}"))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _story_choice_keyboard(choices: list) -> InlineKeyboardMarkup:
+    labels = ["1️⃣", "2️⃣", "3️⃣"]
+    rows = [[InlineKeyboardButton(text=f"{labels[i]} {c}"[:60], callback_data=f"st:c:{i}")]
+            for i, c in enumerate(choices[:3])]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _generate_story_step_sync(story: dict, choice_text: str | None) -> dict:
+    step = story["step"]  # shu sahna raqami (1..STORY_STEPS)
+    is_last = step >= STORY_STEPS
+    recap = "\n".join(story["log"][-4:]) or "(hikoya endi boshlanmoqda)"
+    prompt = (
+        f"You are a gripping interactive-fiction narrator. Genre: {story['desc']}. "
+        "Write in UZBEK (Latin script), vivid, suspenseful, second person ('siz'). "
+        f"Story so far (most recent last):\n{recap}\n\n"
+        + (f"The player just chose: {choice_text}\n\n" if choice_text else "This is the opening scene.\n\n")
+        + f"Write scene {step} of {STORY_STEPS}. 3-5 short sentences. "
+        + ("This is the FINAL scene: give a memorable ending that depends on earlier choices, "
+           "set \"ending\" to true and \"choices\" to an empty list. "
+           if is_last else
+           "End on tension. Give exactly 3 distinct, short (max 6 words) choices with real consequences. "
+           "Set \"ending\" to false. ")
+        + 'Reply ONLY as JSON: {"scene": "...", "choices": ["...","...","..."], "ending": false, "title": "short ending title or empty"}'
+    )
+    data = _llm_json_sync(prompt, temperature=0.95)
+    scene = str(data.get("scene", "")).strip()
+    if not scene:
+        raise ValueError("Bo'sh sahna")
+    choices = [str(c).strip() for c in (data.get("choices") or []) if str(c).strip()][:3]
+    if not is_last and len(choices) < 2:
+        raise ValueError("Tanlovlar yetarli emas")
+    return {"scene": scene, "choices": choices, "ending": is_last, "title": str(data.get("title", "")).strip()}
+
+
+async def _story_advance(chat_message: Message, user_id: int, choice_text: str | None):
+    story = active_stories.get(user_id)
+    if not story:
+        return
+    await bot.send_chat_action(chat_message.chat.id, "typing")
+    try:
+        res = await asyncio.to_thread(_generate_story_step_sync, story, choice_text)
+    except Exception as e:
+        logger.exception("Hikoya sahnasini yaratishda xatolik: %s", e)
+        await chat_message.answer("❌ Hikoyani davom ettirib bo'lmadi. Qayta urinish uchun /hikoya yuboring.")
+        active_stories.pop(user_id, None)
+        return
+
+    story["log"].append(f"Scene {story['step']}: {res['scene']}")
+    story["choices"] = res["choices"]
+    header = f"{story['emoji']} <b>{story['name']}</b> — {story['step']}/{STORY_STEPS}"
+
+    if res["ending"]:
+        active_stories.pop(user_id, None)
+        title = f"\n🏁 <b>{html.escape(res['title'])}</b>" if res["title"] else ""
+        await chat_message.answer(
+            f"{header}\n{title}\n\n{html.escape(res['scene'])}\n\n"
+            "🎭 <b>Hikoya yakunlandi!</b> Boshqa tanlov — boshqa yakun. Yana o'ynaymizmi? 👇",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔁 Yangi hikoya", callback_data="st:new")]
+            ]),
+        )
+        return
+
+    await chat_message.answer(
+        f"{header}\n\n{html.escape(res['scene'])}\n\n<i>Nima qilasiz? 👇</i>",
+        reply_markup=_story_choice_keyboard(res["choices"]),
+    )
+
+
+@dp.message(Command("hikoya"))
+async def cmd_hikoya(message: Message, state: FSMContext):
+    if await state.get_state() is not None:
+        await message.answer("⏳ Avval joriy testni tugating yoki /stop yuboring.")
+        return
+    active_stories.pop(message.from_user.id, None)
+    await message.answer(
+        "📖 <b>Interaktiv hikoya</b>\n\n"
+        "Men hikoya boshlayman, siz esa har qadamda yo'lni tanlaysiz — "
+        f"{STORY_STEPS} qadamdan keyin yakun sizning tanlovlaringizga bog'liq bo'ladi 🎲\n\n"
+        "Janrni tanlang 👇",
+        reply_markup=_story_genre_keyboard(),
+    )
+
+
+@dp.callback_query(F.data.startswith("st:"))
+async def handle_story_action(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    parts = callback.data.split(":")
+    action = parts[1] if len(parts) > 1 else ""
+
+    if action == "new":
+        await callback.answer()
+        await callback.message.answer("📖 Janrni tanlang 👇", reply_markup=_story_genre_keyboard())
+        return
+
+    if action == "g":
+        try:
+            emoji, name, desc = STORY_GENRES[int(parts[2])]
+        except (ValueError, IndexError):
+            await callback.answer("Xatolik", show_alert=True)
+            return
+        await callback.answer(f"{emoji} {name}")
+        active_stories[user_id] = {"emoji": emoji, "name": name, "desc": desc,
+                                   "step": 1, "log": [], "choices": []}
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        await _story_advance(callback.message, user_id, None)
+        return
+
+    if action == "c":
+        story = active_stories.get(user_id)
+        if not story or not story.get("choices"):
+            await callback.answer("Bu hikoya tugagan. /hikoya bilan yangisini boshlang.", show_alert=True)
+            return
+        try:
+            choice = story["choices"][int(parts[2])]
+        except (ValueError, IndexError):
+            await callback.answer("Xatolik", show_alert=True)
+            return
+        story["choices"] = []  # ikki marta bosishdan himoya
+        await callback.answer()
+        story["log"].append(f"Player chose: {choice}")
+        story["step"] += 1
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+            await callback.message.answer(f"👉 <b>Siz tanladingiz:</b> {html.escape(choice)}")
+        except Exception:
+            pass
+        await _story_advance(callback.message, user_id, choice)
+        return
+
+    await callback.answer()
 
 
 # --- Kunlik fan + ingliz tili maslahati ----------------------------------
@@ -2974,6 +3318,8 @@ async def setup_bot_commands():
         BotCommand(command="start", description="Boshlash va barcha imkoniyatlar"),
         BotCommand(command="quiz", description="Istalgan fandan viktorina"),
         BotCommand(command="teaser", description="Miya jumboqlari va topishmoqlar"),
+        BotCommand(command="topaman", description="Men o'ylagan narsani top (o'yin)"),
+        BotCommand(command="hikoya", description="Interaktiv hikoya — yo'lni o'zingiz tanlang"),
         BotCommand(command="kunlik", description="Bugungi fan, fakt va ingliz tili maslahati"),
         BotCommand(command="english", description="Ingliz tilida suhbat (xatolarni tuzatadi)"),
         BotCommand(command="sertifikat", description="25 savolli sertifikat testi"),
