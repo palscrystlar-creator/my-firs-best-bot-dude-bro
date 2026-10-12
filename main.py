@@ -1059,6 +1059,7 @@ WELCOME_TEXT = (
     "🔮 /topaman — siz o'ylagan narsani men topaman!\n"
     "/kunlik — bugungi fan, qiziqarli fakt va test\n"
     "/hikoya — interaktiv hikoya: tanlovingiz yakunni o'zgartiradi 🎭\n"
+    "/yolgon — 3 ta gapdan yolg'onini toping 🕵️\n"
     "/sertifikat — 25 savolli test, natija yaxshi bo'lsa sertifikat\n"
     "/reyting — eng yaxshilar jadvali\n\n"
     "🇬🇧 <b>Ingliz tili va IELTS</b>\n"
@@ -1085,6 +1086,7 @@ async def cmd_stop(message: Message, state: FSMContext):
     quiz_stopped = active_quizzes.pop(message.from_user.id, None) is not None
     active_teasers.pop(message.from_user.id, None)
     active_stories.pop(message.from_user.id, None)
+    active_lies.pop(message.from_user.id, None)
     active_guess_games.pop(message.from_user.id, None)
 
     if current is None:
@@ -1999,6 +2001,124 @@ async def handle_story_action(callback: CallbackQuery):
         return
 
     await callback.answer()
+
+
+# --- Yolg'onni top (/yolgon) ---------------------------------------------
+# AI 3 ta "fakt" aytadi: 2 tasi rost, 1 tasi yolg'on. Foydalanuvchi yolg'onni
+# topadi. Ketma-ket topishlar soni sessiya davomida hisoblanadi.
+
+active_lies: dict[int, dict] = {}
+_LIE_TOPICS = [
+    "hayvonlar", "inson tanasi", "kosmos", "tarix", "okeanlar", "oziq-ovqat",
+    "texnologiya", "geografiya", "o'simliklar", "dunyo rekordlari", "tillar", "ixtirolar",
+]
+
+
+def _generate_lie_sync(topic: str) -> dict:
+    data = _llm_json_sync(
+        f"Make a 'two truths and a lie' round about: {topic}. Write in UZBEK (Latin script). "
+        "Give exactly 3 surprising short statements (1 sentence each). Exactly TWO must be 100% true, "
+        "verifiable facts and ONE must be a believable but FALSE statement. "
+        "Randomize which position the lie takes. Also give a short explanation (1-2 sentences) with the truth about the lie. "
+        'Reply ONLY as JSON: {"statements": ["...","...","..."], "lie_index": 0, "explanation": "..."}',
+        temperature=0.9,
+    )
+    st = [str(x).strip() for x in (data.get("statements") or []) if str(x).strip()]
+    idx = int(data.get("lie_index", -1))
+    if len(st) != 3 or idx not in (0, 1, 2):
+        raise ValueError("Noto'g'ri format")
+    return {"statements": st, "lie_index": idx, "explanation": str(data.get("explanation", "")).strip(), "topic": topic}
+
+
+def _lie_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="1️⃣ yolg'on", callback_data="lie:0"),
+        InlineKeyboardButton(text="2️⃣ yolg'on", callback_data="lie:1"),
+        InlineKeyboardButton(text="3️⃣ yolg'on", callback_data="lie:2"),
+    ]])
+
+
+async def _send_lie_round(chat_message: Message, user_id: int):
+    import random
+    prev = active_lies.get(user_id, {})
+    await bot.send_chat_action(chat_message.chat.id, "typing")
+    try:
+        rnd = await asyncio.to_thread(_generate_lie_sync, random.choice(_LIE_TOPICS))
+    except Exception as e:
+        logger.exception("Yolg'on raundini yaratishda xatolik: %s", e)
+        await chat_message.answer("❌ Raund tayyorlanmadi. /yolgon bilan qayta urinib ko'ring.")
+        return
+    rnd["streak"] = prev.get("streak", 0)
+    rnd["best"] = prev.get("best", 0)
+    rnd["answered"] = False
+    active_lies[user_id] = rnd
+    body = "\n\n".join(f"{i + 1}️⃣ {html.escape(t)}" for i, t in enumerate(rnd["statements"]))
+    streak_line = f"\n🔥 Ketma-ket: <b>{rnd['streak']}</b>" if rnd["streak"] else ""
+    await chat_message.answer(
+        f"🕵️ <b>Yolg'onni top!</b>{streak_line}\n\n{body}\n\n"
+        "Ulardan <b>bittasi yolg'on</b>. Qaysi biri? 👇",
+        reply_markup=_lie_keyboard(),
+    )
+
+
+@dp.message(Command("yolgon"))
+async def cmd_yolgon(message: Message, state: FSMContext):
+    if await state.get_state() is not None:
+        await message.answer("⏳ Avval joriy testni tugating yoki /stop yuboring.")
+        return
+    active_lies.pop(message.from_user.id, None)
+    await _send_lie_round(message, message.from_user.id)
+
+
+@dp.callback_query(F.data.startswith("lie:"))
+async def handle_lie_action(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    action = callback.data.split(":", 1)[1]
+
+    if action == "next":
+        await callback.answer()
+        await _send_lie_round(callback.message, user_id)
+        return
+
+    rnd = active_lies.get(user_id)
+    if not rnd or rnd.get("answered"):
+        await callback.answer("Bu raund tugagan. /yolgon bilan yangisini boshlang.", show_alert=True)
+        return
+    try:
+        choice = int(action)
+    except ValueError:
+        await callback.answer()
+        return
+
+    rnd["answered"] = True
+    lie = rnd["lie_index"]
+    correct = choice == lie
+    if correct:
+        rnd["streak"] += 1
+        rnd["best"] = max(rnd["best"], rnd["streak"])
+        head = f"🎯 <b>Topdingiz!</b> 🔥 Ketma-ket: <b>{rnd['streak']}</b>"
+        await callback.answer("🎉 To'g'ri!")
+    else:
+        was = rnd["streak"]
+        rnd["streak"] = 0
+        head = "😅 <b>Yolg'on tuzog'iga tushdingiz!</b>" + (f" (seriya {was} da to'xtadi)" if was else "")
+        await callback.answer("Xato 😅")
+
+    lines = []
+    for i, t in enumerate(rnd["statements"]):
+        mark = "❌ yolg'on" if i == lie else "✅ rost"
+        lines.append(f"{i + 1}️⃣ {html.escape(t)}\n   {mark}")
+    text = f"{head}\n\n" + "\n\n".join(lines)
+    if rnd["explanation"]:
+        text += f"\n\n💡 <i>{html.escape(rnd['explanation'])}</i>"
+    if rnd["best"] > 1:
+        text += f"\n\n🏆 Eng yaxshi seriya: {rnd['best']}"
+    try:
+        await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="➡️ Keyingisi", callback_data="lie:next")]]))
+    except Exception:
+        await callback.message.answer(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="➡️ Keyingisi", callback_data="lie:next")]]))
 
 
 # --- Kunlik fan + ingliz tili maslahati ----------------------------------
@@ -3320,6 +3440,7 @@ async def setup_bot_commands():
         BotCommand(command="teaser", description="Miya jumboqlari va topishmoqlar"),
         BotCommand(command="topaman", description="Men o'ylagan narsani top (o'yin)"),
         BotCommand(command="hikoya", description="Interaktiv hikoya — yo'lni o'zingiz tanlang"),
+        BotCommand(command="yolgon", description="3 ta gapdan yolg'onini toping"),
         BotCommand(command="kunlik", description="Bugungi fan, fakt va ingliz tili maslahati"),
         BotCommand(command="english", description="Ingliz tilida suhbat (xatolarni tuzatadi)"),
         BotCommand(command="sertifikat", description="25 savolli sertifikat testi"),
