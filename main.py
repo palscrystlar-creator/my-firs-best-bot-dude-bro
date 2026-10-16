@@ -1209,7 +1209,7 @@ async def cmd_stop(message: Message, state: FSMContext):
     active_lies.pop(message.from_user.id, None)
     active_what.pop(message.from_user.id, None)
     active_grammar.pop(message.from_user.id, None)
-    awaiting_essay.discard(message.from_user.id)
+    awaiting_essay.pop(message.from_user.id, None)
     active_guess_games.pop(message.from_user.id, None)
 
     if current is None:
@@ -2655,10 +2655,60 @@ async def handle_grammar(callback: CallbackQuery):
 
 WRITING_PRICE_STARS = 10
 WRITING_CREDIT_PREFIX = "ielts_bot:writing_credit:"
-WRITING_MIN_WORDS = 40
-WRITING_MAX_CHARS = 3500
+WRITING_MIN_WORDS = 120   # mock uchun (rasmiy imtihonda Task 2 — kamida 250 so'z)
+WRITING_MAX_CHARS = 4500
 _writing_credit_mem: set = set()
-awaiting_essay: set = set()
+awaiting_essay: dict = {}   # user_id -> berilgan IELTS Writing topshirig'i (matn)
+
+_FALLBACK_WRITING_TASKS = [
+    "Some people believe that children should start learning a foreign language at primary school, while others think it is better to start in secondary school. Discuss both views and give your own opinion.",
+    "In many countries, more and more people are choosing to work from home. Do the advantages of this trend outweigh the disadvantages?",
+    "Some people think that governments should spend money on public transport rather than building new roads. To what extent do you agree or disagree?",
+    "Nowadays many people spend a lot of time on social media. What are the causes of this, and what effects does it have on society?",
+    "Some argue that university education should be free for everyone. Others believe students should pay for it. Discuss both views and give your opinion.",
+]
+_WRITING_TASK_TYPES = [
+    "opinion (to what extent do you agree or disagree)", "discussion (discuss both views and give your opinion)",
+    "problem and solution", "advantages and disadvantages", "causes and effects",
+]
+
+
+def _generate_writing_task_sync() -> str:
+    import random
+    topic = random.choice(["education", "technology", "environment", "health", "work and careers", "society and family",
+                           "culture and globalisation", "transport and cities", "crime and law", "media and advertising"])
+    data = _llm_json_sync(
+        f"Write ONE original IELTS Writing Task 2 question about {topic}. Essay type: {random.choice(_WRITING_TASK_TYPES)}. "
+        "Use authentic IELTS wording, 1-3 sentences, English only. "
+        'Reply ONLY as JSON: {"task": "..."}',
+        temperature=1.0,
+    )
+    task = str(data.get("task", "")).strip()
+    if len(task) < 30:
+        raise ValueError("Task juda qisqa")
+    return task
+
+
+async def _give_writing_task(message: Message, uid: int, intro: str = ""):
+    """Mock testdagidek: IELTS Writing Task 2 topshirig'ini beradi va inshoni kutadi."""
+    import random
+    await bot.send_chat_action(message.chat.id, "typing")
+    try:
+        task = await asyncio.to_thread(_generate_writing_task_sync)
+    except Exception as e:
+        logger.warning("Writing task generatsiyasida xatolik, zaxira ishlatiladi: %s", e)
+        task = random.choice(_FALLBACK_WRITING_TASKS)
+    awaiting_essay[uid] = task
+    await message.answer(
+        f"{intro}✍️ <b>IELTS WRITING — Task 2</b>\n\n"
+        f"📋 <b>Topshiriq:</b>\n<i>{html.escape(task)}</i>\n\n"
+        f"⏱ Vaqt: 40 daqiqa (mock uchun cheklov yo'q)\n"
+        f"📝 Kamida <b>{WRITING_MIN_WORDS} so'z</b> (rasmiy imtihonda 250) — inshoni bitta xabar qilib yuboring.\n"
+        "📌 Reja: kirish → 2 ta asosiy paragraf → xulosa.\n\n"
+        "<i>Bekor qilish: /stop</i>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🔄 Boshqa mavzu", callback_data="wr:new")]]),
+    )
 
 
 def _is_admin(user_id: int) -> bool:
@@ -2694,10 +2744,11 @@ async def _consume_writing_credit(user_id: int):
             logger.warning("Writing kreditini o'chirishda xatolik: %s", e)
 
 
-def _analyze_essay_sync(essay: str) -> dict:
+def _analyze_essay_sync(essay: str, task: str = "") -> dict:
     return _llm_json_sync(
         "You are a strict but encouraging certified IELTS Writing examiner. Evaluate the following essay "
-        "(Task 2 style). Explain in UZBEK (Latin script); keep quoted fragments and corrections in English. "
+        "written for this IELTS Writing Task 2 question (judge Task Response against it): "
+        f"\"{task or 'free topic'}\". Explain in UZBEK (Latin script); keep quoted fragments and corrections in English. "
         "Use IELTS half-band scores (e.g. 6.5). Reply ONLY as JSON: "
         '{"task_response": 6.0, "coherence": 6.0, "lexical": 6.0, "grammar": 6.0, "overall": 6.0, '
         '"strengths": ["...","..."], '
@@ -2763,18 +2814,14 @@ async def cmd_writing(message: Message, state: FSMContext):
         return
 
     if _is_admin(uid) or await _has_writing_credit(uid):
-        awaiting_essay.add(uid)
         free = "🎁 <i>Siz uchun bepul.</i>\n\n" if _is_admin(uid) else "✅ <i>To'lov qabul qilingan.</i>\n\n"
-        await message.answer(
-            f"💎 <b>IELTS Writing tahlili</b>\n\n{free}"
-            f"Inshongizni (ingliz tilida, kamida {WRITING_MIN_WORDS} so'z) bitta xabar qilib yuboring 👇\n"
-            "<i>Bekor qilish: /stop</i>"
-        )
+        await _give_writing_task(message, uid, f"💎 {free}")
         return
 
     await message.answer(
         "💎 <b>IELTS Writing tahlili (Premium)</b>\n\n"
-        "Inshongizni yuborasiz — men IELTS mezonlari bo'yicha:\n"
+        "Xuddi mock testdagidek: men IELTS <b>Writing Task 2</b> topshirig'ini beraman, "
+        "siz insho yozasiz — men esa IELTS mezonlari bo'yicha tekshiraman:\n"
         "🏆 band ballni (4 ta mezon bo'yicha)\n"
         "🔧 xatolar va ularning tuzatilishini\n"
         "📚 boy lug'at takliflarini\n"
@@ -2812,11 +2859,21 @@ async def handle_successful_payment(message: Message):
     uid = message.from_user.id
     logger.info("Stars to'lov: user=%s amount=%s charge_id=%s", uid, pay.total_amount, pay.telegram_payment_charge_id)
     await _grant_writing_credit(uid)
-    awaiting_essay.add(uid)
-    await message.answer(
-        "✅ <b>To'lov qabul qilindi, rahmat!</b> ⭐\n\n"
-        f"Endi inshongizni (ingliz tilida, kamida {WRITING_MIN_WORDS} so'z) bitta xabar qilib yuboring 👇"
-    )
+    await _give_writing_task(message, uid, "✅ <b>To'lov qabul qilindi, rahmat!</b> ⭐\n\n")
+
+
+@dp.callback_query(F.data == "wr:new")
+async def handle_writing_new_task(callback: CallbackQuery):
+    uid = callback.from_user.id
+    if uid not in awaiting_essay:
+        await callback.answer("Bu sessiya tugagan. /writing bilan qayta boshlang.", show_alert=True)
+        return
+    await callback.answer()
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await _give_writing_task(callback.message, uid)
 
 
 async def _essay_filter(message: Message) -> bool:
@@ -2835,19 +2892,19 @@ async def handle_essay(message: Message):
         await message.answer(f"✂️ Insho juda uzun. Iltimos, {WRITING_MAX_CHARS} belgidan oshmasin.")
         return
 
-    awaiting_essay.discard(uid)
+    task = awaiting_essay.pop(uid)
     await message.answer("🔎 Inshoyingiz tahlil qilinmoqda, 20–40 soniya kuting...")
     await bot.send_chat_action(message.chat.id, "typing")
     try:
-        data = await asyncio.to_thread(_analyze_essay_sync, essay)
+        data = await asyncio.to_thread(_analyze_essay_sync, essay, task)
         report = _format_essay_report(data)
     except Exception as e:
         logger.exception("Essay tahlilida xatolik: %s", e)
-        awaiting_essay.add(uid)  # kredit saqlanadi — qayta yuborish mumkin
+        awaiting_essay[uid] = task  # kredit saqlanadi — qayta yuborish mumkin
         await message.answer("❌ Tahlilda xatolik yuz berdi. To'lovingiz saqlandi — inshongizni qayta yuboring.")
         return
 
-    await _send_long(message, report)
+    await _send_long(message, f"📋 <i>{html.escape(task)}</i>\n📏 So'zlar soni: <b>{words}</b>\n\n" + report)
     if not _is_admin(uid):
         await _consume_writing_credit(uid)
         await message.answer("🔁 Yana tahlil qildirish uchun /writing yuboring.")
