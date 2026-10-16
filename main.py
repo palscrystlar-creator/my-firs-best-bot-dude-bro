@@ -41,6 +41,7 @@ import shutil
 import secrets
 import base64
 import html
+import contextvars
 from datetime import datetime, timedelta, timezone
 
 from aiogram import Bot, Dispatcher, F, BaseMiddleware
@@ -394,6 +395,165 @@ dp.message.outer_middleware(UserTrackingMiddleware())
 dp.callback_query.outer_middleware(UserTrackingMiddleware())
 
 
+# --- 🌐 Til tanlash (🇺🇿 / 🇷🇺 / 🇬🇧) ---------------------------------------
+# Foydalanuvchi tilini tanlaydi (Redis'da saqlanadi). Til AI yaratadigan barcha
+# kontentga (savollar, izohlar, hikoyalar, tahlillar) va asosiy menyuga ta'sir qiladi.
+
+LANGS = {
+    "uz": ("🇺🇿", "O'zbekcha", "Uzbek"),
+    "ru": ("🇷🇺", "Русский", "Russian"),
+    "en": ("🇬🇧", "English", "English"),
+}
+DEFAULT_LANG = "uz"
+BOT_USER_LANG_KEY = "ielts_bot:user_lang"   # hash: user_id -> uz|ru|en
+current_lang: contextvars.ContextVar = contextvars.ContextVar("current_lang", default=DEFAULT_LANG)
+_user_lang: dict = {}   # user_id -> "uz"|"ru"|"en" ("" = hali tanlanmagan)
+
+
+def cur_lang() -> str:
+    return current_lang.get()
+
+
+async def get_lang(user_id: int):
+    """Foydalanuvchi tilini qaytaradi; hali tanlamagan bo'lsa None."""
+    if user_id in _user_lang:
+        return _user_lang[user_id] or None
+    lang = ""
+    if redis_client is not None:
+        try:
+            val = await redis_client.hget(BOT_USER_LANG_KEY, str(user_id))
+            if val in LANGS:
+                lang = val
+        except Exception as e:
+            logger.warning("Tilni o'qishda xatolik: %s", e)
+    _user_lang[user_id] = lang
+    return lang or None
+
+
+async def set_lang(user_id: int, lang: str):
+    _user_lang[user_id] = lang
+    if redis_client is not None:
+        try:
+            await redis_client.hset(BOT_USER_LANG_KEY, str(user_id), lang)
+        except Exception as e:
+            logger.warning("Tilni saqlashda xatolik: %s", e)
+
+
+# AI chaqiruvlariga til ko'rsatmasi qo'shiladi (barcha promptlarga alohida tegmasdan).
+_orig_groq_create = groq_client.chat.completions.create
+
+
+def _groq_create_with_lang(*args, **kwargs):
+    lang = current_lang.get()
+    msgs = kwargs.get("messages")
+    if lang != "uz" and msgs is not None:
+        name = LANGS[lang][2]
+        note = (
+            f"The user's interface language is {name}. Wherever the instructions below ask you to write "
+            f"or answer in UZBEK (O'zbek tilida / o'zbek tilida / Uzbek), write that text in {name} instead. "
+            "Text that must stay in English (English sentences, answer options, examples, quoted learner text, "
+            "IELTS terms) stays in English. Keep the requested output format (e.g. JSON keys) unchanged."
+        )
+        kwargs["messages"] = [{"role": "system", "content": note}] + list(msgs)
+    return _orig_groq_create(*args, **kwargs)
+
+
+groq_client.chat.completions.create = _groq_create_with_lang
+
+
+class LanguageMiddleware(BaseMiddleware):
+    """Har bir yangilanishda foydalanuvchi tilini aniqlab, contextvar'ga qo'yadi."""
+
+    async def __call__(self, handler, event, data):
+        user = getattr(event, "from_user", None)
+        lang = None
+        if user is not None and not user.is_bot:
+            lang = await get_lang(user.id)
+        current_lang.set(lang or DEFAULT_LANG)
+        data["lang"] = lang
+        return await handler(event, data)
+
+
+dp.message.outer_middleware(LanguageMiddleware())
+dp.callback_query.outer_middleware(LanguageMiddleware())
+
+
+I18N = {
+    "pick": {
+        "_": "🌐 <b>Tilni tanlang / Выберите язык / Choose your language</b>",
+    },
+    "intro": {
+        "uz": "👋 <b>Salom! Men universal yordamchi botman.</b>\n\n💬 Menga istalgan narsani yozing yoki ovozli xabar yuboring — savol bering, gaplashing. Yoki pastdan yo'nalishni tanlang 👇",
+        "ru": "👋 <b>Привет! Я универсальный помощник.</b>\n\n💬 Пишите мне что угодно или отправляйте голосовые — задавайте вопросы, болтайте. Или выберите раздел ниже 👇",
+        "en": "👋 <b>Hi! I'm a universal assistant bot.</b>\n\n💬 Write or send a voice message about anything — ask questions, just chat. Or pick a section below 👇",
+    },
+    "main_menu": {"uz": "📋 <b>Asosiy menyu</b> 👇", "ru": "📋 <b>Главное меню</b> 👇", "en": "📋 <b>Main menu</b> 👇"},
+    "btn_sci": {"uz": "🔬 Ilm yo'nalishi", "ru": "🔬 Наука и игры", "en": "🔬 Science & games"},
+    "btn_eng": {"uz": "🇬🇧 Ingliz tili", "ru": "🇬🇧 Английский язык", "en": "🇬🇧 English learning"},
+    "btn_all": {"uz": "ℹ️ Barcha buyruqlar", "ru": "ℹ️ Все команды", "en": "ℹ️ All commands"},
+    "btn_lang": {"uz": "🌐 Til", "ru": "🌐 Язык", "en": "🌐 Language"},
+    "btn_back": {"uz": "⬅️ Orqaga", "ru": "⬅️ Назад", "en": "⬅️ Back"},
+    "sci_title": {
+        "uz": "🔬 <b>Ilm yo'nalishi</b>\n\nViktorinalar, jumboqlar va o'yinlar — tanlang 👇",
+        "ru": "🔬 <b>Наука и игры</b>\n\nВикторины, головоломки и игры — выбирайте 👇",
+        "en": "🔬 <b>Science & games</b>\n\nQuizzes, puzzles and games — pick one 👇",
+    },
+    "eng_title": {
+        "uz": "🇬🇧 <b>Ingliz tili</b>\n\nSuhbat, IELTS testlari va materiallar — tanlang 👇",
+        "ru": "🇬🇧 <b>Английский язык</b>\n\nРазговор, тесты IELTS и материалы — выбирайте 👇",
+        "en": "🇬🇧 <b>English learning</b>\n\nConversation, IELTS tests and materials — pick one 👇",
+    },
+    "lang_set": {
+        "uz": "✅ Til tanlandi: <b>O'zbekcha</b> 🇺🇿",
+        "ru": "✅ Язык выбран: <b>Русский</b> 🇷🇺",
+        "en": "✅ Language set: <b>English</b> 🇬🇧",
+    },
+    "sub_text": {
+        "uz": "📢 <b>Botdan foydalanish uchun kanalimizga obuna bo'ling!</b>\n\n1️⃣ Pastdagi tugma orqali kanalga o'ting va obuna bo'ling.\n2️⃣ Keyin <b>✅ Tekshirish</b> tugmasini bosing.",
+        "ru": "📢 <b>Чтобы пользоваться ботом, подпишитесь на наш канал!</b>\n\n1️⃣ Перейдите в канал по кнопке ниже и подпишитесь.\n2️⃣ Затем нажмите <b>✅ Проверить</b>.",
+        "en": "📢 <b>Please subscribe to our channel to use the bot!</b>\n\n1️⃣ Open the channel with the button below and subscribe.\n2️⃣ Then tap <b>✅ Check</b>.",
+    },
+    "sub_btn": {"uz": "📢 Kanalga obuna bo'lish", "ru": "📢 Подписаться на канал", "en": "📢 Subscribe to the channel"},
+    "sub_check": {"uz": "✅ Tekshirish", "ru": "✅ Проверить", "en": "✅ Check"},
+    "sub_alert": {
+        "uz": "📢 Avval kanalga obuna bo'ling!",
+        "ru": "📢 Сначала подпишитесь на канал!",
+        "en": "📢 Please subscribe to the channel first!",
+    },
+}
+
+MENU_LABELS = {
+    "quiz": {"uz": "Viktorina", "ru": "Викторина", "en": "Quiz"},
+    "teaser": {"uz": "Miya jumboqlari", "ru": "Головоломки", "en": "Brain teasers"},
+    "nima": {"uz": "Nima bo'ladi?", "ru": "Что будет?", "en": "What happens?"},
+    "yolgon": {"uz": "Yolg'onni top", "ru": "Найди ложь", "en": "Spot the lie"},
+    "topaman": {"uz": "Men topaman", "ru": "Я угадаю", "en": "I'll guess it"},
+    "hikoya": {"uz": "Interaktiv hikoya", "ru": "Интерактивная история", "en": "Interactive story"},
+    "kunlik": {"uz": "Kunlik fan va fakt", "ru": "Факт и тест дня", "en": "Daily fact & quiz"},
+    "sertifikat": {"uz": "Sertifikat testi", "ru": "Тест с сертификатом", "en": "Certificate test"},
+    "reyting": {"uz": "Reyting", "ru": "Рейтинг", "en": "Leaderboard"},
+    "english": {"uz": "Ingliz tilida suhbat", "ru": "Разговор на английском", "en": "English chat"},
+    "grammar": {"uz": "Grammatika", "ru": "Грамматика", "en": "Grammar"},
+    "writing": {"uz": "Writing tahlili", "ru": "Разбор Writing", "en": "Writing review"},
+    "test": {"uz": "IELTS Speaking", "ru": "IELTS Speaking", "en": "IELTS Speaking"},
+    "reading_test": {"uz": "IELTS Reading", "ru": "IELTS Reading", "en": "IELTS Reading"},
+    "listening_test": {"uz": "IELTS Listening", "ru": "IELTS Listening", "en": "IELTS Listening"},
+    "dashboard": {"uz": "Dashboard va materiallar", "ru": "Дашборд и материалы", "en": "Dashboard & materials"},
+}
+
+
+def tr(key: str, lang: str = None) -> str:
+    lang = lang or cur_lang()
+    d = I18N.get(key, {})
+    return d.get(lang) or d.get(DEFAULT_LANG) or d.get("_", "")
+
+
+def _lang_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=f"{e} {name}", callback_data=f"lg:{code}") for code, (e, name, _en) in LANGS.items()
+    ]])
+
+
 # --- Majburiy obuna tekshiruvi -------------------------------------------
 
 CHECK_SUB_CALLBACK = "checksub"
@@ -419,16 +579,13 @@ async def is_user_subscribed(user_id: int) -> bool:
 def _subscribe_keyboard() -> InlineKeyboardMarkup:
     rows = []
     if REQUIRED_CHANNEL_LINK:
-        rows.append([InlineKeyboardButton(text="📢 Kanalga obuna bo'lish", url=REQUIRED_CHANNEL_LINK)])
-    rows.append([InlineKeyboardButton(text="✅ Tekshirish", callback_data=CHECK_SUB_CALLBACK)])
+        rows.append([InlineKeyboardButton(text=tr("sub_btn"), url=REQUIRED_CHANNEL_LINK)])
+    rows.append([InlineKeyboardButton(text=tr("sub_check"), callback_data=CHECK_SUB_CALLBACK)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-SUBSCRIBE_TEXT = (
-    "📢 <b>Botdan foydalanish uchun kanalimizga obuna bo'ling!</b>\n\n"
-    "1️⃣ Pastdagi tugma orqali kanalga o'ting va obuna bo'ling.\n"
-    "2️⃣ Keyin <b>✅ Tekshirish</b> tugmasini bosing."
-)
+def _subscribe_text() -> str:
+    return tr("sub_text")
 
 
 class SubscriptionMiddleware(BaseMiddleware):
@@ -451,14 +608,14 @@ class SubscriptionMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         if isinstance(event, CallbackQuery):
-            await event.answer("📢 Avval kanalga obuna bo'ling!", show_alert=True)
+            await event.answer(tr("sub_alert"), show_alert=True)
             if event.message:
                 try:
-                    await event.message.answer(SUBSCRIBE_TEXT, reply_markup=_subscribe_keyboard())
+                    await event.message.answer(_subscribe_text(), reply_markup=_subscribe_keyboard())
                 except Exception:
                     pass
         elif isinstance(event, Message):
-            await event.answer(SUBSCRIBE_TEXT, reply_markup=_subscribe_keyboard())
+            await event.answer(_subscribe_text(), reply_markup=_subscribe_keyboard())
         return None
 
 
@@ -1097,65 +1254,131 @@ WELCOME_TEXT = (
 
 # --- Asosiy menyu: 🔬 Ilm / 🇬🇧 Ingliz tili -------------------------------
 
-MENU_INTRO = (
-    "👋 <b>Salom! Men universal yordamchi botman.</b>\n\n"
-    "💬 Menga istalgan narsani yozing yoki ovozli xabar yuboring — savol bering, "
-    "gaplashing. Yoki pastdan yo'nalishni tanlang 👇"
-)
-
-# (emoji, matn, buyruq)
+# (emoji, buyruq) — matnlar MENU_LABELS orqali tanlangan tilda olinadi
 MENU_SCIENCE = [
-    ("🧩", "Viktorina", "quiz"),
-    ("🧠", "Miya jumboqlari", "teaser"),
-    ("🔬", "Nima bo'ladi?", "nima"),
-    ("🕵️", "Yolg'onni top", "yolgon"),
-    ("🔮", "Men topaman", "topaman"),
-    ("📖", "Interaktiv hikoya", "hikoya"),
-    ("📅", "Kunlik fan va fakt", "kunlik"),
-    ("🎓", "Sertifikat testi", "sertifikat"),
-    ("🏆", "Reyting", "reyting"),
+    ("🧩", "quiz"), ("🧠", "teaser"), ("🔬", "nima"), ("🕵️", "yolgon"), ("🔮", "topaman"),
+    ("📖", "hikoya"), ("📅", "kunlik"), ("🎓", "sertifikat"), ("🏆", "reyting"),
 ]
 MENU_ENGLISH = [
-    ("💬", "Ingliz tilida suhbat", "english"),
-    ("📝", "Grammatika", "grammar"),
-    ("💎", f"Writing tahlili (⭐{WRITING_PRICE_STARS})", "writing"),
-    ("🎤", "IELTS Speaking", "test"),
-    ("📖", "IELTS Reading", "reading_test"),
-    ("🎧", "IELTS Listening", "listening_test"),
-    ("📚", "Dashboard va materiallar", "dashboard"),
+    ("💬", "english"), ("📝", "grammar"), ("💎", "writing"), ("🎤", "test"),
+    ("📖", "reading_test"), ("🎧", "listening_test"), ("📚", "dashboard"),
 ]
+
+ALL_COMMANDS = {
+    "uz": WELCOME_TEXT,
+    "ru": (
+        "👋 <b>Привет! Я универсальный помощник.</b>\n\n"
+        "Пишите что угодно или отправляйте голосовые — задавайте вопросы, просите совета, просто общайтесь 💬\n\n"
+        "🧩 <b>Знания и игры</b>\n"
+        "/quiz — викторина по любой науке\n"
+        "/teaser — головоломки и загадки\n"
+        "🔮 /topaman — я угадаю, что вы загадали!\n"
+        "/kunlik — факт, тест и совет дня\n"
+        "/hikoya — интерактивная история 🎭\n"
+        "/yolgon — найдите ложь среди 3 фактов 🕵️\n"
+        "/nima — «Что будет?» научные загадки 🔬\n"
+        "/sertifikat — тест из 25 вопросов с сертификатом\n"
+        "/reyting — таблица лидеров\n\n"
+        "🇬🇧 <b>Английский и IELTS</b>\n"
+        "/english — разговор на английском с исправлением ошибок\n"
+        "/grammar — грамматика: урок + упражнения 📝\n"
+        f"/writing — 💎 разбор IELTS Writing ({WRITING_PRICE_STARS} ⭐)\n"
+        "/test — IELTS Speaking (голосовые ответы)\n"
+        "/reading_test, /listening_test — тесты в стиле IELTS\n"
+        "/dashboard — профиль и материалы\n\n"
+        "🌐 /til — сменить язык\n"
+        "🔔 Каждое утро присылаю новый факт и совет по английскому — отключить: /xabarnoma\n"
+        "🛑 Остановить процесс: /stop"
+    ),
+    "en": (
+        "👋 <b>Hi! I'm a universal assistant bot.</b>\n\n"
+        "Write or send a voice message about anything — ask questions, get advice, just chat 💬\n\n"
+        "🧩 <b>Knowledge & games</b>\n"
+        "/quiz — a quiz on any subject\n"
+        "/teaser — brain teasers and riddles\n"
+        "🔮 /topaman — I'll guess what you're thinking of!\n"
+        "/kunlik — daily fact, quiz and tip\n"
+        "/hikoya — interactive story 🎭\n"
+        "/yolgon — spot the lie among 3 facts 🕵️\n"
+        "/nima — \"What happens?\" science riddles 🔬\n"
+        "/sertifikat — 25-question test with a certificate\n"
+        "/reyting — leaderboards\n\n"
+        "🇬🇧 <b>English & IELTS</b>\n"
+        "/english — chat in English, I'll fix your mistakes\n"
+        "/grammar — grammar: lesson + exercises 📝\n"
+        f"/writing — 💎 IELTS Writing review ({WRITING_PRICE_STARS} ⭐)\n"
+        "/test — IELTS Speaking mock (voice answers)\n"
+        "/reading_test, /listening_test — IELTS-style tests\n"
+        "/dashboard — profile and study materials\n\n"
+        "🌐 /til — change language\n"
+        "🔔 Every morning I send a new fact and an English tip — turn off: /xabarnoma\n"
+        "🛑 Stop the current process: /stop"
+    ),
+}
+
+
+def _menu_label(cmd: str) -> str:
+    base = MENU_LABELS.get(cmd, {}).get(cur_lang()) or MENU_LABELS.get(cmd, {}).get("uz") or cmd
+    if cmd == "writing":
+        base += f" (⭐{WRITING_PRICE_STARS})"
+    return base
 
 
 def _main_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔬 Ilm yo'nalishi", callback_data="mn:sci")],
-        [InlineKeyboardButton(text="🇬🇧 Ingliz tili", callback_data="mn:eng")],
-        [InlineKeyboardButton(text="ℹ️ Barcha buyruqlar", callback_data="mn:all")],
+        [InlineKeyboardButton(text=tr("btn_sci"), callback_data="mn:sci")],
+        [InlineKeyboardButton(text=tr("btn_eng"), callback_data="mn:eng")],
+        [InlineKeyboardButton(text=tr("btn_all"), callback_data="mn:all"),
+         InlineKeyboardButton(text=tr("btn_lang"), callback_data="mn:lang")],
     ])
 
 
 def _submenu_keyboard(items: list) -> InlineKeyboardMarkup:
     rows, row = [], []
-    for emoji, label, cmd in items:
-        row.append(InlineKeyboardButton(text=f"{emoji} {label}", callback_data=f"mn:run:{cmd}"))
+    for emoji, cmd in items:
+        row.append(InlineKeyboardButton(text=f"{emoji} {_menu_label(cmd)}", callback_data=f"mn:run:{cmd}"))
         if len(row) == 2:
             rows.append(row)
             row = []
     if row:
         rows.append(row)
-    rows.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="mn:home")])
+    rows.append([InlineKeyboardButton(text=tr("btn_back"), callback_data="mn:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
-    await message.answer(MENU_INTRO, reply_markup=_main_menu_keyboard())
+    if await get_lang(message.from_user.id) is None:
+        await message.answer(tr("pick"), reply_markup=_lang_keyboard())
+        return
+    await message.answer(tr("intro"), reply_markup=_main_menu_keyboard())
+
+
+@dp.message(Command("til"))
+async def cmd_til(message: Message):
+    await message.answer(tr("pick"), reply_markup=_lang_keyboard())
 
 
 @dp.message(Command("menu"))
 async def cmd_menu(message: Message):
-    await message.answer("📋 <b>Asosiy menyu</b> 👇", reply_markup=_main_menu_keyboard())
+    await message.answer(tr("main_menu"), reply_markup=_main_menu_keyboard())
+
+
+@dp.callback_query(F.data.startswith("lg:"))
+async def handle_language(callback: CallbackQuery):
+    code = callback.data.split(":", 1)[1]
+    if code not in LANGS:
+        await callback.answer()
+        return
+    await set_lang(callback.from_user.id, code)
+    current_lang.set(code)
+    await callback.answer(LANGS[code][0])
+    text = f"{tr('lang_set')}\n\n{tr('intro')}"
+    try:
+        await callback.message.edit_text(text, reply_markup=_main_menu_keyboard())
+    except Exception:
+        await callback.message.answer(text, reply_markup=_main_menu_keyboard())
 
 
 @dp.callback_query(F.data.startswith("mn:"))
@@ -1172,22 +1395,23 @@ async def handle_menu(callback: CallbackQuery):
 
     if action == "home":
         await callback.answer()
-        await show("📋 <b>Asosiy menyu</b> 👇", _main_menu_keyboard())
+        await show(tr("main_menu"), _main_menu_keyboard())
     elif action == "sci":
         await callback.answer()
-        await show("🔬 <b>Ilm yo'nalishi</b>\n\nViktorinalar, jumboqlar va o'yinlar — tanlang 👇",
-                   _submenu_keyboard(MENU_SCIENCE))
+        await show(tr("sci_title"), _submenu_keyboard(MENU_SCIENCE))
     elif action == "eng":
         await callback.answer()
-        await show("🇬🇧 <b>Ingliz tili</b>\n\nSuhbat, IELTS testlari va materiallar — tanlang 👇",
-                   _submenu_keyboard(MENU_ENGLISH))
+        await show(tr("eng_title"), _submenu_keyboard(MENU_ENGLISH))
+    elif action == "lang":
+        await callback.answer()
+        await show(tr("pick"), _lang_keyboard())
     elif action == "all":
         await callback.answer()
-        await show(WELCOME_TEXT, InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="⬅️ Orqaga", callback_data="mn:home")]]))
+        await show(ALL_COMMANDS.get(cur_lang(), WELCOME_TEXT), InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=tr("btn_back"), callback_data="mn:home")]]))
     elif action == "run" and len(parts) > 2:
         cmd = parts[2]
-        allowed = {c for _e, _l, c in MENU_SCIENCE + MENU_ENGLISH}
+        allowed = {c for _e, c in MENU_SCIENCE + MENU_ENGLISH}
         if cmd not in allowed:
             await callback.answer()
             return
@@ -4224,6 +4448,7 @@ def create_app() -> web.Application:
 
 async def setup_bot_commands():
     commands = [
+        BotCommand(command="til", description="Tilni tanlash / Язык / Language"),
         BotCommand(command="menu", description="Asosiy menyu (Ilm / Ingliz tili)"),
         BotCommand(command="start", description="Boshlash va barcha imkoniyatlar"),
         BotCommand(command="quiz", description="Istalgan fandan viktorina"),
