@@ -118,6 +118,7 @@ UPSTASH_REDIS_REST_URL = os.getenv("UPSTASH_REDIS_REST_URL")
 UPSTASH_REDIS_REST_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN")
 BOT_USERS_SET_KEY = "ielts_bot:unique_users"
 BOT_STARTS_COUNTER_KEY = "ielts_bot:total_starts"
+BOT_USER_INFO_KEY = "ielts_bot:user_info"      # hash: user_id -> JSON {n, u, d}
 BOT_ACTIVE_DAY_PREFIX = "ielts_bot:active:"   # + YYYY-MM-DD (Toshkent vaqti)
 _active_seen: set = set()  # (kun, user_id) — Redis'ga kuniga bir marta yozish uchun
 LEADERBOARD_QUIZ_KEY = "ielts_bot:leaderboard:quiz"
@@ -171,7 +172,7 @@ else:
     )
 
 
-async def track_user(user_id: int):
+async def track_user(user_id: int, name: str = "", username: str = ""):
     """Foydalanuvchini Upstash Redis'dagi noyob foydalanuvchilar to'plamiga
     qo'shadi va umumiy murojaatlar sonini oshiradi. Xatolik bo'lsa botni
     to'xtatmaydi, faqat log yozadi."""
@@ -189,6 +190,9 @@ async def track_user(user_id: int):
             _active_seen.add((today, user_id))
             day_key = f"{BOT_ACTIVE_DAY_PREFIX}{today}"
             await redis_client.sadd(day_key, str(user_id))
+            # Egasi uchun /users ro'yxati: ism, username va oxirgi faol kun (kuniga bir marta)
+            await redis_client.hset(BOT_USER_INFO_KEY, str(user_id), json.dumps(
+                {"n": (name or "")[:60], "u": (username or "")[:40], "d": today}, ensure_ascii=False))
             await redis_client.expire(day_key, 8 * 24 * 3600)
     except Exception as e:
         logger.warning("Redis orqali statistika yozishda xatolik: %s", e)
@@ -379,7 +383,7 @@ class UserTrackingMiddleware(BaseMiddleware):
     async def __call__(self, handler, event, data):
         user = getattr(event, "from_user", None)
         if user is not None:
-            asyncio.create_task(track_user(user.id))
+            asyncio.create_task(track_user(user.id, user.full_name or "", user.username or ""))
         return await handler(event, data)
 
 
@@ -1261,6 +1265,42 @@ async def cmd_stats(message: Message):
         f"📅 Oxirgi 7 kunda faol: <b>{active_week}</b>\n"
         f"📨 Jami murojaatlar (xabar/tugma): <b>{total_starts}</b>"
     )
+
+
+@dp.message(Command("users"))
+async def cmd_users(message: Message):
+    """Faqat bot egasi uchun: oxirgi faol foydalanuvchilar ro'yxati (ism, username, ID)."""
+    if not ADMIN_USER_ID or str(message.from_user.id) != str(ADMIN_USER_ID):
+        await message.answer("⛔ Bu buyruq faqat bot egasi uchun.")
+        return
+    if redis_client is None:
+        await message.answer("⚠️ Redis sozlanmagan.")
+        return
+    try:
+        raw = await redis_client.hgetall(BOT_USER_INFO_KEY) or {}
+    except Exception as e:
+        logger.exception("Foydalanuvchilar ro'yxatini o'qishda xatolik: %s", e)
+        await message.answer("❌ Ro'yxatni olishda xatolik yuz berdi.")
+        return
+    if not raw:
+        await message.answer("📭 Hozircha ro'yxat bo'sh. Foydalanuvchilar faol bo'lgach shu yerda ko'rinadi.")
+        return
+    rows = []
+    for uid, val in raw.items():
+        try:
+            d = json.loads(val)
+        except (TypeError, ValueError):
+            d = {}
+        rows.append((str(d.get("d", "")), str(uid), str(d.get("n", "")), str(d.get("u", ""))))
+    rows.sort(reverse=True)
+    limit = 40
+    lines = [f"👥 <b>Foydalanuvchilar</b> (ro'yxatda: {len(rows)}, oxirgi {min(limit, len(rows))} ta faol)\n"]
+    for day, uid, name, uname in rows[:limit]:
+        nm = html.escape(name) or "—"
+        un = f" @{html.escape(uname)}" if uname else ""
+        lines.append(f"• <a href=\"tg://user?id={uid}\">{nm}</a>{un} — <code>{uid}</code> — {day}")
+    lines.append("\n<i>Eslatma: ro'yxat yangilanish kunidan boshlab to'planadi; eski foydalanuvchilar faol bo'lgach qo'shiladi.</i>")
+    await message.answer("\n".join(lines))
 
 
 @dp.message(Command("reyting"))
@@ -3934,6 +3974,7 @@ async def setup_bot_commands():
         BotCommand(command="listening_test", description="IELTS Listening testi"),
         BotCommand(command="dashboard", description="Profil va o'quv materiallari"),
         BotCommand(command="xabarnoma", description="Kunlik xabarni yoqish/o'chirish"),
+        BotCommand(command="users", description="Foydalanuvchilar ro'yxati (faqat egasi)"),
         BotCommand(command="stats", description="Bot statistikasi"),
         BotCommand(command="stop", description="Joriy jarayonni to'xtatish"),
     ]
