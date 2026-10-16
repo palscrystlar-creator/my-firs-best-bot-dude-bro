@@ -118,6 +118,8 @@ UPSTASH_REDIS_REST_URL = os.getenv("UPSTASH_REDIS_REST_URL")
 UPSTASH_REDIS_REST_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN")
 BOT_USERS_SET_KEY = "ielts_bot:unique_users"
 BOT_STARTS_COUNTER_KEY = "ielts_bot:total_starts"
+BOT_ACTIVE_DAY_PREFIX = "ielts_bot:active:"   # + YYYY-MM-DD (Toshkent vaqti)
+_active_seen: set = set()  # (kun, user_id) — Redis'ga kuniga bir marta yozish uchun
 LEADERBOARD_QUIZ_KEY = "ielts_bot:leaderboard:quiz"
 LEADERBOARD_CERT_KEY = "ielts_bot:leaderboard:sertifikat"
 LEADERBOARD_READING_KEY = "ielts_bot:leaderboard:reading"
@@ -178,6 +180,16 @@ async def track_user(user_id: int):
     try:
         await redis_client.sadd(BOT_USERS_SET_KEY, str(user_id))
         await redis_client.incr(BOT_STARTS_COUNTER_KEY)
+
+        # Kunlik faol foydalanuvchilar: har kim uchun kuniga faqat bir marta yoziladi
+        today = datetime.now(timezone(timedelta(hours=5))).strftime("%Y-%m-%d")
+        if (today, user_id) not in _active_seen:
+            if len(_active_seen) > 50000:
+                _active_seen.clear()
+            _active_seen.add((today, user_id))
+            day_key = f"{BOT_ACTIVE_DAY_PREFIX}{today}"
+            await redis_client.sadd(day_key, str(user_id))
+            await redis_client.expire(day_key, 8 * 24 * 3600)
     except Exception as e:
         logger.warning("Redis orqali statistika yozishda xatolik: %s", e)
 
@@ -1066,6 +1078,7 @@ WELCOME_TEXT = (
     "/reyting — eng yaxshilar jadvali\n\n"
     "🇬🇧 <b>Ingliz tili va IELTS</b>\n"
     "/english — ingliz tilida suhbat, xatolaringizni tuzatib boraman\n"
+    "/grammar — grammatika: dars + mashqlar 📝\n"
     "/test — IELTS Speaking mock testi (ovozli javoblar)\n"
     "/reading_test, /listening_test — IELTS uslubidagi testlar\n"
     "/dashboard — profil va o'quv materiallari\n\n"
@@ -1096,6 +1109,7 @@ MENU_SCIENCE = [
 ]
 MENU_ENGLISH = [
     ("💬", "Ingliz tilida suhbat", "english"),
+    ("📝", "Grammatika", "grammar"),
     ("🎤", "IELTS Speaking", "test"),
     ("📖", "IELTS Reading", "reading_test"),
     ("🎧", "IELTS Listening", "listening_test"),
@@ -1186,6 +1200,7 @@ async def cmd_stop(message: Message, state: FSMContext):
     active_stories.pop(message.from_user.id, None)
     active_lies.pop(message.from_user.id, None)
     active_what.pop(message.from_user.id, None)
+    active_grammar.pop(message.from_user.id, None)
     active_guess_games.pop(message.from_user.id, None)
 
     if current is None:
@@ -1227,6 +1242,11 @@ async def cmd_stats(message: Message):
     try:
         total_users = await redis_client.scard(BOT_USERS_SET_KEY)
         total_starts = await redis_client.get(BOT_STARTS_COUNTER_KEY)
+        now = datetime.now(timezone(timedelta(hours=5)))
+        day_keys = [f"{BOT_ACTIVE_DAY_PREFIX}{(now - timedelta(days=d)).strftime('%Y-%m-%d')}" for d in range(7)]
+        active_today = await redis_client.scard(day_keys[0])
+        week_members = await redis_client.sunion(*day_keys)
+        active_week = len(week_members or [])
     except Exception as e:
         logger.exception("Statistikani o'qishda xatolik: %s", e)
         await message.answer("❌ Statistikani olishda xatolik yuz berdi.")
@@ -1237,6 +1257,8 @@ async def cmd_stats(message: Message):
     await message.answer(
         "📊 <b>Bot statistikasi</b>\n\n"
         f"👥 Jami noyob foydalanuvchilar: <b>{total_users}</b>\n"
+        f"🟢 Bugun faol: <b>{active_today}</b>\n"
+        f"📅 Oxirgi 7 kunda faol: <b>{active_week}</b>\n"
         f"📨 Jami murojaatlar (xabar/tugma): <b>{total_starts}</b>"
     )
 
@@ -2338,6 +2360,246 @@ async def handle_what_action(callback: CallbackQuery):
         await callback.message.edit_text(text, reply_markup=kb)
     except Exception:
         await callback.message.answer(text, reply_markup=kb)
+
+
+# --- Ingliz tili grammatikasi (/grammar) ---------------------------------
+# Daraja -> mavzu tanlanadi, AI o'zbek tilida qisqa dars (qoida, misollar,
+# keng tarqalgan xato) yozadi va 5 ta mashq beradi. Mashqlar tugma bilan yechiladi.
+
+GRAMMAR_LEVELS = [
+    ("🟢", "A1–A2 (boshlang'ich)", "beginner (A1-A2)"),
+    ("🟡", "B1–B2 (o'rta)", "intermediate (B1-B2)"),
+    ("🔴", "C1 (yuqori)", "advanced (C1)"),
+]
+GRAMMAR_TOPICS = [
+    ["Present Simple", "Past Simple", "to be (am/is/are)", "Articles: a / an / the",
+     "There is / There are", "Plurals va this/that", "Prepositions of place/time", "Can / Can't"],
+    ["Present Perfect", "Past Continuous", "Conditionals (0, 1, 2)", "Modal verbs (must, should, have to)",
+     "Comparatives & Superlatives", "Passive Voice", "Reported Speech", "Gerund vs Infinitive"],
+    ["Third Conditional & Mixed", "Inversion", "Wish / If only", "Relative clauses (advanced)",
+     "Future Perfect & Continuous", "Subjunctive", "Cleft sentences", "Linking words (however, whereas...)"],
+]
+GRAMMAR_QUESTIONS = 5
+active_grammar: dict[int, dict] = {}
+
+
+def _grammar_levels_keyboard() -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(text=f"{e} {name}", callback_data=f"gr:l:{i}")]
+            for i, (e, name, _d) in enumerate(GRAMMAR_LEVELS)]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _grammar_topics_keyboard(level: int) -> InlineKeyboardMarkup:
+    rows, row = [], []
+    for j, t in enumerate(GRAMMAR_TOPICS[level]):
+        row.append(InlineKeyboardButton(text=t[:30], callback_data=f"gr:t:{level}:{j}"))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton(text="🎲 Tasodifiy mavzu", callback_data=f"gr:t:{level}:r")])
+    rows.append([InlineKeyboardButton(text="⬅️ Darajalar", callback_data="gr:menu")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _generate_grammar_sync(topic: str, level_desc: str) -> dict:
+    data = _llm_json_sync(
+        f"You are an excellent English grammar teacher for UZBEK learners. Topic: '{topic}'. "
+        f"Level: {level_desc}. Write the explanation in UZBEK (Latin script), simple and friendly; "
+        "English examples stay in English. Reply ONLY as JSON with this schema: "
+        '{"title": "...", "rule": "clear explanation in 3-5 short sentences incl. the formula/structure", '
+        '"examples": [{"en": "...", "uz": "..."}, {"en": "...", "uz": "..."}, {"en": "...", "uz": "..."}], '
+        '"mistake": "one very common mistake uzbek speakers make and the correct form", '
+        f'"exercises": [exactly {GRAMMAR_QUESTIONS} items: {{"sentence": "English sentence with ___ gap", '
+        '"options": ["A","B","C","D"], "correct_index": 0, "explanation": "short Uzbek explanation"}]} '
+        "Exercises must test ONLY this topic, have exactly ONE correct option, and vary the correct position.",
+        temperature=0.7,
+    )
+    rule = str(data.get("rule", "")).strip()
+    ex = []
+    for item in data.get("exercises") or []:
+        try:
+            opts = [str(o).strip() for o in item["options"]]
+            ci = int(item["correct_index"])
+            sentence = str(item["sentence"]).strip()
+        except (KeyError, TypeError, ValueError):
+            continue
+        if len(opts) >= 3 and 0 <= ci < len(opts) and sentence:
+            ex.append({"sentence": sentence, "options": opts[:4], "correct_index": ci,
+                       "explanation": str(item.get("explanation", "")).strip()})
+    ex = [q for q in ex if q["correct_index"] < len(q["options"])]
+    if not rule or len(ex) < 3:
+        raise ValueError("Grammar kontenti to'liq emas")
+    examples = []
+    for e in data.get("examples") or []:
+        if isinstance(e, dict) and e.get("en"):
+            examples.append((str(e.get("en")).strip(), str(e.get("uz", "")).strip()))
+    return {"title": str(data.get("title") or topic).strip(), "rule": rule, "examples": examples[:3],
+            "mistake": str(data.get("mistake", "")).strip(), "exercises": ex}
+
+
+def _grammar_question_view(g: dict) -> tuple[str, InlineKeyboardMarkup]:
+    q = g["exercises"][g["idx"]]
+    letters = ["A", "B", "C", "D"]
+    opts = "\n".join(f"<b>{letters[i]})</b> {html.escape(o)}" for i, o in enumerate(q["options"]))
+    text = (f"📝 <b>Mashq {g['idx'] + 1}/{len(g['exercises'])}</b>\n\n"
+            f"{html.escape(q['sentence'])}\n\n{opts}")
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=letters[i], callback_data=f"gr:a:{i}") for i in range(len(q["options"]))]])
+    return text, kb
+
+
+@dp.message(Command("grammar"))
+async def cmd_grammar(message: Message, state: FSMContext):
+    if await state.get_state() is not None:
+        await message.answer("⏳ Avval joriy testni tugating yoki /stop yuboring.")
+        return
+    active_grammar.pop(message.from_user.id, None)
+    await message.answer(
+        "📝 <b>Ingliz tili grammatikasi</b>\n\n"
+        "Darajangizni tanlang — qisqa dars va 5 ta mashq tayyorlayman 👇",
+        reply_markup=_grammar_levels_keyboard(),
+    )
+
+
+@dp.callback_query(F.data.startswith("gr:"))
+async def handle_grammar(callback: CallbackQuery):
+    import random
+    user_id = callback.from_user.id
+    parts = callback.data.split(":")
+    action = parts[1] if len(parts) > 1 else ""
+    msg = callback.message
+
+    if action == "menu":
+        await callback.answer()
+        try:
+            await msg.edit_text("📝 <b>Grammatika</b>\n\nDarajani tanlang 👇", reply_markup=_grammar_levels_keyboard())
+        except Exception:
+            await msg.answer("📝 <b>Grammatika</b>\n\nDarajani tanlang 👇", reply_markup=_grammar_levels_keyboard())
+        return
+
+    if action == "l":
+        try:
+            lvl = int(parts[2])
+            emoji, name, _d = GRAMMAR_LEVELS[lvl]
+        except (ValueError, IndexError):
+            await callback.answer("Xatolik", show_alert=True)
+            return
+        await callback.answer()
+        text = f"{emoji} <b>{name}</b>\n\nMavzuni tanlang 👇"
+        try:
+            await msg.edit_text(text, reply_markup=_grammar_topics_keyboard(lvl))
+        except Exception:
+            await msg.answer(text, reply_markup=_grammar_topics_keyboard(lvl))
+        return
+
+    if action == "t":
+        try:
+            lvl = int(parts[2])
+            topics = GRAMMAR_TOPICS[lvl]
+            topic = random.choice(topics) if parts[3] == "r" else topics[int(parts[3])]
+            level_desc = GRAMMAR_LEVELS[lvl][2]
+        except (ValueError, IndexError):
+            await callback.answer("Xatolik", show_alert=True)
+            return
+        await callback.answer("⏳ Dars tayyorlanmoqda...")
+        try:
+            await msg.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        await bot.send_chat_action(msg.chat.id, "typing")
+        try:
+            data = await asyncio.to_thread(_generate_grammar_sync, topic, level_desc)
+        except Exception as e:
+            logger.exception("Grammar darsini yaratishda xatolik: %s", e)
+            await msg.answer("❌ Dars tayyorlanmadi. /grammar bilan qayta urinib ko'ring.")
+            return
+        examples = "\n".join(f"▫️ <b>{html.escape(en)}</b>\n    <i>{html.escape(uz)}</i>" for en, uz in data["examples"])
+        lesson = f"📘 <b>{html.escape(data['title'])}</b>\n\n{html.escape(data['rule'])}"
+        if examples:
+            lesson += f"\n\n✨ <b>Misollar:</b>\n{examples}"
+        if data["mistake"]:
+            lesson += f"\n\n⚠️ <b>Ko'p uchraydigan xato:</b> {html.escape(data['mistake'])}"
+        active_grammar[user_id] = {"topic": topic, "level": lvl, "exercises": data["exercises"],
+                                   "idx": 0, "score": 0, "answered": True}
+        await msg.answer(lesson, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="📝 Mashqni boshlash", callback_data="gr:go")]]))
+        return
+
+    g = active_grammar.get(user_id)
+    if not g:
+        await callback.answer("Bu sessiya tugagan. /grammar bilan qayta boshlang.", show_alert=True)
+        return
+
+    if action == "go":
+        if g.get("started"):
+            await callback.answer()
+            return
+        g["started"] = True
+        g["answered"] = False
+        await callback.answer()
+        try:
+            await msg.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        text, kb = _grammar_question_view(g)
+        await msg.answer(text, reply_markup=kb)
+        return
+
+    if action == "a":
+        if g["answered"]:
+            await callback.answer()
+            return
+        try:
+            choice = int(parts[2])
+        except (ValueError, IndexError):
+            await callback.answer()
+            return
+        g["answered"] = True
+        q = g["exercises"][g["idx"]]
+        letters = ["A", "B", "C", "D"]
+        good = q["correct_index"]
+        if choice == good:
+            g["score"] += 1
+            result = "✅ <b>To'g'ri!</b>"
+            await callback.answer("✅ To'g'ri!")
+        else:
+            result = f"❌ <b>Noto'g'ri.</b> To'g'ri javob: <b>{letters[good]}) {html.escape(q['options'][good])}</b>"
+            await callback.answer("❌ Noto'g'ri")
+        done = (f"📝 <b>Mashq {g['idx'] + 1}/{len(g['exercises'])}</b>\n\n{html.escape(q['sentence'])}\n\n{result}")
+        if q["explanation"]:
+            done += f"\n\n💡 <i>{html.escape(q['explanation'])}</i>"
+        try:
+            await msg.edit_text(done, reply_markup=None)
+        except Exception:
+            pass
+
+        g["idx"] += 1
+        if g["idx"] < len(g["exercises"]):
+            g["answered"] = False
+            text, kb = _grammar_question_view(g)
+            await msg.answer(text, reply_markup=kb)
+            return
+
+        total = len(g["exercises"])
+        score = g["score"]
+        pct = round(score / total * 100)
+        verdict = ("🏆 Ajoyib! Bu mavzuni yaxshi o'zlashtirdingiz." if pct >= 80 else
+                   "👍 Yomon emas! Yana bir bor mashq qilsangiz, mukammal bo'ladi." if pct >= 50 else
+                   "📚 Dars matnini qayta o'qib, yana urinib ko'ring — albatta chiqadi!")
+        topic, lvl = g["topic"], g["level"]
+        active_grammar.pop(user_id, None)
+        await msg.answer(
+            f"🏁 <b>{html.escape(topic)}</b> — natija\n\n🎯 <b>{score}/{total}</b> ({pct}%)\n\n{verdict}",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔁 Shu darajadan boshqa mavzu", callback_data=f"gr:l:{lvl}")],
+                [InlineKeyboardButton(text="⬅️ Darajalar", callback_data="gr:menu")],
+            ]),
+        )
+        return
+
+    await callback.answer()
 
 
 # --- Kunlik fan + ingliz tili maslahati ----------------------------------
@@ -3663,6 +3925,7 @@ async def setup_bot_commands():
         BotCommand(command="yolgon", description="3 ta gapdan yolg'onini toping"),
         BotCommand(command="nima", description="Nima bo'ladi? Fan jumboqlari"),
         BotCommand(command="kunlik", description="Bugungi fan, fakt va ingliz tili maslahati"),
+        BotCommand(command="grammar", description="Ingliz grammatikasi: dars va mashqlar"),
         BotCommand(command="english", description="Ingliz tilida suhbat (xatolarni tuzatadi)"),
         BotCommand(command="sertifikat", description="25 savolli sertifikat testi"),
         BotCommand(command="reyting", description="TOP 10 reyting jadvallari"),
