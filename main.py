@@ -120,6 +120,7 @@ UPSTASH_REDIS_REST_URL = os.getenv("UPSTASH_REDIS_REST_URL")
 UPSTASH_REDIS_REST_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN")
 BOT_USERS_SET_KEY = "ielts_bot:unique_users"
 BOT_STARTS_COUNTER_KEY = "ielts_bot:total_starts"
+WRITING_PRICE_STARS = 5   # IELTS Writing tahlili narxi (⭐ Telegram Stars) — faqat shu raqamni o'zgartirish kifoya
 BOT_USER_INFO_KEY = "ielts_bot:user_info"      # hash: user_id -> JSON {n, u, d}
 BOT_ACTIVE_DAY_PREFIX = "ielts_bot:active:"   # + YYYY-MM-DD (Toshkent vaqti)
 _active_seen: set = set()  # (kun, user_id) — Redis'ga kuniga bir marta yozish uchun
@@ -1085,7 +1086,7 @@ WELCOME_TEXT = (
     "🇬🇧 <b>Ingliz tili va IELTS</b>\n"
     "/english — ingliz tilida suhbat, xatolaringizni tuzatib boraman\n"
     "/grammar — grammatika: dars + mashqlar 📝\n"
-    "/writing — 💎 IELTS Writing tahlili (10 ⭐)\n"
+    f"/writing — 💎 IELTS Writing tahlili ({WRITING_PRICE_STARS} ⭐)\n"
     "/test — IELTS Speaking mock testi (ovozli javoblar)\n"
     "/reading_test, /listening_test — IELTS uslubidagi testlar\n"
     "/dashboard — profil va o'quv materiallari\n\n"
@@ -1117,7 +1118,7 @@ MENU_SCIENCE = [
 MENU_ENGLISH = [
     ("💬", "Ingliz tilida suhbat", "english"),
     ("📝", "Grammatika", "grammar"),
-    ("💎", "Writing tahlili (⭐10)", "writing"),
+    ("💎", f"Writing tahlili (⭐{WRITING_PRICE_STARS})", "writing"),
     ("🎤", "IELTS Speaking", "test"),
     ("📖", "IELTS Reading", "reading_test"),
     ("🎧", "IELTS Listening", "listening_test"),
@@ -2648,12 +2649,11 @@ async def handle_grammar(callback: CallbackQuery):
 
 
 # --- 💎 Premium: IELTS Writing tahlili (⭐ Telegram Stars) -----------------
-# Foydalanuvchi 10 ⭐ to'lab, inshosini yuboradi — AI band ball, xatolar va
+# Foydalanuvchi WRITING_PRICE_STARS ⭐ to'lab, inshosini yuboradi — AI band ball, xatolar va
 # yaxshilangan variantni beradi. Bot egasi (admin) uchun BEPUL.
 # To'lov muvaffaqiyatli bo'lsa "kredit" yoziladi (Redis + xotira); tahlil
 # muvaffaqiyatli yuborilgandagina sarflanadi, shuning uchun xatolikda pul yo'qolmaydi.
 
-WRITING_PRICE_STARS = 10
 WRITING_CREDIT_PREFIX = "ielts_bot:writing_credit:"
 WRITING_MIN_WORDS = 120   # mock uchun (rasmiy imtihonda Task 2 — kamida 250 so'z)
 WRITING_MAX_CHARS = 4500
@@ -4233,7 +4233,7 @@ async def setup_bot_commands():
         BotCommand(command="yolgon", description="3 ta gapdan yolg'onini toping"),
         BotCommand(command="nima", description="Nima bo'ladi? Fan jumboqlari"),
         BotCommand(command="kunlik", description="Bugungi fan, fakt va ingliz tili maslahati"),
-        BotCommand(command="writing", description="IELTS Writing tahlili (10 Stars)"),
+        BotCommand(command="writing", description=f"IELTS Writing tahlili ({WRITING_PRICE_STARS} Stars)"),
         BotCommand(command="grammar", description="Ingliz grammatikasi: dars va mashqlar"),
         BotCommand(command="english", description="Ingliz tilida suhbat (xatolarni tuzatadi)"),
         BotCommand(command="sertifikat", description="25 savolli sertifikat testi"),
