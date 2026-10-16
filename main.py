@@ -59,6 +59,8 @@ from aiogram.types import (
     BotCommand,
     WebAppInfo,
     Update,
+    LabeledPrice,
+    PreCheckoutQuery,
 )
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
@@ -1083,6 +1085,7 @@ WELCOME_TEXT = (
     "🇬🇧 <b>Ingliz tili va IELTS</b>\n"
     "/english — ingliz tilida suhbat, xatolaringizni tuzatib boraman\n"
     "/grammar — grammatika: dars + mashqlar 📝\n"
+    "/writing — 💎 IELTS Writing tahlili (10 ⭐)\n"
     "/test — IELTS Speaking mock testi (ovozli javoblar)\n"
     "/reading_test, /listening_test — IELTS uslubidagi testlar\n"
     "/dashboard — profil va o'quv materiallari\n\n"
@@ -1114,6 +1117,7 @@ MENU_SCIENCE = [
 MENU_ENGLISH = [
     ("💬", "Ingliz tilida suhbat", "english"),
     ("📝", "Grammatika", "grammar"),
+    ("💎", "Writing tahlili (⭐10)", "writing"),
     ("🎤", "IELTS Speaking", "test"),
     ("📖", "IELTS Reading", "reading_test"),
     ("🎧", "IELTS Listening", "listening_test"),
@@ -1205,6 +1209,7 @@ async def cmd_stop(message: Message, state: FSMContext):
     active_lies.pop(message.from_user.id, None)
     active_what.pop(message.from_user.id, None)
     active_grammar.pop(message.from_user.id, None)
+    awaiting_essay.discard(message.from_user.id)
     active_guess_games.pop(message.from_user.id, None)
 
     if current is None:
@@ -2642,6 +2647,212 @@ async def handle_grammar(callback: CallbackQuery):
     await callback.answer()
 
 
+# --- 💎 Premium: IELTS Writing tahlili (⭐ Telegram Stars) -----------------
+# Foydalanuvchi 10 ⭐ to'lab, inshosini yuboradi — AI band ball, xatolar va
+# yaxshilangan variantni beradi. Bot egasi (admin) uchun BEPUL.
+# To'lov muvaffaqiyatli bo'lsa "kredit" yoziladi (Redis + xotira); tahlil
+# muvaffaqiyatli yuborilgandagina sarflanadi, shuning uchun xatolikda pul yo'qolmaydi.
+
+WRITING_PRICE_STARS = 10
+WRITING_CREDIT_PREFIX = "ielts_bot:writing_credit:"
+WRITING_MIN_WORDS = 40
+WRITING_MAX_CHARS = 3500
+_writing_credit_mem: set = set()
+awaiting_essay: set = set()
+
+
+def _is_admin(user_id: int) -> bool:
+    return bool(ADMIN_USER_ID) and str(user_id) == str(ADMIN_USER_ID)
+
+
+async def _has_writing_credit(user_id: int) -> bool:
+    if user_id in _writing_credit_mem:
+        return True
+    if redis_client is not None:
+        try:
+            return bool(await redis_client.exists(f"{WRITING_CREDIT_PREFIX}{user_id}"))
+        except Exception as e:
+            logger.warning("Writing kreditini o'qishda xatolik: %s", e)
+    return False
+
+
+async def _grant_writing_credit(user_id: int):
+    _writing_credit_mem.add(user_id)
+    if redis_client is not None:
+        try:
+            await redis_client.set(f"{WRITING_CREDIT_PREFIX}{user_id}", "1", ex=30 * 24 * 3600)
+        except Exception as e:
+            logger.warning("Writing kreditini yozishda xatolik: %s", e)
+
+
+async def _consume_writing_credit(user_id: int):
+    _writing_credit_mem.discard(user_id)
+    if redis_client is not None:
+        try:
+            await redis_client.delete(f"{WRITING_CREDIT_PREFIX}{user_id}")
+        except Exception as e:
+            logger.warning("Writing kreditini o'chirishda xatolik: %s", e)
+
+
+def _analyze_essay_sync(essay: str) -> dict:
+    return _llm_json_sync(
+        "You are a strict but encouraging certified IELTS Writing examiner. Evaluate the following essay "
+        "(Task 2 style). Explain in UZBEK (Latin script); keep quoted fragments and corrections in English. "
+        "Use IELTS half-band scores (e.g. 6.5). Reply ONLY as JSON: "
+        '{"task_response": 6.0, "coherence": 6.0, "lexical": 6.0, "grammar": 6.0, "overall": 6.0, '
+        '"strengths": ["...","..."], '
+        '"errors": [{"wrong": "quote from essay", "right": "corrected", "why": "short Uzbek reason"}] (3-5 items), '
+        '"vocab": ["better word/phrase suggestion", "..."] (3-5 items), '
+        '"improved_paragraph": "rewrite the weakest paragraph at a higher band level (English)", '
+        '"next_steps": ["short Uzbek actionable tip", "..."] (2-3 items)}\n\nESSAY:\n' + essay,
+        temperature=0.4,
+    )
+
+
+def _format_essay_report(d: dict) -> str:
+    def band(k):
+        try:
+            return f"{float(d.get(k, 0)):.1f}"
+        except (TypeError, ValueError):
+            return "—"
+    e = html.escape
+    out = [
+        "📝 <b>IELTS WRITING — TAHLIL</b>\n",
+        f"🎯 Task Response: <b>{band('task_response')}</b>",
+        f"🔗 Coherence & Cohesion: <b>{band('coherence')}</b>",
+        f"📚 Lexical Resource: <b>{band('lexical')}</b>",
+        f"✍️ Grammar: <b>{band('grammar')}</b>",
+        f"\n🏆 <b>Overall Band: {band('overall')}</b>",
+    ]
+    st = [x for x in (d.get("strengths") or []) if str(x).strip()]
+    if st:
+        out.append("\n💪 <b>Kuchli tomonlar:</b>\n" + "\n".join(f"✅ {e(str(x))}" for x in st[:4]))
+    errs = [x for x in (d.get("errors") or []) if isinstance(x, dict)]
+    if errs:
+        out.append("\n🔧 <b>Xatolar va tuzatishlar:</b>")
+        for x in errs[:5]:
+            out.append(f"❌ <i>{e(str(x.get('wrong', '')))}</i>\n✅ <b>{e(str(x.get('right', '')))}</b>\n💡 {e(str(x.get('why', '')))}")
+    vc = [x for x in (d.get("vocab") or []) if str(x).strip()]
+    if vc:
+        out.append("\n📚 <b>Boy lug'at:</b>\n" + "\n".join(f"▫️ {e(str(x))}" for x in vc[:5]))
+    ip = str(d.get("improved_paragraph", "")).strip()
+    if ip:
+        out.append(f"\n✨ <b>Yaxshilangan paragraf:</b>\n<i>{e(ip)}</i>")
+    ns = [x for x in (d.get("next_steps") or []) if str(x).strip()]
+    if ns:
+        out.append("\n🚀 <b>Keyingi qadamlar:</b>\n" + "\n".join(f"{i}. {e(str(x))}" for i, x in enumerate(ns[:3], 1)))
+    return "\n".join(out)
+
+
+async def _send_long(message: Message, text: str):
+    while text:
+        if len(text) <= 4000:
+            await message.answer(text)
+            return
+        cut = text.rfind("\n", 0, 4000)
+        cut = cut if cut > 1000 else 4000
+        await message.answer(text[:cut])
+        text = text[cut:].lstrip("\n")
+
+
+@dp.message(Command("writing"))
+async def cmd_writing(message: Message, state: FSMContext):
+    uid = message.from_user.id
+    if await state.get_state() is not None:
+        await message.answer("⏳ Avval joriy testni tugating yoki /stop yuboring.")
+        return
+
+    if _is_admin(uid) or await _has_writing_credit(uid):
+        awaiting_essay.add(uid)
+        free = "🎁 <i>Siz uchun bepul.</i>\n\n" if _is_admin(uid) else "✅ <i>To'lov qabul qilingan.</i>\n\n"
+        await message.answer(
+            f"💎 <b>IELTS Writing tahlili</b>\n\n{free}"
+            f"Inshongizni (ingliz tilida, kamida {WRITING_MIN_WORDS} so'z) bitta xabar qilib yuboring 👇\n"
+            "<i>Bekor qilish: /stop</i>"
+        )
+        return
+
+    await message.answer(
+        "💎 <b>IELTS Writing tahlili (Premium)</b>\n\n"
+        "Inshongizni yuborasiz — men IELTS mezonlari bo'yicha:\n"
+        "🏆 band ballni (4 ta mezon bo'yicha)\n"
+        "🔧 xatolar va ularning tuzatilishini\n"
+        "📚 boy lug'at takliflarini\n"
+        "✨ yaxshilangan paragrafni beraman.\n\n"
+        f"Narxi: <b>{WRITING_PRICE_STARS} ⭐ Telegram Stars</b>"
+    )
+    try:
+        await bot.send_invoice(
+            chat_id=message.chat.id,
+            title="IELTS Writing tahlili",
+            description="Inshongiz uchun band ball, xatolar tahlili va yaxshilangan variant.",
+            payload=f"writing:{uid}",
+            currency="XTR",
+            prices=[LabeledPrice(label="Writing tahlili", amount=WRITING_PRICE_STARS)],
+            provider_token="",
+        )
+    except Exception as e:
+        logger.exception("Invoice yuborishda xatolik: %s", e)
+        await message.answer("❌ To'lov oynasini ochib bo'lmadi. Birozdan so'ng qayta urinib ko'ring.")
+
+
+@dp.pre_checkout_query()
+async def handle_pre_checkout(query: PreCheckoutQuery):
+    ok = (query.currency == "XTR" and query.total_amount == WRITING_PRICE_STARS
+          and query.invoice_payload == f"writing:{query.from_user.id}")
+    if ok:
+        await query.answer(ok=True)
+    else:
+        await query.answer(ok=False, error_message="To'lov ma'lumotlari mos kelmadi. /writing orqali qayta urinib ko'ring.")
+
+
+@dp.message(F.successful_payment)
+async def handle_successful_payment(message: Message):
+    pay = message.successful_payment
+    uid = message.from_user.id
+    logger.info("Stars to'lov: user=%s amount=%s charge_id=%s", uid, pay.total_amount, pay.telegram_payment_charge_id)
+    await _grant_writing_credit(uid)
+    awaiting_essay.add(uid)
+    await message.answer(
+        "✅ <b>To'lov qabul qilindi, rahmat!</b> ⭐\n\n"
+        f"Endi inshongizni (ingliz tilida, kamida {WRITING_MIN_WORDS} so'z) bitta xabar qilib yuboring 👇"
+    )
+
+
+async def _essay_filter(message: Message) -> bool:
+    return bool(message.text) and not message.text.startswith("/") and message.from_user.id in awaiting_essay
+
+
+@dp.message(F.text, _essay_filter)
+async def handle_essay(message: Message):
+    uid = message.from_user.id
+    essay = message.text.strip()
+    words = len(essay.split())
+    if words < WRITING_MIN_WORDS:
+        await message.answer(f"✍️ Insho juda qisqa ({words} so'z). Kamida {WRITING_MIN_WORDS} so'z yozing va qayta yuboring.")
+        return
+    if len(essay) > WRITING_MAX_CHARS:
+        await message.answer(f"✂️ Insho juda uzun. Iltimos, {WRITING_MAX_CHARS} belgidan oshmasin.")
+        return
+
+    awaiting_essay.discard(uid)
+    await message.answer("🔎 Inshoyingiz tahlil qilinmoqda, 20–40 soniya kuting...")
+    await bot.send_chat_action(message.chat.id, "typing")
+    try:
+        data = await asyncio.to_thread(_analyze_essay_sync, essay)
+        report = _format_essay_report(data)
+    except Exception as e:
+        logger.exception("Essay tahlilida xatolik: %s", e)
+        awaiting_essay.add(uid)  # kredit saqlanadi — qayta yuborish mumkin
+        await message.answer("❌ Tahlilda xatolik yuz berdi. To'lovingiz saqlandi — inshongizni qayta yuboring.")
+        return
+
+    await _send_long(message, report)
+    if not _is_admin(uid):
+        await _consume_writing_credit(uid)
+        await message.answer("🔁 Yana tahlil qildirish uchun /writing yuboring.")
+
+
 # --- Kunlik fan + ingliz tili maslahati ----------------------------------
 # Har kuni (Toshkent vaqti bilan) navbatdagi fan tanlanadi: qiziqarli fakt,
 # 5 ta savollik test va ingliz tilidan foydali maslahat. Kontent kuniga BIR marta
@@ -3965,6 +4176,7 @@ async def setup_bot_commands():
         BotCommand(command="yolgon", description="3 ta gapdan yolg'onini toping"),
         BotCommand(command="nima", description="Nima bo'ladi? Fan jumboqlari"),
         BotCommand(command="kunlik", description="Bugungi fan, fakt va ingliz tili maslahati"),
+        BotCommand(command="writing", description="IELTS Writing tahlili (10 Stars)"),
         BotCommand(command="grammar", description="Ingliz grammatikasi: dars va mashqlar"),
         BotCommand(command="english", description="Ingliz tilida suhbat (xatolarni tuzatadi)"),
         BotCommand(command="sertifikat", description="25 savolli sertifikat testi"),
