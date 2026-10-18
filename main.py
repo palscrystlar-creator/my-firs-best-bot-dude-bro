@@ -124,6 +124,7 @@ UPSTASH_REDIS_REST_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN")
 BOT_USERS_SET_KEY = "ielts_bot:unique_users"
 BOT_STARTS_COUNTER_KEY = "ielts_bot:total_starts"
 WRITING_PRICE_STARS = 5   # IELTS Writing tahlili narxi (⭐ Telegram Stars) — faqat shu raqamni o'zgartirish kifoya
+SPEAKING_PRICE_STARS = 3   # IELTS Speaking to'liq mock narxi (⭐ Telegram Stars)
 BOT_USER_INFO_KEY = "ielts_bot:user_info"      # hash: user_id -> JSON {n, u, d}
 BOT_ACTIVE_DAY_PREFIX = "ielts_bot:active:"   # + YYYY-MM-DD (Toshkent vaqti)
 _active_seen: set = set()  # (kun, user_id) — Redis'ga kuniga bir marta yozish uchun
@@ -538,6 +539,7 @@ MENU_LABELS = {
     "english": {"uz": "Ingliz tilida suhbat", "ru": "Разговор на английском", "en": "English chat"},
     "grammar": {"uz": "Grammatika", "ru": "Грамматика", "en": "Grammar"},
     "writing": {"uz": "Writing tahlili", "ru": "Разбор Writing", "en": "Writing review"},
+    "speaking": {"uz": "Speaking to'liq mock", "ru": "Полный Speaking мок", "en": "Full Speaking mock"},
     "test": {"uz": "IELTS Speaking", "ru": "IELTS Speaking", "en": "IELTS Speaking"},
     "reading_test": {"uz": "IELTS Reading", "ru": "IELTS Reading", "en": "IELTS Reading"},
     "listening_test": {"uz": "IELTS Listening", "ru": "IELTS Listening", "en": "IELTS Listening"},
@@ -564,6 +566,10 @@ def _lang_keyboard() -> InlineKeyboardMarkup:
 # Kalit — kodda yozilgan o'zbekcha matn bo'lagi, qiymat — (ruscha, inglizcha).
 
 I18N_FRAGMENTS = {
+    '✅ <b>Test tayyor!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview (qisqa test)\n🎙 Har bir savolga ovozli xabar bilan javob bering.': ('✅ <b>Тест готов!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview (короткий тест)\n🎙 Отвечайте на каждый вопрос голосовым сообщением.', '✅ <b>Test ready!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview (short test)\n🎙 Answer every question with a voice message.'),
+    '✅ <b>Part 1 tugadi!</b>\n\n📊 Yakuniy natija tayyorlanmoqda, biroz kuting...': ('✅ <b>Part 1 завершена!</b>\n\n📊 Готовлю итоговый результат, подождите...', '✅ <b>Part 1 complete!</b>\n\n📊 Preparing your final result, please wait...'),
+    '🏁 <b>IELTS SPEAKING PART 1 — YAKUNIY NATIJA</b>\n\n🗣 Fluency & Coherence: <b>': ('🏁 <b>IELTS SPEAKING PART 1 — ИТОГОВЫЙ РЕЗУЛЬТАТ</b>\n\n🗣 Fluency & Coherence: <b>', '🏁 <b>IELTS SPEAKING PART 1 — FINAL RESULT</b>\n\n🗣 Fluency & Coherence: <b>'),
+    "🔁 Yangi test uchun /test, to'liq 3 qismli mock uchun /speaking yuboring.": ('🔁 Для нового теста — /test, для полного мока из 3 частей — /speaking.', '🔁 Send /test for a new test, or /speaking for the full 3-part mock.'),
     "\n\nHozircha natijalar yo'q. Birinchi bo'lib test yeching!": ('\n\nПока нет результатов. Пройдите тест первым!', '\n\nNo results yet. Be the first to take a test!'),
     'Foydalanuvchi ': ('Пользователь ', 'User '),
     '✅ Rahmat! Obuna tasdiqlandi.': ('✅ Спасибо! Подписка подтверждена.', '✅ Thank you! Subscription confirmed.'),
@@ -1667,6 +1673,7 @@ WELCOME_TEXT = (
     "/english — ingliz tilida suhbat, xatolaringizni tuzatib boraman\n"
     "/grammar — grammatika: dars + mashqlar 📝\n"
     f"/writing — 💎 IELTS Writing tahlili ({WRITING_PRICE_STARS} ⭐)\n"
+    f"/speaking — 🎙 IELTS Speaking to'liq mock ({SPEAKING_PRICE_STARS} ⭐)\n"
     "/test — IELTS Speaking mock testi (ovozli javoblar)\n"
     "/reading_test, /listening_test — IELTS uslubidagi testlar\n"
     "/dashboard — profil va o'quv materiallari\n\n"
@@ -1683,7 +1690,7 @@ MENU_SCIENCE = [
     ("📖", "story"), ("📅", "daily"), ("🎓", "certificate"), ("🏆", "leaderboard"),
 ]
 MENU_ENGLISH = [
-    ("💬", "english"), ("📝", "grammar"), ("💎", "writing"), ("🎤", "test"),
+    ("💬", "english"), ("📝", "grammar"), ("💎", "writing"), ("🎙", "speaking"), ("🎤", "test"),
     ("📖", "reading_test"), ("🎧", "listening_test"), ("📚", "dashboard"),
 ]
 
@@ -1706,6 +1713,7 @@ ALL_COMMANDS = {
         "/english — разговор на английском с исправлением ошибок\n"
         "/grammar — грамматика: урок + упражнения 📝\n"
         f"/writing — 💎 разбор IELTS Writing ({WRITING_PRICE_STARS} ⭐)\n"
+        f"/speaking — 🎙 полный мок IELTS Speaking ({SPEAKING_PRICE_STARS} ⭐)\n"
         "/test — IELTS Speaking (голосовые ответы)\n"
         "/reading_test, /listening_test — тесты в стиле IELTS\n"
         "/dashboard — профиль и материалы\n\n"
@@ -1730,6 +1738,7 @@ ALL_COMMANDS = {
         "/english — chat in English, I'll fix your mistakes\n"
         "/grammar — grammar: lesson + exercises 📝\n"
         f"/writing — 💎 IELTS Writing review ({WRITING_PRICE_STARS} ⭐)\n"
+        f"/speaking — 🎙 IELTS Speaking full mock ({SPEAKING_PRICE_STARS} ⭐)\n"
         "/test — IELTS Speaking mock (voice answers)\n"
         "/reading_test, /listening_test — IELTS-style tests\n"
         "/dashboard — profile and study materials\n\n"
@@ -1744,6 +1753,8 @@ def _menu_label(cmd: str) -> str:
     base = MENU_LABELS.get(cmd, {}).get(cur_lang()) or MENU_LABELS.get(cmd, {}).get("uz") or cmd
     if cmd == "writing":
         base += f" (⭐{WRITING_PRICE_STARS})"
+    if cmd == "speaking":
+        base += f" (⭐{SPEAKING_PRICE_STARS})"
     return base
 
 
@@ -3492,19 +3503,25 @@ async def cmd_writing(message: Message, state: FSMContext):
 
 @dp.pre_checkout_query()
 async def handle_pre_checkout(query: PreCheckoutQuery):
-    ok = (query.currency == "XTR" and query.total_amount == WRITING_PRICE_STARS
-          and query.invoice_payload == f"writing:{query.from_user.id}")
+    uid = query.from_user.id
+    prices = {f"writing:{uid}": WRITING_PRICE_STARS, f"speaking:{uid}": SPEAKING_PRICE_STARS}
+    ok = query.currency == "XTR" and prices.get(query.invoice_payload) == query.total_amount
     if ok:
         await query.answer(ok=True)
     else:
-        await query.answer(ok=False, error_message="To'lov ma'lumotlari mos kelmadi. /writing orqali qayta urinib ko'ring.")
+        await query.answer(ok=False, error_message="Payment details do not match. Please try again from the bot menu.")
 
 
 @dp.message(F.successful_payment)
-async def handle_successful_payment(message: Message):
+async def handle_successful_payment(message: Message, state: FSMContext):
     pay = message.successful_payment
     uid = message.from_user.id
-    logger.info("Stars to'lov: user=%s amount=%s charge_id=%s", uid, pay.total_amount, pay.telegram_payment_charge_id)
+    logger.info("Stars to'lov: user=%s amount=%s payload=%s charge_id=%s", uid, pay.total_amount,
+                pay.invoice_payload, pay.telegram_payment_charge_id)
+    if pay.invoice_payload.startswith("speaking:"):
+        await _grant_speaking_credit(uid)
+        await _start_full_speaking(message, state, uid, _sp("thanks"))
+        return
     await _grant_writing_credit(uid)
     await _give_writing_task(message, uid, "✅ <b>To'lov qabul qilindi, rahmat!</b> ⭐\n\n")
 
@@ -3555,6 +3572,394 @@ async def handle_essay(message: Message):
     if not _is_admin(uid):
         await _consume_writing_credit(uid)
         await message.answer("🔁 Yana tahlil qildirish uchun /writing yuboring.")
+
+
+# --- 💎 Premium: IELTS Speaking FULL MOCK (⭐ Telegram Stars) ---------------
+# Haqiqiy imtihondagidek: Part 1 (3 mavzu, ~10 savol) + Part 2 (cue card) + Part 3 (5 savol).
+# Imtihon davomida har javobga izoh berilmaydi (real imtihondagidek) — oxirida bitta batafsil
+# hisobot: 4 mezon bo'yicha band, xatolar, lug'at, reja. Bot egasi (admin) uchun BEPUL.
+# Kredit faqat hisobot muvaffaqiyatli yuborilgandan keyin sarflanadi.
+
+SPEAKING_CREDIT_PREFIX = "ielts_bot:speaking_credit:"
+_speaking_credit_mem: set = set()
+
+
+class FullSpeakStates(StatesGroup):
+    active = State()
+
+
+_SP = {
+    "intro": {
+        "uz": "💎 <b>IELTS Speaking — TO'LIQ MOCK (Premium)</b>\n\nHaqiqiy imtihondek, 3 qismli:\n🗣 <b>Part 1</b> — tanishuv va 3 ta mavzu (~10 savol)\n🎴 <b>Part 2</b> — cue card, 1–2 daqiqa monolog\n💭 <b>Part 3</b> — chuqur muhokama (5 savol)\n\nImtihon davomida izoh berilmaydi (real imtihondek). Oxirida batafsil hisobot: 4 mezon bo'yicha band, xatolar va tuzatishlar, lug'at takliflari, o'quv rejasi.\n\nNarxi: <b>{p} ⭐ Telegram Stars</b>",
+        "ru": "💎 <b>IELTS Speaking — ПОЛНЫЙ МОК (Premium)</b>\n\nКак на настоящем экзамене, 3 части:\n🗣 <b>Part 1</b> — знакомство и 3 темы (~10 вопросов)\n🎴 <b>Part 2</b> — карточка, монолог 1–2 минуты\n💭 <b>Part 3</b> — углублённое обсуждение (5 вопросов)\n\nВо время экзамена комментариев нет (как на реальном). В конце — подробный отчёт: балл по 4 критериям, ошибки и исправления, лексика, план обучения.\n\nЦена: <b>{p} ⭐ Telegram Stars</b>",
+        "en": "💎 <b>IELTS Speaking — FULL MOCK (Premium)</b>\n\nJust like the real exam, 3 parts:\n🗣 <b>Part 1</b> — introduction and 3 topics (~10 questions)\n🎴 <b>Part 2</b> — cue card, 1–2 minute talk\n💭 <b>Part 3</b> — in-depth discussion (5 questions)\n\nNo feedback during the exam (like the real thing). At the end you get a detailed report: band for all 4 criteria, mistakes and corrections, vocabulary upgrades and a study plan.\n\nPrice: <b>{p} ⭐ Telegram Stars</b>",
+    },
+    "inv_title": {"uz": "IELTS Speaking to'liq mock", "ru": "Полный мок IELTS Speaking", "en": "IELTS Speaking full mock"},
+    "inv_desc": {
+        "uz": "3 qismli speaking imtihoni va batafsil band hisoboti.",
+        "ru": "Экзамен Speaking из 3 частей и подробный отчёт с баллами.",
+        "en": "A 3-part speaking exam and a detailed band report.",
+    },
+    "inv_label": {"uz": "Speaking mock", "ru": "Speaking мок", "en": "Speaking mock"},
+    "inv_fail": {
+        "uz": "❌ To'lov oynasini ochib bo'lmadi. Birozdan so'ng qayta urinib ko'ring.",
+        "ru": "❌ Не удалось открыть окно оплаты. Попробуйте чуть позже.",
+        "en": "❌ Couldn't open the payment window. Please try again shortly.",
+    },
+    "busy": {
+        "uz": "⏳ Avval joriy testni tugating yoki /stop yuboring.",
+        "ru": "⏳ Сначала завершите текущий тест или отправьте /stop.",
+        "en": "⏳ Finish your current test first or send /stop.",
+    },
+    "free": {"uz": "🎁 <i>Siz uchun bepul.</i>\n\n", "ru": "🎁 <i>Для вас бесплатно.</i>\n\n", "en": "🎁 <i>Free for you.</i>\n\n"},
+    "paid": {"uz": "✅ <i>To'lov qabul qilingan.</i>\n\n", "ru": "✅ <i>Оплата получена.</i>\n\n", "en": "✅ <i>Payment received.</i>\n\n"},
+    "thanks": {
+        "uz": "✅ <b>To'lov qabul qilindi, rahmat!</b> ⭐\n\n",
+        "ru": "✅ <b>Оплата получена, спасибо!</b> ⭐\n\n",
+        "en": "✅ <b>Payment received, thank you!</b> ⭐\n\n",
+    },
+    "preparing": {
+        "uz": "⏳ Imtihon savollari tayyorlanmoqda...",
+        "ru": "⏳ Готовлю вопросы экзамена...",
+        "en": "⏳ Preparing your exam questions...",
+    },
+    "gen_fail": {
+        "uz": "❌ Savollarni tayyorlab bo'lmadi. To'lovingiz saqlandi — /speaking bilan qayta urinib ko'ring.",
+        "ru": "❌ Не удалось подготовить вопросы. Оплата сохранена — попробуйте снова через /speaking.",
+        "en": "❌ Couldn't prepare the questions. Your payment is saved — try again with /speaking.",
+    },
+    "start": {
+        "uz": "🎙 <b>Imtihon boshlandi!</b>\nHar bir savolga <b>ovozli xabar</b> bilan javob bering. Savol matn va ovoz ko'rinishida keladi. To'xtatish: /stop",
+        "ru": "🎙 <b>Экзамен начался!</b>\nОтвечайте на каждый вопрос <b>голосовым сообщением</b>. Вопрос приходит текстом и голосом. Остановить: /stop",
+        "en": "🎙 <b>The exam has started!</b>\nAnswer every question with a <b>voice message</b>. Each question comes as text and audio. To stop: /stop",
+    },
+    "p1": {
+        "uz": "🗣 <b>PART 1</b> — Introduction & Interview\nQisqa, tabiiy javob bering (2–4 gap).",
+        "ru": "🗣 <b>PART 1</b> — Introduction & Interview\nОтвечайте коротко и естественно (2–4 предложения).",
+        "en": "🗣 <b>PART 1</b> — Introduction & Interview\nGive short, natural answers (2–4 sentences).",
+    },
+    "p2": {
+        "uz": "🎬 <b>PART 2</b> — Cue Card\n⏱ 1 daqiqa tayyorlaning (qog'ozga reja yozishingiz mumkin), so'ng <b>1–2 daqiqa</b> to'xtamasdan gapirib, bitta ovozli xabar yuboring.",
+        "ru": "🎬 <b>PART 2</b> — Cue Card\n⏱ Подготовьтесь 1 минуту (можно набросать план), затем говорите <b>1–2 минуты</b> без остановки и отправьте одно голосовое.",
+        "en": "🎬 <b>PART 2</b> — Cue Card\n⏱ Take 1 minute to prepare (you can jot down notes), then speak for <b>1–2 minutes</b> without stopping and send one voice message.",
+    },
+    "p3": {
+        "uz": "💭 <b>PART 3</b> — Discussion\nFikringizni asoslab, kengroq javob bering (4–6 gap).",
+        "ru": "💭 <b>PART 3</b> — Discussion\nОбосновывайте мнение, отвечайте развёрнуто (4–6 предложений).",
+        "en": "💭 <b>PART 3</b> — Discussion\nSupport your opinions and give fuller answers (4–6 sentences).",
+    },
+    "q": {"uz": "🗣 <b>Savol {i}/{n}:</b>\n{q}", "ru": "🗣 <b>Вопрос {i}/{n}:</b>\n{q}", "en": "🗣 <b>Question {i}/{n}:</b>\n{q}"},
+    "cue": {"uz": "🎴 <b>Cue Card:</b>\n{q}", "ru": "🎴 <b>Cue Card:</b>\n{q}", "en": "🎴 <b>Cue Card:</b>\n{q}"},
+    "ack": {"uz": "✅ Qabul qilindi.", "ru": "✅ Принято.", "en": "✅ Noted."},
+    "voice_only": {
+        "uz": "🎙 Iltimos, javobni faqat <b>ovozli xabar</b> bilan yuboring.",
+        "ru": "🎙 Пожалуйста, отвечайте только <b>голосовым сообщением</b>.",
+        "en": "🎙 Please answer with a <b>voice message</b> only.",
+    },
+    "dl_fail": {
+        "uz": "❌ Ovozli xabarni yuklab olishda xatolik. Qayta yuboring.",
+        "ru": "❌ Ошибка при загрузке голосового. Отправьте ещё раз.",
+        "en": "❌ Couldn't download the voice message. Please send it again.",
+    },
+    "stt_fail": {
+        "uz": "❌ Ovozni matnga aylantirib bo'lmadi. Qayta yuboring.",
+        "ru": "❌ Не удалось распознать речь. Отправьте ещё раз.",
+        "en": "❌ Couldn't transcribe your voice. Please send it again.",
+    },
+    "no_speech": {
+        "uz": "⚠️ Nutq aniqlanmadi. Aniqroq gapirib, qayta yuboring.",
+        "ru": "⚠️ Речь не распознана. Говорите чётче и отправьте ещё раз.",
+        "en": "⚠️ No speech detected. Please speak clearly and send it again.",
+    },
+    "analyzing": {
+        "uz": "✅ <b>Imtihon tugadi!</b>\n\n📊 Hisobot tayyorlanmoqda (20–40 soniya)...",
+        "ru": "✅ <b>Экзамен завершён!</b>\n\n📊 Готовлю отчёт (20–40 секунд)...",
+        "en": "✅ <b>Exam finished!</b>\n\n📊 Preparing your report (20–40 seconds)...",
+    },
+    "report_fail": {
+        "uz": "❌ Hisobotni tayyorlashda xatolik. To'lovingiz saqlandi — /speaking bilan qayta urinib ko'ring.",
+        "ru": "❌ Ошибка при подготовке отчёта. Оплата сохранена — попробуйте снова через /speaking.",
+        "en": "❌ Couldn't build the report. Your payment is saved — try again with /speaking.",
+    },
+    "again": {
+        "uz": "🔁 Yana mock topshirish uchun /speaking yuboring.",
+        "ru": "🔁 Чтобы пройти мок ещё раз, отправьте /speaking.",
+        "en": "🔁 Send /speaking to take another mock.",
+    },
+    "h_title": {"uz": "🏁 <b>IELTS SPEAKING — TO'LIQ HISOBOT</b>", "ru": "🏁 <b>IELTS SPEAKING — ПОЛНЫЙ ОТЧЁТ</b>", "en": "🏁 <b>IELTS SPEAKING — FULL REPORT</b>"},
+    "h_overall": {"uz": "🏆 <b>Overall Band: {b}</b>", "ru": "🏆 <b>Overall Band: {b}</b>", "en": "🏆 <b>Overall Band: {b}</b>"},
+    "h_summary": {"uz": "💬 <b>Examiner xulosasi:</b>", "ru": "💬 <b>Вывод экзаменатора:</b>", "en": "💬 <b>Examiner's summary:</b>"},
+    "h_strong": {"uz": "💪 <b>Kuchli tomonlar:</b>", "ru": "💪 <b>Сильные стороны:</b>", "en": "💪 <b>Strengths:</b>"},
+    "h_errors": {"uz": "🔧 <b>Xatolar va tuzatishlar:</b>", "ru": "🔧 <b>Ошибки и исправления:</b>", "en": "🔧 <b>Mistakes and corrections:</b>"},
+    "h_vocab": {"uz": "📚 <b>Lug'atni boyiting:</b>", "ru": "📚 <b>Обогатите лексику:</b>", "en": "📚 <b>Vocabulary upgrades:</b>"},
+    "h_plan": {"uz": "🚀 <b>Keyingi qadamlar:</b>", "ru": "🚀 <b>Следующие шаги:</b>", "en": "🚀 <b>Next steps:</b>"},
+    "h_note": {
+        "uz": "ℹ️ <i>Talaffuz bahosi taxminiy: u matnga aylantirilgan nutq asosida chiqarilgan, ovozning o'zini tahlil qilmaydi.</i>",
+        "ru": "ℹ️ <i>Оценка произношения приблизительная: она основана на расшифрованном тексте, а не на анализе самого звука.</i>",
+        "en": "ℹ️ <i>The pronunciation score is an estimate: it is based on the transcribed text, not on analysis of the audio itself.</i>",
+    },
+}
+
+
+def _sp(key: str, **kw) -> str:
+    d = _SP[key]
+    t = d.get(cur_lang()) or d["en"]
+    return t.format(**kw) if kw else t
+
+
+async def _has_speaking_credit(user_id: int) -> bool:
+    if user_id in _speaking_credit_mem:
+        return True
+    if redis_client is not None:
+        try:
+            return bool(await redis_client.exists(f"{SPEAKING_CREDIT_PREFIX}{user_id}"))
+        except Exception as e:
+            logger.warning("Speaking kreditini o'qishda xatolik: %s", e)
+    return False
+
+
+async def _grant_speaking_credit(user_id: int):
+    _speaking_credit_mem.add(user_id)
+    if redis_client is not None:
+        try:
+            await redis_client.set(f"{SPEAKING_CREDIT_PREFIX}{user_id}", "1", ex=30 * 24 * 3600)
+        except Exception as e:
+            logger.warning("Speaking kreditini yozishda xatolik: %s", e)
+
+
+async def _consume_speaking_credit(user_id: int):
+    _speaking_credit_mem.discard(user_id)
+    if redis_client is not None:
+        try:
+            await redis_client.delete(f"{SPEAKING_CREDIT_PREFIX}{user_id}")
+        except Exception as e:
+            logger.warning("Speaking kreditini o'chirishda xatolik: %s", e)
+
+
+def _generate_full_speaking_sync() -> list:
+    """To'liq mock uchun tartiblangan savollar ro'yxatini qaytaradi:
+    [{"part": 1|2|3, "q": str}, ...]"""
+    d = _llm_json_sync(
+        "You are an official IELTS Speaking examiner. Create a fresh, realistic FULL IELTS Speaking test. "
+        "Reply ONLY as JSON: "
+        '{"part1": {"topics": [{"topic": "Work or studies", "questions": ["q1","q2","q3","q4"]}, '
+        '{"topic": "a familiar topic", "questions": ["q1","q2","q3"]}, {"topic": "another familiar topic", "questions": ["q1","q2","q3"]}]}, '
+        '"part2": {"cue_card": "Describe a ... You should say:\\n- point 1\\n- point 2\\n- point 3\\nand explain ..."}, '
+        '"part3": ["q1","q2","q3","q4","q5"]}. '
+        "Part 1: the first topic is about the candidate's work or studies (or home/hometown), the other two are common "
+        "everyday topics (e.g. food, free time, technology, transport); questions are simple and short. "
+        "Part 2: classic cue card. Part 3: five abstract/analytical questions thematically connected to the Part 2 topic. "
+        "All text in English.",
+        temperature=0.9,
+    )
+    items = []
+    for t in (d.get("part1") or {}).get("topics") or []:
+        for q in (t.get("questions") or []):
+            if str(q).strip():
+                items.append({"part": 1, "q": str(q).strip()})
+    cue = str((d.get("part2") or {}).get("cue_card", "")).strip()
+    p3 = [str(q).strip() for q in (d.get("part3") or []) if str(q).strip()]
+    if len([i for i in items if i["part"] == 1]) < 6 or not cue or len(p3) < 3:
+        raise ValueError("Speaking test generation returned incomplete data")
+    items.append({"part": 2, "q": cue})
+    items += [{"part": 3, "q": q} for q in p3[:5]]
+    return items
+
+
+def _evaluate_full_speaking_sync(answers: list) -> dict:
+    lines = []
+    for i, a in enumerate(answers, 1):
+        words = len(a["text"].split())
+        lines.append(f"{i}. [Part {a['part']}] Q: {a['q']}\n   ({a['sec']} sec, {words} words) A: {a['text'][:1200]}")
+    return _llm_json_sync(
+        "You are a strict, experienced IELTS Speaking examiner. Below is the full transcript (speech-to-text) of a "
+        "mock Speaking test. Judge by official band descriptors for Fluency & Coherence, Lexical Resource, "
+        "Grammatical Range & Accuracy and Pronunciation. Pronunciation can only be ESTIMATED from the transcript "
+        "(clarity, natural phrasing, signs of mis-recognised words) — be conservative. Take answer length and speaking "
+        "speed (words per second) into account; very short Part 2 answers must lower fluency/coherence. "
+        "Use half-band scores. Explain in UZBEK (Latin script); keep quotes and corrections in English. "
+        "Reply ONLY as JSON: "
+        '{"fluency": 6.0, "lexical": 6.0, "grammar": 6.0, "pronunciation": 6.0, "overall": 6.0, '
+        '"summary": "3-4 sentence honest examiner summary", '
+        '"strengths": ["...","..."] (2-3 items), '
+        '"errors": [{"wrong": "exact quote from candidate", "right": "corrected English", "why": "short reason"}] (4-6 items), '
+        '"vocab": ["weak word/phrase -> stronger alternative", "..."] (4-5 items), '
+        '"plan": ["concrete study action", "..."] (3 items)}\n\nTRANSCRIPT:\n' + "\n".join(lines),
+        temperature=0.3,
+    )
+
+
+def _format_full_speaking_report(d: dict) -> str:
+    def band(k):
+        try:
+            return f"{float(d.get(k, 0)):.1f}"
+        except (TypeError, ValueError):
+            return "—"
+    e = html.escape
+    out = [
+        _sp("h_title") + "\n",
+        f"🗣 Fluency & Coherence: <b>{band('fluency')}</b>",
+        f"📚 Lexical Resource: <b>{band('lexical')}</b>",
+        f"✍️ Grammatical Range & Accuracy: <b>{band('grammar')}</b>",
+        f"🔊 Pronunciation (est.): <b>{band('pronunciation')}</b>",
+        "\n" + _sp("h_overall", b=band("overall")),
+    ]
+    summ = str(d.get("summary", "")).strip()
+    if summ:
+        out.append("\n" + _sp("h_summary") + "\n" + e(summ))
+    st = [x for x in (d.get("strengths") or []) if str(x).strip()]
+    if st:
+        out.append("\n" + _sp("h_strong") + "\n" + "\n".join(f"✅ {e(str(x))}" for x in st[:3]))
+    errs = [x for x in (d.get("errors") or []) if isinstance(x, dict)]
+    if errs:
+        out.append("\n" + _sp("h_errors"))
+        for x in errs[:6]:
+            out.append(f"❌ <i>{e(str(x.get('wrong', '')))}</i>\n✅ <b>{e(str(x.get('right', '')))}</b>\n💡 {e(str(x.get('why', '')))}")
+    vc = [x for x in (d.get("vocab") or []) if str(x).strip()]
+    if vc:
+        out.append("\n" + _sp("h_vocab") + "\n" + "\n".join(f"▫️ {e(str(x))}" for x in vc[:5]))
+    pl = [x for x in (d.get("plan") or []) if str(x).strip()]
+    if pl:
+        out.append("\n" + _sp("h_plan") + "\n" + "\n".join(f"{i}. {e(str(x))}" for i, x in enumerate(pl[:3], 1)))
+    out.append("\n" + _sp("h_note"))
+    return "\n".join(out)
+
+
+async def _start_full_speaking(message: Message, state: FSMContext, uid: int, prefix: str = ""):
+    prep = await message.answer(prefix + _sp("preparing"))
+    try:
+        items = await asyncio.to_thread(_generate_full_speaking_sync)
+    except Exception as e:
+        logger.exception("Full speaking savollarini yaratishda xatolik: %s", e)
+        await prep.edit_text(_sp("gen_fail"))
+        return
+    try:
+        await prep.delete()
+    except Exception:
+        pass
+    await state.clear()
+    await state.set_state(FullSpeakStates.active)
+    await state.update_data(sp_items=items, sp_idx=0, sp_answers=[])
+    await message.answer(_sp("start"))
+    await _ask_full_speaking(message, items, 0)
+
+
+async def _ask_full_speaking(message: Message, items: list, idx: int):
+    it = items[idx]
+    part = it["part"]
+    if idx == 0 or items[idx - 1]["part"] != part:
+        await message.answer(_sp({1: "p1", 2: "p2", 3: "p3"}[part]))
+    if part == 2:
+        await send_text_and_voice(message, _sp("cue", q=it["q"]), tts_text=it["q"])
+    else:
+        same = [x for x in items if x["part"] == part]
+        n = len(same)
+        i = same.index(it) + 1
+        await send_text_and_voice(message, _sp("q", i=i, n=n, q=it["q"]), tts_text=it["q"])
+
+
+@dp.message(Command("speaking"))
+async def cmd_speaking(message: Message, state: FSMContext):
+    uid = message.from_user.id
+    if await state.get_state() is not None:
+        await message.answer(_sp("busy"))
+        return
+    cleanup_user_dir(uid)
+
+    if _is_admin(uid):
+        await _start_full_speaking(message, state, uid, _sp("free"))
+        return
+    if await _has_speaking_credit(uid):
+        await _start_full_speaking(message, state, uid, _sp("paid"))
+        return
+
+    await message.answer(_sp("intro", p=SPEAKING_PRICE_STARS))
+    try:
+        await bot.send_invoice(
+            chat_id=message.chat.id,
+            title=_sp("inv_title"),
+            description=_sp("inv_desc"),
+            payload=f"speaking:{uid}",
+            currency="XTR",
+            prices=[LabeledPrice(label=_sp("inv_label"), amount=SPEAKING_PRICE_STARS)],
+            provider_token="",
+        )
+    except Exception as e:
+        logger.exception("Speaking invoice yuborishda xatolik: %s", e)
+        await message.answer(_sp("inv_fail"))
+
+
+@dp.message(FullSpeakStates.active, F.voice)
+async def handle_full_speaking_voice(message: Message, state: FSMContext):
+    uid = message.from_user.id
+    data = await state.get_data()
+    items = data.get("sp_items") or []
+    idx = data.get("sp_idx", 0)
+    answers = data.get("sp_answers", [])
+    if idx >= len(items):
+        await state.clear()
+        return
+
+    user_dir = _user_dir(uid)
+    ogg_path = os.path.join(user_dir, f"fs_{message.voice.file_unique_id}.ogg")
+    try:
+        f = await bot.get_file(message.voice.file_id)
+        await bot.download_file(f.file_path, destination=ogg_path)
+    except Exception as e:
+        logger.exception("Full speaking: voice yuklashda xatolik: %s", e)
+        await message.answer(_sp("dl_fail"))
+        return
+    try:
+        transcript = await asyncio.to_thread(_transcribe_sync, ogg_path)
+    except Exception as e:
+        logger.exception("Full speaking: transkripsiya xatoligi: %s", e)
+        await message.answer(_sp("stt_fail"))
+        return
+    finally:
+        if os.path.exists(ogg_path):
+            try:
+                os.remove(ogg_path)
+            except OSError:
+                pass
+    if not transcript:
+        await message.answer(_sp("no_speech"))
+        return
+
+    it = items[idx]
+    answers.append({"part": it["part"], "q": it["q"], "text": transcript, "sec": int(message.voice.duration or 0)})
+    idx += 1
+    await state.update_data(sp_idx=idx, sp_answers=answers)
+
+    if idx < len(items):
+        await _ask_full_speaking(message, items, idx)
+        return
+
+    await message.answer(_sp("analyzing"))
+    await bot.send_chat_action(message.chat.id, "typing")
+    try:
+        report = await asyncio.to_thread(_evaluate_full_speaking_sync, answers)
+        text = _format_full_speaking_report(report)
+    except Exception as e:
+        logger.exception("Full speaking hisobotida xatolik: %s", e)
+        await state.clear()
+        cleanup_user_dir(uid)
+        await message.answer(_sp("report_fail"))
+        return
+
+    await state.clear()
+    cleanup_user_dir(uid)
+    await _send_long(message, text)
+    if not _is_admin(uid):
+        await _consume_speaking_credit(uid)
+    await message.answer(_sp("again"))
+
+
+@dp.message(FullSpeakStates.active)
+async def handle_full_speaking_wrong_type(message: Message):
+    if message.text and message.text.startswith("/"):
+        await message.answer(_sp("busy"))
+        return
+    await message.answer(_sp("voice_only"))
 
 
 # --- Kunlik fan + ingliz tili maslahati ----------------------------------
@@ -4170,7 +4575,7 @@ async def cmd_test(message: Message, state: FSMContext):
         pass
 
     await message.answer(
-        "✅ <b>Test tayyor!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview\n"
+        "✅ <b>Test tayyor!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview (qisqa test)\n"
         "🎙 Har bir savolga ovozli xabar bilan javob bering."
     )
     q0 = questions["part1"][0]
@@ -4248,10 +4653,31 @@ async def handle_part1_voice(message: Message, state: FSMContext):
         next_q = questions["part1"][idx]
         await send_text_and_voice(message, f"🗣 <b>Savol {idx + 1}/{PART1_QUESTIONS_COUNT}:</b>\n{next_q}", tts_text=next_q)
     else:
-        cue = questions["part2"]["cue_card"]
-        await state.set_state(ExamStates.part2)
-        await message.answer("✅ <b>Part 1 tugadi!</b>\n\n🎬 <b>PART 2</b> — Cue Card\n⏱ O'zingizni tayyorlang va so'ng 1-2 daqiqa gapirib, ovozli xabar sifatida yuboring.")
-        await send_text_and_voice(message, f"🎴 <b>Cue Card:</b>\n{cue}", tts_text=cue)
+        await message.answer("✅ <b>Part 1 tugadi!</b>\n\n📊 Yakuniy natija tayyorlanmoqda, biroz kuting...")
+        try:
+            report = await asyncio.to_thread(_generate_final_report_sync, answers)
+        except Exception as e:
+            logger.exception("Yakuniy hisobotni tayyorlashda xatolik: %s", e)
+            await message.answer("❌ Yakuniy hisobotni tayyorlashda xatolik yuz berdi.")
+            await state.clear()
+            cleanup_user_dir(message.from_user.id)
+            return
+
+        avg = report["averages"]
+        final_text = (
+            "🏁 <b>IELTS SPEAKING PART 1 — YAKUNIY NATIJA</b>\n\n"
+            f"🗣 Fluency & Coherence: <b>{avg.get('fluency_coherence', 0)}</b>\n"
+            f"📚 Lexical Resource: <b>{avg.get('lexical_resource', 0)}</b>\n"
+            f"✍️ Grammatical Range & Accuracy: <b>{avg.get('grammar_range_accuracy', 0)}</b>\n"
+            f"🔊 Pronunciation: <b>{avg.get('pronunciation_estimate', 0)}</b>\n\n"
+            f"🏆 <b>Overall Band Score: {report['overall_band']}</b>\n\n"
+            f"💬 <b>Examiner fikri:</b>\n{report['text']}"
+        )
+        await send_text_and_voice(message, final_text, tts_text=report["text"])
+
+        await state.clear()
+        cleanup_user_dir(message.from_user.id)
+        await message.answer("🔁 Yangi test uchun /test, to'liq 3 qismli mock uchun /speaking yuboring.")
 
 
 @dp.message(ExamStates.part2, F.voice)
@@ -4947,6 +5373,7 @@ async def setup_bot_commands():
         BotCommand(command="whatif", description="What happens? Science puzzles"),
         BotCommand(command="daily", description="Today's science, fact and English tip"),
         BotCommand(command="writing", description=f"IELTS Writing review ({WRITING_PRICE_STARS} Stars)"),
+        BotCommand(command="speaking", description=f"IELTS Speaking full mock ({SPEAKING_PRICE_STARS} Stars)"),
         BotCommand(command="grammar", description="English grammar: lessons and practice"),
         BotCommand(command="english", description="Chat in English (corrects your mistakes)"),
         BotCommand(command="certificate", description="25-question certificate test"),
