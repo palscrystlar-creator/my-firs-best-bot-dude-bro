@@ -43,6 +43,8 @@ import secrets
 import base64
 import html
 import contextvars
+import random
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 from aiogram import Bot, Dispatcher, F, BaseMiddleware
@@ -63,6 +65,8 @@ from aiogram.types import (
     Update,
     LabeledPrice,
     PreCheckoutQuery,
+    BufferedInputFile,
+    InputMediaPhoto,
 )
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
@@ -3590,9 +3594,9 @@ class FullSpeakStates(StatesGroup):
 
 _SP = {
     "intro": {
-        "uz": "💎 <b>IELTS Speaking — TO'LIQ MOCK (Premium)</b>\n\nHaqiqiy imtihondek, 3 qismli:\n🗣 <b>Part 1</b> — tanishuv va 3 ta mavzu (~10 savol)\n🎴 <b>Part 2</b> — cue card, 1–2 daqiqa monolog\n💭 <b>Part 3</b> — chuqur muhokama (5 savol)\n\nImtihon davomida izoh berilmaydi (real imtihondek). Oxirida batafsil hisobot: 4 mezon bo'yicha band, xatolar va tuzatishlar, lug'at takliflari, o'quv rejasi.\n\nNarxi: <b>{p} ⭐ Telegram Stars</b>",
-        "ru": "💎 <b>IELTS Speaking — ПОЛНЫЙ МОК (Premium)</b>\n\nКак на настоящем экзамене, 3 части:\n🗣 <b>Part 1</b> — знакомство и 3 темы (~10 вопросов)\n🎴 <b>Part 2</b> — карточка, монолог 1–2 минуты\n💭 <b>Part 3</b> — углублённое обсуждение (5 вопросов)\n\nВо время экзамена комментариев нет (как на реальном). В конце — подробный отчёт: балл по 4 критериям, ошибки и исправления, лексика, план обучения.\n\nЦена: <b>{p} ⭐ Telegram Stars</b>",
-        "en": "💎 <b>IELTS Speaking — FULL MOCK (Premium)</b>\n\nJust like the real exam, 3 parts:\n🗣 <b>Part 1</b> — introduction and 3 topics (~10 questions)\n🎴 <b>Part 2</b> — cue card, 1–2 minute talk\n💭 <b>Part 3</b> — in-depth discussion (5 questions)\n\nNo feedback during the exam (like the real thing). At the end you get a detailed report: band for all 4 criteria, mistakes and corrections, vocabulary upgrades and a study plan.\n\nPrice: <b>{p} ⭐ Telegram Stars</b>",
+        "uz": "💎 <b>IELTS Speaking — TO'LIQ MOCK (Premium)</b>\n\nHaqiqiy imtihondek, 3 qismli:\n🗣 <b>Part 1</b> — tanishuv va 3 ta mavzu (~10 savol)\n🖼 <b>Part 2</b> — 2 ta rasmni tasvirlash va solishtirish (1–2 daqiqa)\n💭 <b>Part 3</b> — chuqur muhokama (5 savol)\n\nImtihon davomida izoh berilmaydi (real imtihondek), examiner siz bilan jonli suhbatlashgandek gapiradi. Oxirida batafsil hisobot: 4 mezon bo'yicha band, xatolar va tuzatishlar, lug'at takliflari, o'quv rejasi.\n\nNarxi: <b>{p} ⭐ Telegram Stars</b>",
+        "ru": "💎 <b>IELTS Speaking — ПОЛНЫЙ МОК (Premium)</b>\n\nКак на настоящем экзамене, 3 части:\n🗣 <b>Part 1</b> — знакомство и 3 темы (~10 вопросов)\n🖼 <b>Part 2</b> — описание и сравнение 2 картинок (1–2 минуты)\n💭 <b>Part 3</b> — углублённое обсуждение (5 вопросов)\n\nВо время экзамена комментариев нет (как на реальном). В конце — подробный отчёт: балл по 4 критериям, ошибки и исправления, лексика, план обучения.\n\nЦена: <b>{p} ⭐ Telegram Stars</b>",
+        "en": "💎 <b>IELTS Speaking — FULL MOCK (Premium)</b>\n\nJust like the real exam, 3 parts:\n🗣 <b>Part 1</b> — introduction and 3 topics (~10 questions)\n🖼 <b>Part 2</b> — describe and compare 2 pictures (1–2 minutes)\n💭 <b>Part 3</b> — in-depth discussion (5 questions)\n\nNo feedback during the exam (like the real thing). At the end you get a detailed report: band for all 4 criteria, mistakes and corrections, vocabulary upgrades and a study plan.\n\nPrice: <b>{p} ⭐ Telegram Stars</b>",
     },
     "inv_title": {"uz": "IELTS Speaking to'liq mock", "ru": "Полный мок IELTS Speaking", "en": "IELTS Speaking full mock"},
     "inv_desc": {
@@ -3639,9 +3643,16 @@ _SP = {
         "en": "🗣 <b>PART 1</b> — Introduction & Interview\nGive short, natural answers (2–4 sentences).",
     },
     "p2": {
-        "uz": "🎬 <b>PART 2</b> — Cue Card\n⏱ 1 daqiqa tayyorlaning (qog'ozga reja yozishingiz mumkin), so'ng <b>1–2 daqiqa</b> to'xtamasdan gapirib, bitta ovozli xabar yuboring.",
-        "ru": "🎬 <b>PART 2</b> — Cue Card\n⏱ Подготовьтесь 1 минуту (можно набросать план), затем говорите <b>1–2 минуты</b> без остановки и отправьте одно голосовое.",
-        "en": "🎬 <b>PART 2</b> — Cue Card\n⏱ Take 1 minute to prepare (you can jot down notes), then speak for <b>1–2 minutes</b> without stopping and send one voice message.",
+        "uz": "🖼 <b>PART 2</b> — Picture Description\n⏱ Rasmlarga qarang va 1 daqiqa tayyorlaning. So'ng <b>1–2 daqiqa</b> to'xtamasdan gapirib, bitta ovozli xabar yuboring: har bir rasmda nima borligini tasvirlang, ularni solishtiring va qaysi biri sizga ko'proq yoqishini asoslang.",
+        "ru": "🖼 <b>PART 2</b> — Picture Description\n⏱ Посмотрите на картинки и подготовьтесь 1 минуту. Затем говорите <b>1–2 минуты</b> без остановки и отправьте одно голосовое: опишите, что на каждой картинке, сравните их и объясните, какая вам нравится больше.",
+        "en": "🖼 <b>PART 2</b> — Picture Description\n⏱ Look at the pictures and take 1 minute to prepare. Then speak for <b>1–2 minutes</b> without stopping and send one voice message: describe what you see in each picture, compare them, and explain which one you prefer.",
+    },
+    "pic_cap_a": {"uz": "🅰️ Rasm A", "ru": "🅰️ Картинка A", "en": "🅰️ Picture A"},
+    "pic_cap_b": {"uz": "🅱️ Rasm B", "ru": "🅱️ Картинка B", "en": "🅱️ Picture B"},
+    "pic_fallback": {
+        "uz": "⚠️ Rasmlarni yuklab bo'lmadi, shuning uchun ularni matn bilan tasvirlayman:\n\n🅰️ {a}\n🅱️ {b}",
+        "ru": "⚠️ Не удалось загрузить картинки, поэтому описываю их словами:\n\n🅰️ {a}\n🅱️ {b}",
+        "en": "⚠️ I couldn't load the pictures, so here they are in words:\n\n🅰️ {a}\n🅱️ {b}",
     },
     "p3": {
         "uz": "💭 <b>PART 3</b> — Discussion\nFikringizni asoslab, kengroq javob bering (4–6 gap).",
@@ -3649,7 +3660,7 @@ _SP = {
         "en": "💭 <b>PART 3</b> — Discussion\nSupport your opinions and give fuller answers (4–6 sentences).",
     },
     "q": {"uz": "🗣 <b>Savol {i}/{n}:</b>\n{q}", "ru": "🗣 <b>Вопрос {i}/{n}:</b>\n{q}", "en": "🗣 <b>Question {i}/{n}:</b>\n{q}"},
-    "cue": {"uz": "🎴 <b>Cue Card:</b>\n{q}", "ru": "🎴 <b>Cue Card:</b>\n{q}", "en": "🎴 <b>Cue Card:</b>\n{q}"},
+    "cue": {"uz": "🎴 <b>Topshiriq:</b>\n{q}", "ru": "🎴 <b>Задание:</b>\n{q}", "en": "🎴 <b>Task:</b>\n{q}"},
     "ack": {"uz": "✅ Qabul qilindi.", "ru": "✅ Принято.", "en": "✅ Noted."},
     "voice_only": {
         "uz": "🎙 Iltimos, javobni faqat <b>ovozli xabar</b> bilan yuboring.",
@@ -3738,32 +3749,108 @@ async def _consume_speaking_credit(user_id: int):
 
 def _generate_full_speaking_sync() -> list:
     """To'liq mock uchun tartiblangan savollar ro'yxatini qaytaradi:
-    [{"part": 1|2|3, "q": str}, ...]"""
+    [{"part": 1|2|3, "q": str, "lead": str (ixtiyoriy), ...}, ...]
+    Part 2 elementida: "pics": [qidiruv A, qidiruv B], "desc": [matn A, matn B]."""
     d = _llm_json_sync(
-        "You are an official IELTS Speaking examiner. Create a fresh, realistic FULL IELTS Speaking test. "
-        "Reply ONLY as JSON: "
-        '{"part1": {"topics": [{"topic": "Work or studies", "questions": ["q1","q2","q3","q4"]}, '
-        '{"topic": "a familiar topic", "questions": ["q1","q2","q3"]}, {"topic": "another familiar topic", "questions": ["q1","q2","q3"]}]}, '
-        '"part2": {"cue_card": "Describe a ... You should say:\\n- point 1\\n- point 2\\n- point 3\\nand explain ..."}, '
+        "You are a real, friendly but professional IELTS Speaking examiner running a live face-to-face test. "
+        "Create a fresh FULL Speaking test in the examiner's natural spoken voice. Reply ONLY as JSON: "
+        '{"part1": {"topics": [{"lead": "Let\'s talk about your studies.", "questions": ["q1","q2","q3","q4"]}, '
+        '{"lead": "Now let\'s talk about ...", "questions": ["q1","q2","q3"]}, '
+        '{"lead": "Now I\'d like to ask you about ...", "questions": ["q1","q2","q3"]}]}, '
+        '"part2": {"theme": "short theme", "pic_a_query": "2-4 word photo search phrase", "pic_b_query": "2-4 word photo search phrase", '
+        '"pic_a_desc": "one-sentence description of a typical photo for query A", "pic_b_desc": "same for B"}, '
         '"part3": ["q1","q2","q3","q4","q5"]}. '
-        "Part 1: the first topic is about the candidate's work or studies (or home/hometown), the other two are common "
-        "everyday topics (e.g. food, free time, technology, transport); questions are simple and short. "
-        "Part 2: classic cue card. Part 3: five abstract/analytical questions thematically connected to the Part 2 topic. "
-        "All text in English.",
+        "Rules: the first Part 1 topic is the candidate's work or studies (or home/hometown); the other two are everyday topics "
+        "(food, free time, technology, transport, weather, shopping...). Questions are short and sound like speech "
+        "(e.g. 'Do you work or are you a student?', 'What do you enjoy most about it?'). "
+        "Part 2 is a TWO-PICTURE task: the two photos show two contrasting but comparable situations on one theme "
+        "(e.g. two ways of travelling, two kinds of homes, studying alone vs in a group). Search phrases must describe concrete, "
+        "photographable scenes (no abstract words, no people's names, no brands). "
+        "Part 3: five abstract, analytical questions linked to the Part 2 theme. All text in English.",
         temperature=0.9,
     )
     items = []
     for t in (d.get("part1") or {}).get("topics") or []:
-        for q in (t.get("questions") or []):
-            if str(q).strip():
-                items.append({"part": 1, "q": str(q).strip()})
-    cue = str((d.get("part2") or {}).get("cue_card", "")).strip()
+        qs = [str(q).strip() for q in (t.get("questions") or []) if str(q).strip()]
+        lead = str(t.get("lead", "")).strip()
+        for i, q in enumerate(qs):
+            items.append({"part": 1, "q": q, "lead": lead if i == 0 else ""})
+    p2 = d.get("part2") or {}
+    qa, qb = str(p2.get("pic_a_query", "")).strip(), str(p2.get("pic_b_query", "")).strip()
+    da, db = str(p2.get("pic_a_desc", "")).strip(), str(p2.get("pic_b_desc", "")).strip()
+    theme = str(p2.get("theme", "")).strip() or "everyday life"
     p3 = [str(q).strip() for q in (d.get("part3") or []) if str(q).strip()]
-    if len([i for i in items if i["part"] == 1]) < 6 or not cue or len(p3) < 3:
+    if len([i for i in items if i["part"] == 1]) < 6 or not (qa and qb) or len(p3) < 3:
         raise ValueError("Speaking test generation returned incomplete data")
-    items.append({"part": 2, "q": cue})
-    items += [{"part": 3, "q": q} for q in p3[:5]]
+    # Real imtihondagidek: tanishuv savollari har doim boshida
+    items = [
+        {"part": 1, "q": "Could you tell me your full name, please? And what should I call you?",
+         "lead": "Good day! 😊 I'm your examiner today. This is the Speaking test."},
+        {"part": 1, "q": "And where are you from?", "lead": ""},
+    ] + items
+    items.append({
+        "part": 2,
+        "q": "I'm going to show you two pictures. Please describe each one, say how they are similar or different, "
+             "and explain which one you would prefer and why. You have one minute to prepare, then please speak for one to two minutes.",
+        "lead": "Now we're moving on to Part 2.",
+        "pics": [qa, qb], "desc": [da or qa, db or qb], "theme": theme,
+    })
+    for i, q in enumerate(p3[:5]):
+        items.append({"part": 3, "q": q, "lead": "Thank you. Let's talk about this topic in more general terms. 💭" if i == 0 else ""})
     return items
+
+
+def _plain_speech(t: str) -> str:
+    """TTS uchun emoji va maxsus belgilarni olib tashlaydi."""
+    return re.sub(r"\s+", " ", t.encode("ascii", "ignore").decode()).strip()
+
+
+async def _fetch_commons_photo(query: str, used: set) -> bytes | None:
+    """Wikimedia Commons'dan so'rovga mos JPEG fotosuratni yuklab oladi (kalit talab qilinmaydi)."""
+    import aiohttp
+    params = {
+        "action": "query", "generator": "search", "gsrsearch": f"{query} filetype:bitmap",
+        "gsrnamespace": "6", "gsrlimit": "20", "prop": "imageinfo", "iiprop": "url|size|mime",
+        "iiurlwidth": "960", "format": "json",
+    }
+    headers = {"User-Agent": "TalkBot/1.0 (educational Telegram bot; contact via Telegram)"}
+    timeout = aiohttp.ClientTimeout(total=12)
+    async with aiohttp.ClientSession(headers=headers, timeout=timeout) as sess:
+        async with sess.get("https://commons.wikimedia.org/w/api.php", params=params) as r:
+            data = await r.json(content_type=None)
+        pages = list(((data or {}).get("query") or {}).get("pages", {}).values())
+        cands = []
+        for pg in pages:
+            ii = (pg.get("imageinfo") or [{}])[0]
+            if ii.get("mime") != "image/jpeg":
+                continue
+            if (ii.get("width") or 0) < 800 or (ii.get("height") or 0) < 500:
+                continue
+            url = ii.get("thumburl") or ii.get("url")
+            if url and url not in used:
+                cands.append(url)
+        random.shuffle(cands)
+        for url in cands[:4]:
+            try:
+                async with sess.get(url) as r:
+                    if r.status == 200:
+                        body = await r.read()
+                        if 20_000 < len(body) < 9_000_000:
+                            used.add(url)
+                            return body
+            except Exception as e:
+                logger.warning("Rasm yuklashda xatolik: %s", e)
+    return None
+
+
+async def _fetch_two_pictures(queries: list) -> list | None:
+    used: set = set()
+    try:
+        res = await asyncio.gather(*[_fetch_commons_photo(q, used) for q in queries[:2]], return_exceptions=True)
+    except Exception:
+        return None
+    pics = [r for r in res if isinstance(r, (bytes, bytearray))]
+    return pics if len(pics) == 2 else None
 
 
 def _evaluate_full_speaking_sync(answers: list) -> dict:
@@ -3777,6 +3864,9 @@ def _evaluate_full_speaking_sync(answers: list) -> dict:
         "Grammatical Range & Accuracy and Pronunciation. Pronunciation can only be ESTIMATED from the transcript "
         "(clarity, natural phrasing, signs of mis-recognised words) — be conservative. Take answer length and speaking "
         "speed (words per second) into account; very short Part 2 answers must lower fluency/coherence. "
+        "Part 2 was a TWO-PICTURE task (describe both pictures, compare them, give a preference with reasons); "
+        "you cannot see the pictures, so judge only the language, structure (describing, comparing, speculating, justifying) and "
+        "coherence, not the accuracy of the content. "
         "Use half-band scores. Explain in UZBEK (Latin script); keep quotes and corrections in English. "
         "Reply ONLY as JSON: "
         '{"fluency": 6.0, "lexical": 6.0, "grammar": 6.0, "pronunciation": 6.0, "overall": 6.0, '
@@ -3847,15 +3937,32 @@ async def _start_full_speaking(message: Message, state: FSMContext, uid: int, pr
 async def _ask_full_speaking(message: Message, items: list, idx: int):
     it = items[idx]
     part = it["part"]
+    lead = it.get("lead") or ""
     if idx == 0 or items[idx - 1]["part"] != part:
         await message.answer(_sp({1: "p1", 2: "p2", 3: "p3"}[part]))
     if part == 2:
-        await send_text_and_voice(message, _sp("cue", q=it["q"]), tts_text=it["q"])
-    else:
-        same = [x for x in items if x["part"] == part]
-        n = len(same)
-        i = same.index(it) + 1
-        await send_text_and_voice(message, _sp("q", i=i, n=n, q=it["q"]), tts_text=it["q"])
+        pics = await _fetch_two_pictures(it.get("pics") or [])
+        if pics:
+            try:
+                await bot.send_chat_action(message.chat.id, "upload_photo")
+                await message.answer_media_group([
+                    InputMediaPhoto(media=BufferedInputFile(pics[0], "picture_a.jpg"), caption=_sp("pic_cap_a")),
+                    InputMediaPhoto(media=BufferedInputFile(pics[1], "picture_b.jpg"), caption=_sp("pic_cap_b")),
+                ])
+            except Exception as e:
+                logger.warning("Rasmlarni yuborishda xatolik: %s", e)
+                pics = None
+        if not pics:
+            da, db = (it.get("desc") or ["", ""])[:2]
+            await message.answer(_sp("pic_fallback", a=html.escape(da), b=html.escape(db)))
+        text = (lead + "\n\n" if lead else "") + _sp("cue", q=it["q"])
+        await send_text_and_voice(message, text, tts_text=_plain_speech((lead + " " if lead else "") + it["q"]))
+        return
+    same = [x for x in items if x["part"] == part]
+    n = len(same)
+    i = same.index(it) + 1
+    text = (lead + "\n\n" if lead else "") + _sp("q", i=i, n=n, q=it["q"])
+    await send_text_and_voice(message, text, tts_text=_plain_speech((lead + " " if lead else "") + it["q"]))
 
 
 @dp.message(Command("speaking"))
@@ -3926,7 +4033,7 @@ async def handle_full_speaking_voice(message: Message, state: FSMContext):
         return
 
     it = items[idx]
-    answers.append({"part": it["part"], "q": it["q"], "text": transcript, "sec": int(message.voice.duration or 0)})
+    answers.append({"part": it["part"], "q": it["q"] + (f" [pictures theme: {it['theme']}]" if it.get("theme") else ""), "text": transcript, "sec": int(message.voice.duration or 0)})
     idx += 1
     await state.update_data(sp_idx=idx, sp_answers=answers)
 
