@@ -528,13 +528,13 @@ I18N = {
 MENU_LABELS = {
     "quiz": {"uz": "Viktorina", "ru": "Викторина", "en": "Quiz"},
     "teaser": {"uz": "Miya jumboqlari", "ru": "Головоломки", "en": "Brain teasers"},
-    "nima": {"uz": "Nima bo'ladi?", "ru": "Что будет?", "en": "What happens?"},
-    "yolgon": {"uz": "Yolg'onni top", "ru": "Найди ложь", "en": "Spot the lie"},
-    "topaman": {"uz": "Men topaman", "ru": "Я угадаю", "en": "I'll guess it"},
-    "hikoya": {"uz": "Interaktiv hikoya", "ru": "Интерактивная история", "en": "Interactive story"},
-    "kunlik": {"uz": "Kunlik fan va fakt", "ru": "Факт и тест дня", "en": "Daily fact & quiz"},
-    "sertifikat": {"uz": "Sertifikat testi", "ru": "Тест с сертификатом", "en": "Certificate test"},
-    "reyting": {"uz": "Reyting", "ru": "Рейтинг", "en": "Leaderboard"},
+    "whatif": {"uz": "Nima bo'ladi?", "ru": "Что будет?", "en": "What happens?"},
+    "lie": {"uz": "Yolg'onni top", "ru": "Найди ложь", "en": "Spot the lie"},
+    "guess": {"uz": "Men topaman", "ru": "Я угадаю", "en": "I'll guess it"},
+    "story": {"uz": "Interaktiv hikoya", "ru": "Интерактивная история", "en": "Interactive story"},
+    "daily": {"uz": "Kunlik fan va fakt", "ru": "Факт и тест дня", "en": "Daily fact & quiz"},
+    "certificate": {"uz": "Sertifikat testi", "ru": "Тест с сертификатом", "en": "Certificate test"},
+    "leaderboard": {"uz": "Reyting", "ru": "Рейтинг", "en": "Leaderboard"},
     "english": {"uz": "Ingliz tilida suhbat", "ru": "Разговор на английском", "en": "English chat"},
     "grammar": {"uz": "Grammatika", "ru": "Грамматика", "en": "Grammar"},
     "writing": {"uz": "Writing tahlili", "ru": "Разбор Writing", "en": "Writing review"},
@@ -638,14 +638,14 @@ I18N_FRAGMENTS = {
     "🤷 Ba'zan / bilmayman": ('🤷 Иногда / не знаю', "🤷 Sometimes / I don't know"),
     "🙅 Yo'q, xato": ('🙅 Нет, ошибка', '🙅 No, wrong'),
     "🔁 Yana o'ynash": ('🔁 Сыграть ещё', '🔁 Play again'),
-    '⚠️ Kechirasiz, xatolik yuz berdi. Qayta boshlash: /topaman': ('⚠️ Извините, произошла ошибка. Начать заново: /topaman', '⚠️ Sorry, something went wrong. Start over with /topaman'),
+    '⚠️ Kechirasiz, xatolik yuz berdi. Qayta boshlash: /guess': ('⚠️ Извините, произошла ошибка. Начать заново: /guess', '⚠️ Sorry, something went wrong. Start over with /guess'),
     "🔮 <b>Menimcha, siz o'ylagan narsa:</b>\n\n✨ <b>": ('🔮 <b>Думаю, вы загадали:</b>\n\n✨ <b>', '🔮 <b>I think you were thinking of:</b>\n\n✨ <b>'),
     '</b>\n\nTopdimmi?': ('</b>\n\nУгадал?', '</b>\n\nAm I right?'),
     'Bu tirik mavjudotmi?': ('Это живое существо?', 'Is it a living thing?'),
     '🔮 <b>Savol ': ('🔮 <b>Вопрос ', '🔮 <b>Question '),
     "🔮 <b>Men topaman!</b>\n\nBiror narsani <b>o'ylang</b> — mashhur inson, hayvon, narsa, ovqat, multfilm qahramoni... Hech qayerga yozmang, faqat xayolingizda tuting 🤫\n\nMen ": ('🔮 <b>Я угадаю!</b>\n\nЗагадайте что-нибудь — известного человека, животное, предмет, блюдо, героя мультфильма... Никому не говорите, держите в уме 🤫\n\nЯ задам до ', "🔮 <b>I'll guess it!</b>\n\nThink of something — a famous person, an animal, an object, a food, a cartoon character... Don't tell anyone, just keep it in your head 🤫\n\nI'll ask up to "),
     ' tagacha savol berib, topishga harakat qilaman. Siz faqat tugmalarni bosasiz 👇': (' вопросов и постараюсь угадать. Вам нужно только нажимать кнопки 👇', ' questions and try to guess it. You only need to tap the buttons 👇'),
-    "Bu o'yin tugagan. Yangisi: /topaman": ('Эта игра закончена. Новая: /topaman', 'This game is over. Start a new one: /topaman'),
+    "Bu o'yin tugagan. Yangisi: /guess": ('Эта игра закончена. Новая: /guess', 'This game is over. Start a new one: /guess'),
     "⏳ Bir soniya, o'ylayapman...": ('⏳ Секунду, думаю...', "⏳ One moment, I'm thinking..."),
     '🎉 <b>Yutdim!</b> Men ': ('🎉 <b>Угадал!</b> Вопросов задано: ', '🎉 <b>I won!</b> It took me '),
     ' ta savolda <b>': ('. Это — <b>', ' questions to find <b>'),
@@ -659,7 +659,7 @@ I18N_FRAGMENTS = {
     'Omon qolish': ('Выживание', 'Survival'),
     'Qaroqchilar': ('Пираты', 'Pirates'),
     'Vaqt sayohati': ('Путешествие во времени', 'Time travel'),
-    "❌ Hikoyani davom ettirib bo'lmadi. Qayta urinish uchun /hikoya yuboring.": ('❌ Не удалось продолжить историю. Чтобы начать заново, отправьте /hikoya.', "❌ Couldn't continue the story. Send /hikoya to start again."),
+    "❌ Hikoyani davom ettirib bo'lmadi. Qayta urinish uchun /story yuboring.": ('❌ Не удалось продолжить историю. Чтобы начать заново, отправьте /story.', "❌ Couldn't continue the story. Send /story to start again."),
     "\n\n🎭 <b>Hikoya yakunlandi!</b> Boshqa tanlov — boshqa yakun. Yana o'ynaymizmi? 👇": ('\n\n🎭 <b>История завершена!</b> Другой выбор — другой финал. Сыграем ещё? 👇', '\n\n🎭 <b>The story is over!</b> A different choice means a different ending. Play again? 👇'),
     '🔁 Yangi hikoya': ('🔁 Новая история', '🔁 New story'),
     '\n\n<i>Nima qilasiz? 👇</i>': ('\n\n<i>Что будете делать? 👇</i>', '\n\n<i>What will you do? 👇</i>'),
@@ -668,16 +668,16 @@ I18N_FRAGMENTS = {
     " qadamdan keyin yakun sizning tanlovlaringizga bog'liq bo'ladi 🎲\n\nJanrni tanlang 👇": (' шагов 🎲\n\nВыберите жанр 👇', ' steps 🎲\n\nChoose a genre 👇'),
     '📖 Janrni tanlang 👇': ('📖 Выберите жанр 👇', '📖 Choose a genre 👇'),
     'Xatolik': ('Ошибка', 'Error'),
-    'Bu hikoya tugagan. /hikoya bilan yangisini boshlang.': ('Эта история закончена. Начните новую: /hikoya', 'This story is over. Start a new one: /hikoya'),
+    'Bu hikoya tugagan. /story bilan yangisini boshlang.': ('Эта история закончена. Начните новую: /story', 'This story is over. Start a new one: /story'),
     '👉 <b>Siz tanladingiz:</b> ': ('👉 <b>Вы выбрали:</b> ', '👉 <b>You chose:</b> '),
     "1️⃣ yolg'on": ('1️⃣ ложь', '1️⃣ is the lie'),
     "2️⃣ yolg'on": ('2️⃣ ложь', '2️⃣ is the lie'),
     "3️⃣ yolg'on": ('3️⃣ ложь', '3️⃣ is the lie'),
-    "❌ Raund tayyorlanmadi. /yolgon bilan qayta urinib ko'ring.": ('❌ Раунд не подготовлен. Попробуйте ещё раз: /yolgon', "❌ The round couldn't be prepared. Please try again with /yolgon."),
+    "❌ Raund tayyorlanmadi. /lie bilan qayta urinib ko'ring.": ('❌ Раунд не подготовлен. Попробуйте ещё раз: /lie', "❌ The round couldn't be prepared. Please try again with /lie."),
     '\n🔥 Ketma-ket: <b>': ('\n🔥 Подряд: <b>', '\n🔥 In a row: <b>'),
     "🕵️ <b>Yolg'onni top!</b>": ('🕵️ <b>Найди ложь!</b>', '🕵️ <b>Spot the lie!</b>'),
     "\n\nUlardan <b>bittasi yolg'on</b>. Qaysi biri? 👇": ('\n\nИз них <b>одно — ложь</b>. Какое? 👇', '\n\nOne of them is <b>a lie</b>. Which one? 👇'),
-    'Bu raund tugagan. /yolgon bilan yangisini boshlang.': ('Этот раунд закончен. Начните новый: /yolgon', 'This round is over. Start a new one: /yolgon'),
+    'Bu raund tugagan. /lie bilan yangisini boshlang.': ('Этот раунд закончен. Начните новый: /lie', 'This round is over. Start a new one: /lie'),
     '🎯 <b>Topdingiz!</b> 🔥 Ketma-ket: <b>': ('🎯 <b>Угадали!</b> 🔥 Подряд: <b>', '🎯 <b>You got it!</b> 🔥 In a row: <b>'),
     "😅 <b>Yolg'on tuzog'iga tushdingiz!</b>": ('😅 <b>Попались на ложь!</b>', '😅 <b>You fell for the lie!</b>'),
     ' (seriya ': (' (серия из ', ' (your streak of '),
@@ -687,10 +687,10 @@ I18N_FRAGMENTS = {
     '✅ rost': ('✅ правда', '✅ true'),
     '\n\n🏆 Eng yaxshi seriya: ': ('\n\n🏆 Лучшая серия: ', '\n\n🏆 Best streak: '),
     '➡️ Keyingisi': ('➡️ Дальше', '➡️ Next'),
-    "❌ Savol tayyorlanmadi. /nima bilan qayta urinib ko'ring.": ('❌ Вопрос не подготовлен. Попробуйте ещё раз: /nima', "❌ The question couldn't be prepared. Please try again with /nima."),
+    "❌ Savol tayyorlanmadi. /whatif bilan qayta urinib ko'ring.": ('❌ Вопрос не подготовлен. Попробуйте ещё раз: /whatif', "❌ The question couldn't be prepared. Please try again with /whatif."),
     "🔬 <b>Nima bo'ladi?</b>": ('🔬 <b>Что будет?</b>', '🔬 <b>What happens?</b>'),
     '\n\n<i>Sizningcha-chi? 👇</i>': ('\n\n<i>Как вы думаете? 👇</i>', '\n\n<i>What do you think? 👇</i>'),
-    'Bu savol tugagan. /nima bilan yangisini oling.': ('Этот вопрос закончен. Получите новый: /nima', 'This question is over. Get a new one with /nima'),
+    'Bu savol tugagan. /whatif bilan yangisini oling.': ('Этот вопрос закончен. Получите новый: /whatif', 'This question is over. Get a new one with /whatif'),
     "🎉 <b>To'g'ri taxmin!</b>": ('🎉 <b>Верный прогноз!</b>', '🎉 <b>Great guess!</b>'),
     "🤯 <b>Aksincha bo'ldi!</b>": ('🤯 <b>Вышло наоборот!</b>', '🤯 <b>It turned out differently!</b>'),
     'Kutilmagan 🤯': ('Неожиданно 🤯', 'Unexpected 🤯'),
@@ -753,16 +753,16 @@ I18N_FRAGMENTS = {
     '🇬🇧 <b>Kunlik ingliz tili: ': ('🇬🇧 <b>Английский на каждый день: ', '🇬🇧 <b>Daily English: '),
     '🎯 Kunlik testni boshlash (': ('🎯 Начать тест дня (', "🎯 Start today's quiz ("),
     '⏳ Bugungi kontent tayyorlanmoqda...': ('⏳ Готовлю сегодняшний материал...', "⏳ Preparing today's content..."),
-    "❌ Bugungi kontentni tayyorlab bo'lmadi. Birozdan keyin /kunlik bilan qayta urinib ko'ring.": ('❌ Не удалось подготовить сегодняшний материал. Попробуйте чуть позже: /kunlik', "❌ Couldn't prepare today's content. Please try again shortly with /kunlik."),
+    "❌ Bugungi kontentni tayyorlab bo'lmadi. Birozdan keyin /daily bilan qayta urinib ko'ring.": ('❌ Не удалось подготовить сегодняшний материал. Попробуйте чуть позже: /daily', "❌ Couldn't prepare today's content. Please try again shortly with /daily."),
     '⚠️ Bugungi test hozir mavjud emas. Boshqa viktorina uchun /quiz yuboring.': ('⚠️ Сегодняшний тест сейчас недоступен. Другую викторину можно запустить командой /quiz.', "⚠️ Today's quiz isn't available right now. Try another quiz with /quiz."),
     '⚠️ Bu xizmat hozir sozlanmagan.': ('⚠️ Этот сервис сейчас не настроен.', "⚠️ This service isn't set up right now."),
     '🔔 Kunlik xabarlar <b>yoqildi</b>. Har kuni yangi fan va ingliz tili maslahatini olasiz!': ('🔔 Ежедневные сообщения <b>включены</b>. Каждый день вы будете получать новую тему и совет по английскому!', "🔔 Daily messages are <b>on</b>. Every day you'll get a new subject and an English tip!"),
-    "🔕 Kunlik xabarlar <b>o'chirildi</b>. Qayta yoqish uchun yana /xabarnoma yuboring.\n\nKunlik kontentni /kunlik orqali o'zingiz ham ochishingiz mumkin.": ('🔕 Ежедневные сообщения <b>отключены</b>. Чтобы включить снова, отправьте /xabarnoma.\n\nЕжедневный материал можно открыть и самому командой /kunlik.', '🔕 Daily messages are <b>off</b>. To turn them back on, send /xabarnoma.\n\nYou can also open the daily content yourself with /kunlik.'),
+    "🔕 Kunlik xabarlar <b>o'chirildi</b>. Qayta yoqish uchun yana /notify yuboring.\n\nKunlik kontentni /daily orqali o'zingiz ham ochishingiz mumkin.": ('🔕 Ежедневные сообщения <b>отключены</b>. Чтобы включить снова, отправьте /notify.\n\nЕжедневный материал можно открыть и самому командой /daily.', '🔕 Daily messages are <b>off</b>. To turn them back on, send /notify.\n\nYou can also open the daily content yourself with /daily.'),
     "❌ Xatolik yuz berdi. Keyinroq qayta urinib ko'ring.": ('❌ Произошла ошибка. Попробуйте позже.', '❌ Something went wrong. Please try again later.'),
-    "\n\n<i>Kunlik xabarni o'chirish: /xabarnoma</i>": ('\n\n<i>Отключить ежедневные сообщения: /xabarnoma</i>', '\n\n<i>Turn off daily messages: /xabarnoma</i>'),
+    "\n\n<i>Kunlik xabarni o'chirish: /notify</i>": ('\n\n<i>Отключить ежедневные сообщения: /notify</i>', '\n\n<i>Turn off daily messages: /notify</i>'),
     '⏳ Sertifikat testi uchun ': ('⏳ Готовлю вопросы для сертификатного теста: ', '⏳ Preparing questions for the certificate test: '),
     ' ta savol tayyorlanmoqda... (bu biroz vaqt olishi mumkin, iltimos kuting)': (' шт. (это может занять немного времени, подождите)', ' (this may take a little while, please wait)'),
-    "❌ Savollarni tayyorlashda xatolik yuz berdi. Iltimos /sertifikat bilan qayta urinib ko'ring.": ('❌ Не удалось подготовить вопросы. Попробуйте ещё раз: /sertifikat', "❌ Couldn't prepare the questions. Please try again with /sertifikat."),
+    "❌ Savollarni tayyorlashda xatolik yuz berdi. Iltimos /certificate bilan qayta urinib ko'ring.": ('❌ Не удалось подготовить вопросы. Попробуйте ещё раз: /certificate', "❌ Couldn't prepare the questions. Please try again with /certificate."),
     '🎓 <b>Sertifikat testi boshlandi!</b>\n\n📝 Jami ': ('🎓 <b>Сертификатный тест начался!</b>\n\n📝 Всего вопросов: ', '🎓 <b>The certificate test has started!</b>\n\n📝 Total questions: '),
     ' ta savol. Agar natijangiz <b>': ('. Если ваш результат будет <b>', '. If your score is <b>'),
     "%</b> yoki undan yuqori bo'lsa, test yakunida shaxsiy sertifikat rasmini olasiz 🏅\n\nOmad! 🍀": ('%</b> или выше, в конце вы получите именной сертификат 🏅\n\nУдачи! 🍀', "%</b> or higher, you'll receive a personal certificate at the end 🏅\n\nGood luck! 🍀"),
@@ -787,16 +787,16 @@ I18N_FRAGMENTS = {
     '!</b>\nSiz ': ('!</b>\nИз ', '!</b>\nOut of '),
     ' savoldan ': (' вопросов вы ответили правильно на ', ' questions you answered '),
     " tasiga to'g'ri javob berib, (": (' и получили сертификат (', ' correctly and earned a certificate ('),
-    "%) sertifikatga sazovor bo'ldingiz!\n\n🏆 Reytingni /reyting orqali ko'rishingiz mumkin.": ('%)!\n\n🏆 Рейтинг можно посмотреть командой /reyting.', '%)!\n\n🏆 You can see the leaderboard with /reyting.'),
+    "%) sertifikatga sazovor bo'ldingiz!\n\n🏆 Reytingni /leaderboard orqali ko'rishingiz mumkin.": ('%)!\n\n🏆 Рейтинг можно посмотреть командой /leaderboard.', '%)!\n\n🏆 You can see the leaderboard with /leaderboard.'),
     '⚠️ Sertifikat rasmini yaratishda xatolik yuz berdi, lekin natijangiz hisobga olindi.': ('⚠️ Не удалось создать изображение сертификата, но ваш результат засчитан.', "⚠️ Couldn't create the certificate image, but your result has been recorded."),
     '%)\n\n😔 Afsuski, sertifikat olish uchun kamida ': ('%)\n\n😔 К сожалению, для получения сертификата нужно набрать не менее ', '%)\n\n😔 Unfortunately, you need at least '),
-    "% kerak. Ko'proq mashq qilib, yana urinib ko'ring!\n\n🔁 Qayta urinish uchun /sertifikat yuboring.": ('%. Потренируйтесь ещё и попробуйте снова!\n\n🔁 Чтобы попробовать снова, отправьте /sertifikat.', '% to earn a certificate. Practise some more and try again!\n\n🔁 To retry, send /sertifikat.'),
+    "% kerak. Ko'proq mashq qilib, yana urinib ko'ring!\n\n🔁 Qayta urinish uchun /certificate yuboring.": ('%. Потренируйтесь ещё и попробуйте снова!\n\n🔁 Чтобы попробовать снова, отправьте /certificate.', '% to earn a certificate. Practise some more and try again!\n\n🔁 To retry, send /certificate.'),
     '🏆 Ajoyib natija!': ('🏆 Отличный результат!', '🏆 Excellent result!'),
     '👍 Yomon emas, yana mashq qiling!': ('👍 Неплохо, продолжайте тренироваться!', '👍 Not bad — keep practising!'),
     "📚 Ko'proq mashq qilish kerak.": ('📚 Нужно больше практики.', '📚 More practice is needed.'),
     ' testi yakunlandi!</b>\n\n🎯 Natijangiz: <b>': (' — тест завершён!</b>\n\n🎯 Ваш результат: <b>', ' test complete!</b>\n\n🎯 Your score: <b>'),
     '\n\n🔁 Yangi test uchun ': ('\n\n🔁 Для нового теста — ', '\n\n🔁 For a new test, send '),
-    ", reytingni ko'rish uchun /reyting yuboring.": (', чтобы посмотреть рейтинг — /reyting.', ' — to see the leaderboard, send /reyting.'),
+    ", reytingni ko'rish uchun /leaderboard yuboring.": (', чтобы посмотреть рейтинг — /leaderboard.', ' — to see the leaderboard, send /leaderboard.'),
     "🏆 Zo'r! Bugungi fanni yaxshi bilar ekansiz.": ('🏆 Отлично! Вы хорошо знаете сегодняшнюю тему.', "🏆 Great! You know today's subject well."),
     '👍 Yaxshi, ertaga yangi fan sizni kutadi!': ('👍 Хорошо, завтра вас ждёт новая тема!', '👍 Good — a new subject awaits you tomorrow!'),
     "📚 Hechqisi yo'q — yangi narsa o'rganish ham yutuq!": ('📚 Ничего страшного — узнать новое тоже достижение!', '📚 No worries — learning something new is an achievement too!'),
@@ -806,7 +806,7 @@ I18N_FRAGMENTS = {
     "👍 Yomon emas! Yana mashq qilsangiz yanada yaxshi bo'ladi.": ('👍 Неплохо! С небольшой практикой будет ещё лучше.', "👍 Not bad! A bit more practice and you'll do even better."),
     "📚 Ko'proq o'rganishga arziydi, lekin harakat qildingiz!": ('📚 Стоит узнать больше, но вы старались!', "📚 There's more to learn, but you gave it a good try!"),
     '🏁 <b>Viktorina yakunlandi!</b>\n\n🎯 Natijangiz: <b>': ('🏁 <b>Викторина завершена!</b>\n\n🎯 Ваш результат: <b>', '🏁 <b>Quiz complete!</b>\n\n🎯 Your score: <b>'),
-    "\n\n🔁 Yana o'ynash uchun /quiz, sertifikat testi uchun /sertifikat, reytingni ko'rish uchun /reyting yuboring.": ('\n\n🔁 Чтобы сыграть ещё — /quiz, тест с сертификатом — /sertifikat, рейтинг — /reyting.', '\n\n🔁 To play again send /quiz, for the certificate test /sertifikat, for the leaderboard /reyting.'),
+    "\n\n🔁 Yana o'ynash uchun /quiz, sertifikat testi uchun /certificate, reytingni ko'rish uchun /leaderboard yuboring.": ('\n\n🔁 Чтобы сыграть ещё — /quiz, тест с сертификатом — /certificate, рейтинг — /leaderboard.', '\n\n🔁 To play again send /quiz, for the certificate test /certificate, for the leaderboard /leaderboard.'),
     '⏳ IELTS Speaking testi tayyorlanmoqda, biroz kuting...': ('⏳ Готовлю тест IELTS Speaking, немного подождите...', '⏳ Preparing your IELTS Speaking test, please wait a moment...'),
     "❌ Savollarni generatsiya qilishda xatolik yuz berdi. Iltimos /test bilan qayta urinib ko'ring.": ('❌ Не удалось сгенерировать вопросы. Попробуйте ещё раз: /test', "❌ Couldn't generate the questions. Please try again with /test."),
     '✅ <b>Test tayyor!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview\n🎙 Har bir savolga ovozli xabar bilan javob bering.': ('✅ <b>Тест готов!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview\n🎙 Отвечайте на каждый вопрос голосовым сообщением.', '✅ <b>Your test is ready!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview\n🎙 Answer each question with a voice message.'),
@@ -1656,13 +1656,13 @@ WELCOME_TEXT = (
     "🧩 <b>Bilim va o'yin</b>\n"
     "/quiz — istalgan fandan viktorina (fanni o'zingiz tanlaysiz)\n"
     "/teaser — miya jumboqlari va topishmoqlar\n"
-    "🔮 /topaman — siz o'ylagan narsani men topaman!\n"
-    "/kunlik — bugungi fan, qiziqarli fakt va test\n"
-    "/hikoya — interaktiv hikoya: tanlovingiz yakunni o'zgartiradi 🎭\n"
-    "/yolgon — 3 ta gapdan yolg'onini toping 🕵️\n"
-    "/nima — \"Nima bo'ladi?\" fan jumboqlari: taxmin qiling 🔬\n"
-    "/sertifikat — 25 savolli test, natija yaxshi bo'lsa sertifikat\n"
-    "/reyting — eng yaxshilar jadvali\n\n"
+    "🔮 /guess — siz o'ylagan narsani men topaman!\n"
+    "/daily — bugungi fan, qiziqarli fakt va test\n"
+    "/story — interaktiv hikoya: tanlovingiz yakunni o'zgartiradi 🎭\n"
+    "/lie — 3 ta gapdan yolg'onini toping 🕵️\n"
+    "/whatif — \"Nima bo'ladi?\" fan jumboqlari: taxmin qiling 🔬\n"
+    "/certificate — 25 savolli test, natija yaxshi bo'lsa sertifikat\n"
+    "/leaderboard — eng yaxshilar jadvali\n\n"
     "🇬🇧 <b>Ingliz tili va IELTS</b>\n"
     "/english — ingliz tilida suhbat, xatolaringizni tuzatib boraman\n"
     "/grammar — grammatika: dars + mashqlar 📝\n"
@@ -1670,7 +1670,7 @@ WELCOME_TEXT = (
     "/test — IELTS Speaking mock testi (ovozli javoblar)\n"
     "/reading_test, /listening_test — IELTS uslubidagi testlar\n"
     "/dashboard — profil va o'quv materiallari\n\n"
-    "🔔 Har kuni ertalab yangi fan va ingliz tili maslahati yuboraman — o'chirish: /xabarnoma\n"
+    "🔔 Har kuni ertalab yangi fan va ingliz tili maslahati yuboraman — o'chirish: /notify\n"
     "🛑 Jarayonni to'xtatish: /stop"
 )
 
@@ -1679,8 +1679,8 @@ WELCOME_TEXT = (
 
 # (emoji, buyruq) — matnlar MENU_LABELS orqali tanlangan tilda olinadi
 MENU_SCIENCE = [
-    ("🧩", "quiz"), ("🧠", "teaser"), ("🔬", "nima"), ("🕵️", "yolgon"), ("🔮", "topaman"),
-    ("📖", "hikoya"), ("📅", "kunlik"), ("🎓", "sertifikat"), ("🏆", "reyting"),
+    ("🧩", "quiz"), ("🧠", "teaser"), ("🔬", "whatif"), ("🕵️", "lie"), ("🔮", "guess"),
+    ("📖", "story"), ("📅", "daily"), ("🎓", "certificate"), ("🏆", "leaderboard"),
 ]
 MENU_ENGLISH = [
     ("💬", "english"), ("📝", "grammar"), ("💎", "writing"), ("🎤", "test"),
@@ -1695,13 +1695,13 @@ ALL_COMMANDS = {
         "🧩 <b>Знания и игры</b>\n"
         "/quiz — викторина по любой науке\n"
         "/teaser — головоломки и загадки\n"
-        "🔮 /topaman — я угадаю, что вы загадали!\n"
-        "/kunlik — факт, тест и совет дня\n"
-        "/hikoya — интерактивная история 🎭\n"
-        "/yolgon — найдите ложь среди 3 фактов 🕵️\n"
-        "/nima — «Что будет?» научные загадки 🔬\n"
-        "/sertifikat — тест из 25 вопросов с сертификатом\n"
-        "/reyting — таблица лидеров\n\n"
+        "🔮 /guess — я угадаю, что вы загадали!\n"
+        "/daily — факт, тест и совет дня\n"
+        "/story — интерактивная история 🎭\n"
+        "/lie — найдите ложь среди 3 фактов 🕵️\n"
+        "/whatif — «Что будет?» научные загадки 🔬\n"
+        "/certificate — тест из 25 вопросов с сертификатом\n"
+        "/leaderboard — таблица лидеров\n\n"
         "🇬🇧 <b>Английский и IELTS</b>\n"
         "/english — разговор на английском с исправлением ошибок\n"
         "/grammar — грамматика: урок + упражнения 📝\n"
@@ -1709,8 +1709,8 @@ ALL_COMMANDS = {
         "/test — IELTS Speaking (голосовые ответы)\n"
         "/reading_test, /listening_test — тесты в стиле IELTS\n"
         "/dashboard — профиль и материалы\n\n"
-        "🌐 /til — сменить язык\n"
-        "🔔 Каждое утро присылаю новый факт и совет по английскому — отключить: /xabarnoma\n"
+        "🌐 /language — сменить язык\n"
+        "🔔 Каждое утро присылаю новый факт и совет по английскому — отключить: /notify\n"
         "🛑 Остановить процесс: /stop"
     ),
     "en": (
@@ -1719,13 +1719,13 @@ ALL_COMMANDS = {
         "🧩 <b>Knowledge & games</b>\n"
         "/quiz — a quiz on any subject\n"
         "/teaser — brain teasers and riddles\n"
-        "🔮 /topaman — I'll guess what you're thinking of!\n"
-        "/kunlik — daily fact, quiz and tip\n"
-        "/hikoya — interactive story 🎭\n"
-        "/yolgon — spot the lie among 3 facts 🕵️\n"
-        "/nima — \"What happens?\" science riddles 🔬\n"
-        "/sertifikat — 25-question test with a certificate\n"
-        "/reyting — leaderboards\n\n"
+        "🔮 /guess — I'll guess what you're thinking of!\n"
+        "/daily — daily fact, quiz and tip\n"
+        "/story — interactive story 🎭\n"
+        "/lie — spot the lie among 3 facts 🕵️\n"
+        "/whatif — \"What happens?\" science riddles 🔬\n"
+        "/certificate — 25-question test with a certificate\n"
+        "/leaderboard — leaderboards\n\n"
         "🇬🇧 <b>English & IELTS</b>\n"
         "/english — chat in English, I'll fix your mistakes\n"
         "/grammar — grammar: lesson + exercises 📝\n"
@@ -1733,8 +1733,8 @@ ALL_COMMANDS = {
         "/test — IELTS Speaking mock (voice answers)\n"
         "/reading_test, /listening_test — IELTS-style tests\n"
         "/dashboard — profile and study materials\n\n"
-        "🌐 /til — change language\n"
-        "🔔 Every morning I send a new fact and an English tip — turn off: /xabarnoma\n"
+        "🌐 /language — change language\n"
+        "🔔 Every morning I send a new fact and an English tip — turn off: /notify\n"
         "🛑 Stop the current process: /stop"
     ),
 }
@@ -1778,7 +1778,7 @@ async def cmd_start(message: Message, state: FSMContext):
     await message.answer(tr("intro"), reply_markup=_main_menu_keyboard())
 
 
-@dp.message(Command("til"))
+@dp.message(Command("language", "til"))
 async def cmd_til(message: Message):
     await message.answer(tr("pick"), reply_markup=_lang_keyboard())
 
@@ -1956,9 +1956,9 @@ async def cmd_users(message: Message):
     await message.answer("\n".join(lines))
 
 
-@dp.message(Command("reyting"))
+@dp.message(Command("leaderboard", "reyting"))
 async def cmd_reyting(message: Message):
-    """Viktorina (/quiz), sertifikat (/sertifikat), Reading va Listening testlari uchun
+    """Viktorina (/quiz), sertifikat (/certificate), Reading va Listening testlari uchun
     alohida TOP 10 reyting jadvallarini ko'rsatadi."""
     if redis_client is None:
         await message.answer(
@@ -2546,7 +2546,7 @@ async def _guess_next_step(target: Message, user_id: int):
         except Exception as e:
             logger.exception("Guess o'yini LLM xatosi: %s", e)
             active_guess_games.pop(user_id, None)
-            await target.answer("⚠️ Kechirasiz, xatolik yuz berdi. Qayta boshlash: /topaman")
+            await target.answer("⚠️ Kechirasiz, xatolik yuz berdi. Qayta boshlash: /guess")
             return
 
         if step.get("action") == "guess" and step.get("guess"):
@@ -2578,7 +2578,7 @@ async def _guess_start(target: Message, user_id: int):
     await _guess_next_step(target, user_id)
 
 
-@dp.message(Command("topaman"))
+@dp.message(Command("guess", "topaman"))
 async def cmd_topaman(message: Message, state: FSMContext):
     await state.clear()
     await _guess_start(message, message.from_user.id)
@@ -2596,7 +2596,7 @@ async def handle_guess_action(callback: CallbackQuery):
 
     game = active_guess_games.get(user_id)
     if not game:
-        await callback.answer("Bu o'yin tugagan. Yangisi: /topaman", show_alert=True)
+        await callback.answer("Bu o'yin tugagan. Yangisi: /guess", show_alert=True)
         return
     if game.get("busy"):
         await callback.answer("⏳ Bir soniya, o'ylayapman...")
@@ -2653,7 +2653,7 @@ async def handle_guess_action(callback: CallbackQuery):
     await callback.answer()
 
 
-# --- Interaktiv hikoya (/hikoya) -----------------------------------------
+# --- Interaktiv hikoya (/story) -----------------------------------------
 # AI har qadamda sahna yozadi, foydalanuvchi 3 ta tugmadan birini tanlaydi —
 # tanlov hikoyani o'zgartiradi va oxirida o'ziga xos yakun bor.
 
@@ -2724,7 +2724,7 @@ async def _story_advance(chat_message: Message, user_id: int, choice_text: str |
         res = await asyncio.to_thread(_generate_story_step_sync, story, choice_text)
     except Exception as e:
         logger.exception("Hikoya sahnasini yaratishda xatolik: %s", e)
-        await chat_message.answer("❌ Hikoyani davom ettirib bo'lmadi. Qayta urinish uchun /hikoya yuboring.")
+        await chat_message.answer("❌ Hikoyani davom ettirib bo'lmadi. Qayta urinish uchun /story yuboring.")
         active_stories.pop(user_id, None)
         return
 
@@ -2750,7 +2750,7 @@ async def _story_advance(chat_message: Message, user_id: int, choice_text: str |
     )
 
 
-@dp.message(Command("hikoya"))
+@dp.message(Command("story", "hikoya"))
 async def cmd_hikoya(message: Message, state: FSMContext):
     if await state.get_state() is not None:
         await message.answer("⏳ Avval joriy testni tugating yoki /stop yuboring.")
@@ -2795,7 +2795,7 @@ async def handle_story_action(callback: CallbackQuery):
     if action == "c":
         story = active_stories.get(user_id)
         if not story or not story.get("choices"):
-            await callback.answer("Bu hikoya tugagan. /hikoya bilan yangisini boshlang.", show_alert=True)
+            await callback.answer("Bu hikoya tugagan. /story bilan yangisini boshlang.", show_alert=True)
             return
         try:
             choice = story["choices"][int(parts[2])]
@@ -2817,7 +2817,7 @@ async def handle_story_action(callback: CallbackQuery):
     await callback.answer()
 
 
-# --- Yolg'onni top (/yolgon) ---------------------------------------------
+# --- Yolg'onni top (/lie) ---------------------------------------------
 # AI 3 ta "fakt" aytadi: 2 tasi rost, 1 tasi yolg'on. Foydalanuvchi yolg'onni
 # topadi. Ketma-ket topishlar soni sessiya davomida hisoblanadi.
 
@@ -2860,7 +2860,7 @@ async def _send_lie_round(chat_message: Message, user_id: int):
         rnd = await asyncio.to_thread(_generate_lie_sync, random.choice(_LIE_TOPICS))
     except Exception as e:
         logger.exception("Yolg'on raundini yaratishda xatolik: %s", e)
-        await chat_message.answer("❌ Raund tayyorlanmadi. /yolgon bilan qayta urinib ko'ring.")
+        await chat_message.answer("❌ Raund tayyorlanmadi. /lie bilan qayta urinib ko'ring.")
         return
     rnd["streak"] = prev.get("streak", 0)
     rnd["best"] = prev.get("best", 0)
@@ -2875,7 +2875,7 @@ async def _send_lie_round(chat_message: Message, user_id: int):
     )
 
 
-@dp.message(Command("yolgon"))
+@dp.message(Command("lie", "yolgon"))
 async def cmd_yolgon(message: Message, state: FSMContext):
     if await state.get_state() is not None:
         await message.answer("⏳ Avval joriy testni tugating yoki /stop yuboring.")
@@ -2896,7 +2896,7 @@ async def handle_lie_action(callback: CallbackQuery):
 
     rnd = active_lies.get(user_id)
     if not rnd or rnd.get("answered"):
-        await callback.answer("Bu raund tugagan. /yolgon bilan yangisini boshlang.", show_alert=True)
+        await callback.answer("Bu raund tugagan. /lie bilan yangisini boshlang.", show_alert=True)
         return
     try:
         choice = int(action)
@@ -2935,7 +2935,7 @@ async def handle_lie_action(callback: CallbackQuery):
             InlineKeyboardButton(text="➡️ Keyingisi", callback_data="lie:next")]]))
 
 
-# --- "Nima bo'ladi?" (/nima) ---------------------------------------------
+# --- "Nima bo'ladi?" (/whatif) ---------------------------------------------
 # Fan asosidagi qiziq vaziyat beriladi (masalan: "Suvga natriy tashlasangiz..."),
 # foydalanuvchi 3 ta variantdan nima bo'lishini taxmin qiladi, so'ng
 # ilmiy tushuntirish va hayratlanarli fakt ko'rsatiladi.
@@ -2984,7 +2984,7 @@ async def _send_what_round(chat_message: Message, user_id: int):
         rnd = await asyncio.to_thread(_generate_what_sync, random.choice(_WHAT_TOPICS))
     except Exception as e:
         logger.exception("'Nima bo'ladi' savolini yaratishda xatolik: %s", e)
-        await chat_message.answer("❌ Savol tayyorlanmadi. /nima bilan qayta urinib ko'ring.")
+        await chat_message.answer("❌ Savol tayyorlanmadi. /whatif bilan qayta urinib ko'ring.")
         return
     rnd["right"] = prev.get("right", 0)
     rnd["total"] = prev.get("total", 0)
@@ -2998,7 +2998,7 @@ async def _send_what_round(chat_message: Message, user_id: int):
     )
 
 
-@dp.message(Command("nima"))
+@dp.message(Command("whatif", "nima"))
 async def cmd_nima(message: Message, state: FSMContext):
     if await state.get_state() is not None:
         await message.answer("⏳ Avval joriy testni tugating yoki /stop yuboring.")
@@ -3019,7 +3019,7 @@ async def handle_what_action(callback: CallbackQuery):
 
     rnd = active_what.get(user_id)
     if not rnd or rnd.get("answered"):
-        await callback.answer("Bu savol tugagan. /nima bilan yangisini oling.", show_alert=True)
+        await callback.answer("Bu savol tugagan. /whatif bilan yangisini oling.", show_alert=True)
         return
     try:
         choice = int(action)
@@ -3724,12 +3724,12 @@ def _daily_keyboard(content: dict) -> InlineKeyboardMarkup | None:
     ])
 
 
-@dp.message(Command("kunlik"))
+@dp.message(Command("daily", "kunlik"))
 async def cmd_kunlik(message: Message):
     prep_msg = await message.answer("⏳ Bugungi kontent tayyorlanmoqda...")
     content = await get_daily_content()
     if not content:
-        await prep_msg.edit_text("❌ Bugungi kontentni tayyorlab bo'lmadi. Birozdan keyin /kunlik bilan qayta urinib ko'ring.")
+        await prep_msg.edit_text("❌ Bugungi kontentni tayyorlab bo'lmadi. Birozdan keyin /daily bilan qayta urinib ko'ring.")
         return
     await prep_msg.edit_text(_format_daily_text(content), reply_markup=_daily_keyboard(content))
 
@@ -3754,7 +3754,7 @@ async def handle_daily_start(callback: CallbackQuery):
     await callback.message.answer(text, reply_markup=keyboard)
 
 
-@dp.message(Command("xabarnoma"))
+@dp.message(Command("notify", "xabarnoma"))
 async def cmd_xabarnoma(message: Message):
     """Kunlik avtomatik xabarni (har kuni ertalab fan + ingliz tili maslahati) yoqadi/o'chiradi."""
     if redis_client is None:
@@ -3768,7 +3768,7 @@ async def cmd_xabarnoma(message: Message):
             await message.answer("🔔 Kunlik xabarlar <b>yoqildi</b>. Har kuni yangi fan va ingliz tili maslahatini olasiz!")
         else:
             await redis_client.sadd(DAILY_OPTOUT_KEY, uid)
-            await message.answer("🔕 Kunlik xabarlar <b>o'chirildi</b>. Qayta yoqish uchun yana /xabarnoma yuboring.\n\nKunlik kontentni /kunlik orqali o'zingiz ham ochishingiz mumkin.")
+            await message.answer("🔕 Kunlik xabarlar <b>o'chirildi</b>. Qayta yoqish uchun yana /notify yuboring.\n\nKunlik kontentni /daily orqali o'zingiz ham ochishingiz mumkin.")
     except Exception as e:
         logger.exception("Xabarnoma sozlamasida xatolik: %s", e)
         await message.answer("❌ Xatolik yuz berdi. Keyinroq qayta urinib ko'ring.")
@@ -3804,7 +3804,7 @@ async def broadcast_daily_content(content: dict | None = None) -> tuple[int, int
             if not c:
                 failed += 1
                 continue
-            per_lang[ulang] = (c, _format_daily_text(c) + "\n\n<i>Kunlik xabarni o'chirish: /xabarnoma</i>", _daily_keyboard(c))
+            per_lang[ulang] = (c, _format_daily_text(c) + "\n\n<i>Kunlik xabarni o'chirish: /notify</i>", _daily_keyboard(c))
         _c, text, keyboard = per_lang[ulang]
         current_lang.set(ulang)
         try:
@@ -3854,7 +3854,7 @@ async def daily_broadcast_loop():
 
 
 
-@dp.message(Command("sertifikat"))
+@dp.message(Command("certificate", "sertifikat"))
 async def cmd_sertifikat(message: Message):
     f"""Ketma-ket {CERTIFICATE_QUIZ_LENGTH} ta aralash fanlardan iborat "sertifikat testi"ni
     boshlaydi. Agar natija {CERTIFICATE_PASS_PERCENT}% dan yuqori bo'lsa, test yakunida
@@ -3872,7 +3872,7 @@ async def cmd_sertifikat(message: Message):
             raise ValueError(f"Yetarli savol generatsiya qilinmadi: {len(questions)}")
     except Exception as e:
         logger.exception("Sertifikat testini generatsiya qilishda xatolik: %s", e)
-        await prep_msg.edit_text("❌ Savollarni tayyorlashda xatolik yuz berdi. Iltimos /sertifikat bilan qayta urinib ko'ring.")
+        await prep_msg.edit_text("❌ Savollarni tayyorlashda xatolik yuz berdi. Iltimos /certificate bilan qayta urinib ko'ring.")
         return
 
     active_quizzes[message.from_user.id] = {
@@ -4061,7 +4061,7 @@ async def handle_quiz_answer(callback: CallbackQuery):
                         f"🎓 <b>Tabriklaymiz, {full_name}!</b>\n"
                         f"Siz {total} savoldan {score} tasiga to'g'ri javob berib, "
                         f"({percentage}%) sertifikatga sazovor bo'ldingiz!\n\n"
-                        "🏆 Reytingni /reyting orqali ko'rishingiz mumkin."
+                        "🏆 Reytingni /leaderboard orqali ko'rishingiz mumkin."
                     ),
                 )
             except Exception as e:
@@ -4079,7 +4079,7 @@ async def handle_quiz_answer(callback: CallbackQuery):
                 f"🎯 Natijangiz: <b>{score}/{total}</b> ({percentage}%)\n\n"
                 f"😔 Afsuski, sertifikat olish uchun kamida {CERTIFICATE_PASS_PERCENT}% kerak. "
                 "Ko'proq mashq qilib, yana urinib ko'ring!\n\n"
-                "🔁 Qayta urinish uchun /sertifikat yuboring."
+                "🔁 Qayta urinish uchun /certificate yuboring."
             )
         return
 
@@ -4102,7 +4102,7 @@ async def handle_quiz_answer(callback: CallbackQuery):
             f"🏁 <b>{icon} {label} testi yakunlandi!</b>\n\n"
             f"🎯 Natijangiz: <b>{score}/{total}</b> ({percentage}%)\n\n"
             f"{verdict}\n\n"
-            f"🔁 Yangi test uchun {next_cmd}, reytingni ko'rish uchun /reyting yuboring."
+            f"🔁 Yangi test uchun {next_cmd}, reytingni ko'rish uchun /leaderboard yuboring."
         )
         await callback.message.answer(summary)
         return
@@ -4136,8 +4136,8 @@ async def handle_quiz_answer(callback: CallbackQuery):
         f"🏁 <b>Viktorina yakunlandi!</b>\n\n"
         f"🎯 Natijangiz: <b>{score}/{total}</b> ({percentage}%)\n\n"
         f"{verdict}\n\n"
-        "🔁 Yana o'ynash uchun /quiz, sertifikat testi uchun /sertifikat, "
-        "reytingni ko'rish uchun /reyting yuboring."
+        "🔁 Yana o'ynash uchun /quiz, sertifikat testi uchun /certificate, "
+        "reytingni ko'rish uchun /leaderboard yuboring."
     )
     await callback.message.answer(summary)
 
@@ -4936,38 +4936,35 @@ def create_app() -> web.Application:
 
 async def setup_bot_commands():
     commands = [
-        BotCommand(command="til", description="Tilni tanlash / Язык / Language"),
-        BotCommand(command="menu", description="Asosiy menyu (Ilm / Ingliz tili)"),
-        BotCommand(command="start", description="Boshlash va barcha imkoniyatlar"),
-        BotCommand(command="quiz", description="Istalgan fandan viktorina"),
-        BotCommand(command="teaser", description="Miya jumboqlari va topishmoqlar"),
-        BotCommand(command="topaman", description="Men o'ylagan narsani top (o'yin)"),
-        BotCommand(command="hikoya", description="Interaktiv hikoya — yo'lni o'zingiz tanlang"),
-        BotCommand(command="yolgon", description="3 ta gapdan yolg'onini toping"),
-        BotCommand(command="nima", description="Nima bo'ladi? Fan jumboqlari"),
-        BotCommand(command="kunlik", description="Bugungi fan, fakt va ingliz tili maslahati"),
-        BotCommand(command="writing", description=f"IELTS Writing tahlili ({WRITING_PRICE_STARS} Stars)"),
-        BotCommand(command="grammar", description="Ingliz grammatikasi: dars va mashqlar"),
-        BotCommand(command="english", description="Ingliz tilida suhbat (xatolarni tuzatadi)"),
-        BotCommand(command="sertifikat", description="25 savolli sertifikat testi"),
-        BotCommand(command="reyting", description="TOP 10 reyting jadvallari"),
-        BotCommand(command="test", description="IELTS Speaking mock testi"),
-        BotCommand(command="reading_test", description="IELTS Reading testi"),
-        BotCommand(command="listening_test", description="IELTS Listening testi"),
-        BotCommand(command="dashboard", description="Profil va o'quv materiallari"),
-        BotCommand(command="xabarnoma", description="Kunlik xabarni yoqish/o'chirish"),
-        BotCommand(command="users", description="Foydalanuvchilar ro'yxati (faqat egasi)"),
-        BotCommand(command="stats", description="Bot statistikasi"),
-        BotCommand(command="stop", description="Joriy jarayonni to'xtatish"),
+        BotCommand(command="language", description="Choose language"),
+        BotCommand(command="menu", description="Main menu (Science / English)"),
+        BotCommand(command="start", description="Start and all features"),
+        BotCommand(command="quiz", description="Quiz on any subject"),
+        BotCommand(command="teaser", description="Brain teasers and riddles"),
+        BotCommand(command="guess", description="I guess what you're thinking (game)"),
+        BotCommand(command="story", description="Interactive story — choose your path"),
+        BotCommand(command="lie", description="Spot the lie among 3 statements"),
+        BotCommand(command="whatif", description="What happens? Science puzzles"),
+        BotCommand(command="daily", description="Today's science, fact and English tip"),
+        BotCommand(command="writing", description=f"IELTS Writing review ({WRITING_PRICE_STARS} Stars)"),
+        BotCommand(command="grammar", description="English grammar: lessons and practice"),
+        BotCommand(command="english", description="Chat in English (corrects your mistakes)"),
+        BotCommand(command="certificate", description="25-question certificate test"),
+        BotCommand(command="leaderboard", description="TOP 10 leaderboards"),
+        BotCommand(command="test", description="IELTS Speaking mock test"),
+        BotCommand(command="reading_test", description="IELTS Reading test"),
+        BotCommand(command="listening_test", description="IELTS Listening test"),
+        BotCommand(command="dashboard", description="Profile and study materials"),
+        BotCommand(command="notify", description="Turn daily message on/off"),
+        BotCommand(command="users", description="User list (owner only)"),
+        BotCommand(command="stats", description="Bot statistics"),
+        BotCommand(command="stop", description="Stop current activity"),
     ]
+    # Buyruqlar menyusi hamma uchun faqat inglizcha
     await bot.set_my_commands(commands)
-    # Telegram ilovasi tili rus/ingliz bo'lgan foydalanuvchilar menyuni o'z tilida ko'radi
-    for lc in ("ru", "en"):
+    for lc in ("uz", "ru", "en"):
         try:
-            await bot.set_my_commands(
-                [BotCommand(command=c.command, description=translate_text(c.description, lc)) for c in commands],
-                language_code=lc,
-            )
+            await bot.set_my_commands(commands, language_code=lc)
         except Exception as e:
             logger.warning("%s tilidagi buyruqlar menyusini o'rnatib bo'lmadi: %s", lc, e)
     logger.info("Bot buyruqlar menyusi o'rnatildi.")
