@@ -402,11 +402,12 @@ dp.callback_query.outer_middleware(UserTrackingMiddleware())
 # kontentga (savollar, izohlar, hikoyalar, tahlillar) va asosiy menyuga ta'sir qiladi.
 
 LANGS = {
+    "en": ("🇬🇧", "English", "English"),
     "uz": ("🇺🇿", "O'zbekcha", "Uzbek"),
     "ru": ("🇷🇺", "Русский", "Russian"),
-    "en": ("🇬🇧", "English", "English"),
 }
 DEFAULT_LANG = "uz"
+UNSET_LANG = "en"   # til hali tanlanmagan foydalanuvchilar uchun (birinchi /start gacha)
 BOT_USER_LANG_KEY = "ielts_bot:user_lang"   # hash: user_id -> uz|ru|en
 current_lang: contextvars.ContextVar = contextvars.ContextVar("current_lang", default=DEFAULT_LANG)
 _user_lang: dict = {}   # user_id -> "uz"|"ru"|"en" ("" = hali tanlanmagan)
@@ -471,7 +472,7 @@ class LanguageMiddleware(BaseMiddleware):
         lang = None
         if user is not None and not user.is_bot:
             lang = await get_lang(user.id)
-        current_lang.set(lang or DEFAULT_LANG)
+        current_lang.set(lang or UNSET_LANG)
         data["lang"] = lang
         return await handler(event, data)
 
@@ -482,7 +483,7 @@ dp.callback_query.outer_middleware(LanguageMiddleware())
 
 I18N = {
     "pick": {
-        "_": "🌐 <b>Tilni tanlang / Выберите язык / Choose your language</b>",
+        "_": "🌐 <b>Choose your language / Выберите язык / Tilni tanlang</b>",
     },
     "intro": {
         "uz": "👋 <b>Salom! Men universal yordamchi botman.</b>\n\n💬 Menga istalgan narsani yozing yoki ovozli xabar yuboring — savol bering, gaplashing. Yoki pastdan yo'nalishni tanlang 👇",
@@ -917,7 +918,7 @@ def _translate_markup(markup, lang: str):
 async def _outgoing_lang(method) -> str:
     chat_id = getattr(method, "chat_id", None)
     if isinstance(chat_id, int) and chat_id > 0:
-        return (await get_lang(chat_id)) or DEFAULT_LANG
+        return (await get_lang(chat_id)) or UNSET_LANG
     return current_lang.get()
 
 
@@ -4687,7 +4688,7 @@ def _dashboard_html_for(lang: str) -> str:
 async def dashboard_page(request: web.Request):
     lang = DEFAULT_LANG
     try:
-        lang = (await get_lang(int(request.query.get("uid", "")))) or DEFAULT_LANG
+        lang = (await get_lang(int(request.query.get("uid", "")))) or UNSET_LANG
     except (TypeError, ValueError):
         pass
     return web.Response(text=_dashboard_html_for(lang), content_type="text/html")
