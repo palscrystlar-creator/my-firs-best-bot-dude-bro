@@ -33,6 +33,7 @@ MUHIM (Render sozlamalari uchun):
 """
 
 import os
+import re
 import json
 import asyncio
 import logging
@@ -63,6 +64,7 @@ from aiogram.types import (
     LabeledPrice,
     PreCheckoutQuery,
 )
+from aiogram.client.session.middlewares.base import BaseRequestMiddleware
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 from gtts import gTTS
@@ -552,6 +554,397 @@ def _lang_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text=f"{e} {name}", callback_data=f"lg:{code}") for code, (e, name, _en) in LANGS.items()
     ]])
+
+
+# --- Statik matnlarni tarjima qilish qatlami ----------------------------------
+# Botning tayyor (qo'lda yozilgan, o'zbekcha) xabarlari Telegram'ga yuborilishidan
+# oldin tanlangan tilga o'giriladi. Bitta joyda ishlaydi, shuning uchun har bir
+# handlerga tegish shart emas. AI yaratgan kontent esa allaqachon kerakli tilda keladi.
+# Kalit — kodda yozilgan o'zbekcha matn bo'lagi, qiymat — (ruscha, inglizcha).
+
+I18N_FRAGMENTS = {
+    "\n\nHozircha natijalar yo'q. Birinchi bo'lib test yeching!": ('\n\nПока нет результатов. Пройдите тест первым!', '\n\nNo results yet. Be the first to take a test!'),
+    'Foydalanuvchi ': ('Пользователь ', 'User '),
+    '✅ Rahmat! Obuna tasdiqlandi.': ('✅ Спасибо! Подписка подтверждена.', '✅ Thank you! Subscription confirmed.'),
+    "✅ <b>Obuna tasdiqlandi!</b>\n\nEndi botdan to'liq foydalanishingiz mumkin. Boshlash uchun /start yuboring.": ('✅ <b>Подписка подтверждена!</b>\n\nТеперь вы можете пользоваться ботом в полном объёме. Отправьте /start, чтобы начать.', '✅ <b>Subscription confirmed!</b>\n\nYou can now use the bot in full. Send /start to begin.'),
+    "❌ Siz hali obuna bo'lmagansiz. Avval kanalga obuna bo'ling.": ('❌ Вы ещё не подписаны. Сначала подпишитесь на канал.', "❌ You haven't subscribed yet. Please subscribe to the channel first."),
+    'Geografiya': ('География', 'Geography'),
+    'Fizika': ('Физика', 'Physics'),
+    'Kimyo': ('Химия', 'Chemistry'),
+    'Biologiya': ('Биология', 'Biology'),
+    'Matematika': ('Математика', 'Mathematics'),
+    'Texnologiya va IT': ('Технологии и IT', 'Technology & IT'),
+    'Adabiyot va madaniyat': ('Литература и культура', 'Literature & culture'),
+    "San'at va musiqa": ('Искусство и музыка', 'Art & music'),
+    'Koinot': ('Космос', 'Space'),
+    'Iqtisodiyot va moliya': ('Экономика и финансы', 'Economics & finance'),
+    'Psixologiya': ('Психология', 'Psychology'),
+    'Sport': ('Спорт', None),
+    'Salomatlik va ovqatlanish': ('Здоровье и питание', 'Health & nutrition'),
+    'Ingliz tili': ('Английский язык', 'English language'),
+    '🎓 Sertifikat testi': ('🎓 Тест с сертификатом', '🎓 Certificate test'),
+    '🧩 Viktorina': ('🧩 Викторина', '🧩 Quiz'),
+    '📅 Kunlik test': ('📅 Тест дня', '📅 Daily quiz'),
+    '📖 Reading testi yakunlandi!</b>\n\n🎯 Natijangiz: <b>': ('📖 Тест Reading завершён!</b>\n\n🎯 Ваш результат: <b>', '📖 Reading test complete!</b>\n\n🎯 Your score: <b>'),
+    '🎧 Listening testi yakunlandi!</b>\n\n🎯 Natijangiz: <b>': ('🎧 Тест Listening завершён!</b>\n\n🎯 Ваш результат: <b>', '🎧 Listening test complete!</b>\n\n🎯 Your score: <b>'),
+    '📖 Reading testi': ('📖 Тест Reading', '📖 Reading test'),
+    '🎧 Listening testi': ('🎧 Тест Listening', '🎧 Listening test'),
+    '🧩 Savol': ('🧩 Вопрос', '🧩 Question'),
+    "🛑 Viktorina to'xtatildi. Yangisini boshlash uchun /quiz yuboring.": ('🛑 Викторина остановлена. Чтобы начать новую, отправьте /quiz.', '🛑 Quiz stopped. Send /quiz to start a new one.'),
+    '🔄 Suhbat xotirasi tozalandi. Yangidan yozishingiz mumkin, yoki /quiz bilan viktorina boshlang.': ('🔄 Память разговора очищена. Можете писать заново или начать викторину командой /quiz.', '🔄 Chat memory cleared. You can start fresh, or begin a quiz with /quiz.'),
+    "🛑 Test to'xtatildi. Qayta boshlash uchun /test yuboring.": ('🛑 Тест остановлен. Чтобы начать заново, отправьте /test.', '🛑 Test stopped. Send /test to start over.'),
+    '⛔ Bu buyruq faqat bot egasi uchun.': ('⛔ Эта команда доступна только владельцу бота.', '⛔ This command is for the bot owner only.'),
+    "⚠️ Statistika xizmati sozlanmagan.\n\nUPSTASH_REDIS_REST_URL va UPSTASH_REDIS_REST_TOKEN environment variable'larini qo'shing.": ('⚠️ Сервис статистики не настроен.\n\nДобавьте переменные окружения UPSTASH_REDIS_REST_URL и UPSTASH_REDIS_REST_TOKEN.', "⚠️ The statistics service isn't set up.\n\nAdd the UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables."),
+    '❌ Statistikani olishda xatolik yuz berdi.': ('❌ Не удалось получить статистику.', "❌ Couldn't load the statistics."),
+    '📊 <b>Bot statistikasi</b>\n\n👥 Jami noyob foydalanuvchilar: <b>': ('📊 <b>Статистика бота</b>\n\n👥 Всего уникальных пользователей: <b>', '📊 <b>Bot statistics</b>\n\n👥 Total unique users: <b>'),
+    '</b>\n🟢 Bugun faol: <b>': ('</b>\n🟢 Активны сегодня: <b>', '</b>\n🟢 Active today: <b>'),
+    '</b>\n📅 Oxirgi 7 kunda faol: <b>': ('</b>\n📅 Активны за последние 7 дней: <b>', '</b>\n📅 Active in the last 7 days: <b>'),
+    '</b>\n📨 Jami murojaatlar (xabar/tugma): <b>': ('</b>\n📨 Всего обращений (сообщения/кнопки): <b>', '</b>\n📨 Total interactions (messages/buttons): <b>'),
+    '⚠️ Redis sozlanmagan.': ('⚠️ Redis не настроен.', "⚠️ Redis isn't set up."),
+    "❌ Ro'yxatni olishda xatolik yuz berdi.": ('❌ Не удалось получить список.', "❌ Couldn't load the list."),
+    "📭 Hozircha ro'yxat bo'sh. Foydalanuvchilar faol bo'lgach shu yerda ko'rinadi.": ('📭 Список пока пуст. Пользователи появятся здесь, когда станут активны.', "📭 The list is empty for now. Users will show up here once they're active."),
+    "👥 <b>Foydalanuvchilar</b> (ro'yxatda: ": ('👥 <b>Пользователи</b> (в списке: ', '👥 <b>Users</b> (in the list: '),
+    ', oxirgi ': (', последние ', ', latest '),
+    ' ta faol)\n': (' активных)\n', ' active)\n'),
+    "\n<i>Eslatma: ro'yxat yangilanish kunidan boshlab to'planadi; eski foydalanuvchilar faol bo'lgach qo'shiladi.</i>": ('\n<i>Примечание: список накапливается с момента обновления; прежние пользователи добавятся после первой активности.</i>', "\n<i>Note: the list builds up from the update onward; earlier users are added once they're active.</i>"),
+    "⚠️ Reyting xizmati sozlanmagan.\n\nUPSTASH_REDIS_REST_URL va UPSTASH_REDIS_REST_TOKEN environment variable'larini qo'shing.": ('⚠️ Сервис рейтинга не настроен.\n\nДобавьте переменные окружения UPSTASH_REDIS_REST_URL и UPSTASH_REDIS_REST_TOKEN.', "⚠️ The leaderboard service isn't set up.\n\nAdd the UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables."),
+    '🏆 <b>Viktorina reytingi</b> (TOP 10)': ('🏆 <b>Рейтинг викторины</b> (ТОП 10)', '🏆 <b>Quiz leaderboard</b> (TOP 10)'),
+    '🎓 <b>Sertifikat testi reytingi</b> (TOP 10)': ('🎓 <b>Рейтинг теста с сертификатом</b> (ТОП 10)', '🎓 <b>Certificate test leaderboard</b> (TOP 10)'),
+    '📖 <b>Reading testi reytingi</b> (TOP 10)': ('📖 <b>Рейтинг теста Reading</b> (ТОП 10)', '📖 <b>Reading test leaderboard</b> (TOP 10)'),
+    '🎧 <b>Listening testi reytingi</b> (TOP 10)': ('🎧 <b>Рейтинг теста Listening</b> (ТОП 10)', '🎧 <b>Listening test leaderboard</b> (TOP 10)'),
+    "🎓 Dashboard'ni ochish": ('🎓 Открыть дашборд', '🎓 Open the dashboard'),
+    "🎓 <b>IELTS Dashboard</b>\n\nProfilingiz, Reading, Listening va Grammar materiallarini shu yerdan ko'rishingiz mumkin:": ('🎓 <b>IELTS Dashboard</b>\n\nЗдесь вы найдёте свой профиль и материалы по Reading, Listening и Grammar:', '🎓 <b>IELTS Dashboard</b>\n\nYour profile and the Reading, Listening and Grammar materials are available here:'),
+    "❌ Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.": ('❌ Произошла ошибка. Пожалуйста, попробуйте ещё раз.', '❌ Something went wrong. Please try again.'),
+    "❌ Ovozli xabarni tushunishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.": ('❌ Не удалось обработать голосовое сообщение. Пожалуйста, попробуйте ещё раз.', "❌ Couldn't process your voice message. Please try again."),
+    '⚠️ Ovozingizda nutq aniqlanmadi. Please try speaking again.': ('⚠️ Речь в записи не распознана. Please try speaking again.', '⚠️ No speech was detected in your recording. Please try speaking again.'),
+    '⛔ Bu buyruq faqat bot egasi (admin) uchun.': ('⛔ Эта команда доступна только владельцу бота (админу).', '⛔ This command is for the bot owner (admin) only.'),
+    '🎲 Tasodifiy (aralash)': ('🎲 Случайно (микс)', '🎲 Random (mixed)'),
+    "🧩 <b>Qaysi fandan viktorina o'ynaymiz?</b>\n\nFan tanlang — men ": ('🧩 <b>По какой теме сыграем в викторину?</b>\n\nВыберите тему — я задам ', "🧩 <b>Which subject shall we quiz on?</b>\n\nPick a subject — I'll ask you "),
+    ' ta qiziqarli savol beraman:': (' интересных вопросов:', ' fun questions:'),
+    '🎲 Aralash viktorina': ('🎲 Микс-викторина', '🎲 Mixed quiz'),
+    ' ta savol tayyorlanmoqda...': (' вопросов готовятся...', ' questions are being prepared...'),
+    "❌ Savollarni tayyorlashda xatolik yuz berdi. Iltimos /quiz bilan qayta urinib ko'ring.": ('❌ Не удалось подготовить вопросы. Попробуйте ещё раз: /quiz', "❌ Couldn't prepare the questions. Please try again with /quiz."),
+    '🔄 Yangi jumboq': ('🔄 Новая головоломка', '🔄 New puzzle'),
+    '💡 Maslahat': ('💡 Подсказка', '💡 Hint'),
+    "✅ Javobni ko'rish": ('✅ Показать ответ', '✅ Show the answer'),
+    '🔄 Boshqa jumboq': ('🔄 Другая головоломка', '🔄 Another puzzle'),
+    "❌ Jumboq tayyorlashda xatolik yuz berdi. /teaser bilan qayta urinib ko'ring.": ('❌ Не удалось подготовить головоломку. Попробуйте ещё раз: /teaser', "❌ Couldn't prepare the puzzle. Please try again with /teaser."),
+    "\n\n<i>O'ylab ko'ring, so'ng tugmalardan foydalaning 👇</i>": ('\n\n<i>Подумайте, а затем воспользуйтесь кнопками 👇</i>', '\n\n<i>Give it some thought, then use the buttons 👇</i>'),
+    'Bu jumboq eskirgan. /teaser bilan yangisini oling.': ('Эта головоломка устарела. Получите новую: /teaser.', 'This puzzle has expired. Get a new one with /teaser.'),
+    "Maslahat yo'q": ('Подсказки нет', 'No hint available'),
+    '🧠 <b>Miya jumboqi</b>\n\n': ('🧠 <b>Головоломка</b>\n\n', '🧠 <b>Brain teaser</b>\n\n'),
+    '\n\n✅ <b>Javob:</b> ': ('\n\n✅ <b>Ответ:</b> ', '\n\n✅ <b>Answer:</b> '),
+    "🤷 Ba'zan / bilmayman": ('🤷 Иногда / не знаю', "🤷 Sometimes / I don't know"),
+    "🙅 Yo'q, xato": ('🙅 Нет, ошибка', '🙅 No, wrong'),
+    "🔁 Yana o'ynash": ('🔁 Сыграть ещё', '🔁 Play again'),
+    '⚠️ Kechirasiz, xatolik yuz berdi. Qayta boshlash: /topaman': ('⚠️ Извините, произошла ошибка. Начать заново: /topaman', '⚠️ Sorry, something went wrong. Start over with /topaman'),
+    "🔮 <b>Menimcha, siz o'ylagan narsa:</b>\n\n✨ <b>": ('🔮 <b>Думаю, вы загадали:</b>\n\n✨ <b>', '🔮 <b>I think you were thinking of:</b>\n\n✨ <b>'),
+    '</b>\n\nTopdimmi?': ('</b>\n\nУгадал?', '</b>\n\nAm I right?'),
+    'Bu tirik mavjudotmi?': ('Это живое существо?', 'Is it a living thing?'),
+    '🔮 <b>Savol ': ('🔮 <b>Вопрос ', '🔮 <b>Question '),
+    "🔮 <b>Men topaman!</b>\n\nBiror narsani <b>o'ylang</b> — mashhur inson, hayvon, narsa, ovqat, multfilm qahramoni... Hech qayerga yozmang, faqat xayolingizda tuting 🤫\n\nMen ": ('🔮 <b>Я угадаю!</b>\n\nЗагадайте что-нибудь — известного человека, животное, предмет, блюдо, героя мультфильма... Никому не говорите, держите в уме 🤫\n\nЯ задам до ', "🔮 <b>I'll guess it!</b>\n\nThink of something — a famous person, an animal, an object, a food, a cartoon character... Don't tell anyone, just keep it in your head 🤫\n\nI'll ask up to "),
+    ' tagacha savol berib, topishga harakat qilaman. Siz faqat tugmalarni bosasiz 👇': (' вопросов и постараюсь угадать. Вам нужно только нажимать кнопки 👇', ' questions and try to guess it. You only need to tap the buttons 👇'),
+    "Bu o'yin tugagan. Yangisi: /topaman": ('Эта игра закончена. Новая: /topaman', 'This game is over. Start a new one: /topaman'),
+    "⏳ Bir soniya, o'ylayapman...": ('⏳ Секунду, думаю...', "⏳ One moment, I'm thinking..."),
+    '🎉 <b>Yutdim!</b> Men ': ('🎉 <b>Угадал!</b> Вопросов задано: ', '🎉 <b>I won!</b> It took me '),
+    ' ta savolda <b>': ('. Это — <b>', ' questions to find <b>'),
+    "</b> ni topdim 😎\n\nYana o'ynaymizmi?": ('</b> 😎\n\nСыграем ещё?', '</b> 😎\n\nShall we play again?'),
+    "Sizning o'ylaganingiz ": ('Вы загадали ', 'Were you thinking of '),
+    "🏳️ <b>Yutqazdim!</b> Siz meni chalg'itdingiz 👏\n\nYana bir marta urinib ko'raymi?": ('🏳️ <b>Сдаюсь!</b> Вы меня запутали 👏\n\nПопробуем ещё раз?', "🏳️ <b>I give up!</b> You've outsmarted me 👏\n\nShall I try once more?"),
+    "🤔 Hmm, xato qildim. Yana bir oz o'ylab ko'raman...": ('🤔 Хм, ошибся. Подумаю ещё немного...', '🤔 Hmm, I was wrong. Let me think a bit more...'),
+    'Detektiv': ('Детектив', 'Detective'),
+    'Kosmos': ('Космос', 'Space'),
+    'Fantaziya': ('Фэнтези', 'Fantasy'),
+    'Omon qolish': ('Выживание', 'Survival'),
+    'Qaroqchilar': ('Пираты', 'Pirates'),
+    'Vaqt sayohati': ('Путешествие во времени', 'Time travel'),
+    "❌ Hikoyani davom ettirib bo'lmadi. Qayta urinish uchun /hikoya yuboring.": ('❌ Не удалось продолжить историю. Чтобы начать заново, отправьте /hikoya.', "❌ Couldn't continue the story. Send /hikoya to start again."),
+    "\n\n🎭 <b>Hikoya yakunlandi!</b> Boshqa tanlov — boshqa yakun. Yana o'ynaymizmi? 👇": ('\n\n🎭 <b>История завершена!</b> Другой выбор — другой финал. Сыграем ещё? 👇', '\n\n🎭 <b>The story is over!</b> A different choice means a different ending. Play again? 👇'),
+    '🔁 Yangi hikoya': ('🔁 Новая история', '🔁 New story'),
+    '\n\n<i>Nima qilasiz? 👇</i>': ('\n\n<i>Что будете делать? 👇</i>', '\n\n<i>What will you do? 👇</i>'),
+    '⏳ Avval joriy testni tugating yoki /stop yuboring.': ('⏳ Сначала завершите текущий тест или отправьте /stop.', '⏳ Please finish the current test first, or send /stop.'),
+    "📖 <b>Interaktiv hikoya</b>\n\nMen hikoya boshlayman, siz esa har qadamda yo'lni tanlaysiz — ": ('📖 <b>Интерактивная история</b>\n\nЯ начну историю, а вы на каждом шаге выбираете путь — финал зависит от ваших решений после ', "📖 <b>Interactive story</b>\n\nI'll start a story and you choose the path at every step — the ending depends on your decisions after "),
+    " qadamdan keyin yakun sizning tanlovlaringizga bog'liq bo'ladi 🎲\n\nJanrni tanlang 👇": (' шагов 🎲\n\nВыберите жанр 👇', ' steps 🎲\n\nChoose a genre 👇'),
+    '📖 Janrni tanlang 👇': ('📖 Выберите жанр 👇', '📖 Choose a genre 👇'),
+    'Xatolik': ('Ошибка', 'Error'),
+    'Bu hikoya tugagan. /hikoya bilan yangisini boshlang.': ('Эта история закончена. Начните новую: /hikoya', 'This story is over. Start a new one: /hikoya'),
+    '👉 <b>Siz tanladingiz:</b> ': ('👉 <b>Вы выбрали:</b> ', '👉 <b>You chose:</b> '),
+    "1️⃣ yolg'on": ('1️⃣ ложь', '1️⃣ is the lie'),
+    "2️⃣ yolg'on": ('2️⃣ ложь', '2️⃣ is the lie'),
+    "3️⃣ yolg'on": ('3️⃣ ложь', '3️⃣ is the lie'),
+    "❌ Raund tayyorlanmadi. /yolgon bilan qayta urinib ko'ring.": ('❌ Раунд не подготовлен. Попробуйте ещё раз: /yolgon', "❌ The round couldn't be prepared. Please try again with /yolgon."),
+    '\n🔥 Ketma-ket: <b>': ('\n🔥 Подряд: <b>', '\n🔥 In a row: <b>'),
+    "🕵️ <b>Yolg'onni top!</b>": ('🕵️ <b>Найди ложь!</b>', '🕵️ <b>Spot the lie!</b>'),
+    "\n\nUlardan <b>bittasi yolg'on</b>. Qaysi biri? 👇": ('\n\nИз них <b>одно — ложь</b>. Какое? 👇', '\n\nOne of them is <b>a lie</b>. Which one? 👇'),
+    'Bu raund tugagan. /yolgon bilan yangisini boshlang.': ('Этот раунд закончен. Начните новый: /yolgon', 'This round is over. Start a new one: /yolgon'),
+    '🎯 <b>Topdingiz!</b> 🔥 Ketma-ket: <b>': ('🎯 <b>Угадали!</b> 🔥 Подряд: <b>', '🎯 <b>You got it!</b> 🔥 In a row: <b>'),
+    "😅 <b>Yolg'on tuzog'iga tushdingiz!</b>": ('😅 <b>Попались на ложь!</b>', '😅 <b>You fell for the lie!</b>'),
+    ' (seriya ': (' (серия из ', ' (your streak of '),
+    " da to'xtadi)": (' прервалась)', ' ended)'),
+    'Xato 😅': ('Мимо 😅', 'Missed 😅'),
+    "❌ yolg'on": ('❌ ложь', '❌ lie'),
+    '✅ rost': ('✅ правда', '✅ true'),
+    '\n\n🏆 Eng yaxshi seriya: ': ('\n\n🏆 Лучшая серия: ', '\n\n🏆 Best streak: '),
+    '➡️ Keyingisi': ('➡️ Дальше', '➡️ Next'),
+    "❌ Savol tayyorlanmadi. /nima bilan qayta urinib ko'ring.": ('❌ Вопрос не подготовлен. Попробуйте ещё раз: /nima', "❌ The question couldn't be prepared. Please try again with /nima."),
+    "🔬 <b>Nima bo'ladi?</b>": ('🔬 <b>Что будет?</b>', '🔬 <b>What happens?</b>'),
+    '\n\n<i>Sizningcha-chi? 👇</i>': ('\n\n<i>Как вы думаете? 👇</i>', '\n\n<i>What do you think? 👇</i>'),
+    'Bu savol tugagan. /nima bilan yangisini oling.': ('Этот вопрос закончен. Получите новый: /nima', 'This question is over. Get a new one with /nima'),
+    "🎉 <b>To'g'ri taxmin!</b>": ('🎉 <b>Верный прогноз!</b>', '🎉 <b>Great guess!</b>'),
+    "🤯 <b>Aksincha bo'ldi!</b>": ('🤯 <b>Вышло наоборот!</b>', '🤯 <b>It turned out differently!</b>'),
+    'Kutilmagan 🤯': ('Неожиданно 🤯', 'Unexpected 🤯'),
+    '\n\n🔎 <b>Ilm nima deydi:</b> ': ('\n\n🔎 <b>Что говорит наука:</b> ', '\n\n🔎 <b>What science says:</b> '),
+    '\n\n🎯 Natijangiz: <b>': ('\n\n🎯 Ваш результат: <b>', '\n\n🎯 Your score: <b>'),
+    '➡️ Yana bitta': ('➡️ Ещё один', '➡️ One more'),
+    "A1–A2 (boshlang'ich)": ('A1–A2 (начальный)', 'A1–A2 (beginner)'),
+    "B1–B2 (o'rta)": ('B1–B2 (средний)', 'B1–B2 (intermediate)'),
+    'C1 (yuqori)': ('C1 (продвинутый)', 'C1 (advanced)'),
+    'Plurals va this/that': ('Plurals и this/that', 'Plurals & this/that'),
+    '🎲 Tasodifiy mavzu': ('🎲 Случайная тема', '🎲 Random topic'),
+    '⬅️ Darajalar': ('⬅️ Уровни', '⬅️ Levels'),
+    '📝 <b>Mashq ': ('📝 <b>Упражнение ', '📝 <b>Exercise '),
+    '📝 <b>Ingliz tili grammatikasi</b>\n\nDarajangizni tanlang — qisqa dars va 5 ta mashq tayyorlayman 👇': ('📝 <b>Грамматика английского</b>\n\nВыберите уровень — я подготовлю короткий урок и 5 упражнений 👇', "📝 <b>English grammar</b>\n\nChoose your level — I'll prepare a short lesson and 5 exercises 👇"),
+    '📝 <b>Grammatika</b>\n\nDarajani tanlang 👇': ('📝 <b>Грамматика</b>\n\nВыберите уровень 👇', '📝 <b>Grammar</b>\n\nChoose a level 👇'),
+    '</b>\n\nMavzuni tanlang 👇': ('</b>\n\nВыберите тему 👇', '</b>\n\nChoose a topic 👇'),
+    '⏳ Dars tayyorlanmoqda...': ('⏳ Готовлю урок...', '⏳ Preparing the lesson...'),
+    "❌ Dars tayyorlanmadi. /grammar bilan qayta urinib ko'ring.": ('❌ Не удалось подготовить урок. Попробуйте ещё раз: /grammar', "❌ Couldn't prepare the lesson. Please try again with /grammar."),
+    '\n\n✨ <b>Misollar:</b>\n': ('\n\n✨ <b>Примеры:</b>\n', '\n\n✨ <b>Examples:</b>\n'),
+    "\n\n⚠️ <b>Ko'p uchraydigan xato:</b> ": ('\n\n⚠️ <b>Частая ошибка:</b> ', '\n\n⚠️ <b>A common mistake:</b> '),
+    '📝 Mashqni boshlash': ('📝 Начать упражнения', '📝 Start the exercises'),
+    'Bu sessiya tugagan. /grammar bilan qayta boshlang.': ('Эта сессия закончена. Начните заново: /grammar', 'This session is over. Start again with /grammar'),
+    "❌ Noto'g'ri": ('❌ Неверно', '❌ Incorrect'),
+    "🏆 Ajoyib! Bu mavzuni yaxshi o'zlashtirdingiz.": ('🏆 Отлично! Вы хорошо усвоили эту тему.', "🏆 Excellent! You've got a good grip on this topic."),
+    "👍 Yomon emas! Yana bir bor mashq qilsangiz, mukammal bo'ladi.": ('👍 Неплохо! Ещё немного практики — и будет идеально.', "👍 Not bad! A little more practice and it'll be perfect."),
+    "📚 Dars matnini qayta o'qib, yana urinib ko'ring — albatta chiqadi!": ('📚 Перечитайте урок и попробуйте ещё раз — обязательно получится!', "📚 Re-read the lesson and try again — you'll get it!"),
+    '</b> — natija\n\n🎯 <b>': ('</b> — результат\n\n🎯 <b>', '</b> — results\n\n🎯 <b>'),
+    '🔁 Shu darajadan boshqa mavzu': ('🔁 Другая тема этого уровня', '🔁 Another topic at this level'),
+    '✍️ <b>IELTS WRITING — Task 2</b>\n\n📋 <b>Topshiriq:</b>\n<i>': ('✍️ <b>IELTS WRITING — Task 2</b>\n\n📋 <b>Задание:</b>\n<i>', '✍️ <b>IELTS WRITING — Task 2</b>\n\n📋 <b>Task:</b>\n<i>'),
+    "</i>\n\n⏱ Vaqt: 40 daqiqa (mock uchun cheklov yo'q)\n📝 Kamida <b>": ('</i>\n\n⏱ Время: 40 минут (в тренировке без ограничения)\n📝 Не менее <b>', '</i>\n\n⏱ Time: 40 minutes (no limit in this practice)\n📝 At least <b>'),
+    " so'z</b> (rasmiy imtihonda 250) — inshoni bitta xabar qilib yuboring.\n📌 Reja: kirish → 2 ta asosiy paragraf → xulosa.\n\n<i>Bekor qilish: /stop</i>": (' слов</b> (на экзамене — 250). Отправьте эссе одним сообщением.\n📌 План: введение → 2 основных абзаца → вывод.\n\n<i>Отмена: /stop</i>', ' words</b> (250 in the real exam). Send your essay as a single message.\n📌 Plan: introduction → 2 body paragraphs → conclusion.\n\n<i>Cancel: /stop</i>'),
+    '🔄 Boshqa mavzu': ('🔄 Другая тема', '🔄 Another topic'),
+    '📝 <b>IELTS WRITING — TAHLIL</b>\n': ('📝 <b>IELTS WRITING — РАЗБОР</b>\n', '📝 <b>IELTS WRITING — FEEDBACK</b>\n'),
+    '\n💪 <b>Kuchli tomonlar:</b>\n': ('\n💪 <b>Сильные стороны:</b>\n', '\n💪 <b>Strengths:</b>\n'),
+    '\n🔧 <b>Xatolar va tuzatishlar:</b>': ('\n🔧 <b>Ошибки и исправления:</b>', '\n🔧 <b>Mistakes and corrections:</b>'),
+    "\n📚 <b>Boy lug'at:</b>\n": ('\n📚 <b>Расширьте словарь:</b>\n', '\n📚 <b>Vocabulary boosters:</b>\n'),
+    '\n✨ <b>Yaxshilangan paragraf:</b>\n<i>': ('\n✨ <b>Улучшенный абзац:</b>\n<i>', '\n✨ <b>Improved paragraph:</b>\n<i>'),
+    '\n🚀 <b>Keyingi qadamlar:</b>\n': ('\n🚀 <b>Следующие шаги:</b>\n', '\n🚀 <b>Next steps:</b>\n'),
+    '🎁 <i>Siz uchun bepul.</i>\n\n': ('🎁 <i>Для вас бесплатно.</i>\n\n', '🎁 <i>Free for you.</i>\n\n'),
+    "✅ <i>To'lov qabul qilingan.</i>\n\n": ('✅ <i>Оплата получена.</i>\n\n', '✅ <i>Payment received.</i>\n\n'),
+    "💎 <b>IELTS Writing tahlili (Premium)</b>\n\nXuddi mock testdagidek: men IELTS <b>Writing Task 2</b> topshirig'ini beraman, siz insho yozasiz — men esa IELTS mezonlari bo'yicha tekshiraman:\n🏆 band ballni (4 ta mezon bo'yicha)\n🔧 xatolar va ularning tuzatilishini\n📚 boy lug'at takliflarini\n✨ yaxshilangan paragrafni beraman.\n\nNarxi: <b>": ('💎 <b>Разбор IELTS Writing (Premium)</b>\n\nКак на пробном экзамене: я даю задание IELTS <b>Writing Task 2</b>, вы пишете эссе — а я проверяю его по критериям IELTS:\n🏆 общий балл (band) по 4 критериям\n🔧 ошибки и их исправления\n📚 советы по расширению словаря\n✨ улучшенный абзац.\n\nСтоимость: <b>', '💎 <b>IELTS Writing review (Premium)</b>\n\nJust like a mock exam: I give you an IELTS <b>Writing Task 2</b>, you write an essay — and I assess it against the IELTS criteria:\n🏆 band score across 4 criteria\n🔧 mistakes and their corrections\n📚 vocabulary suggestions\n✨ an improved paragraph.\n\nPrice: <b>'),
+    ' ⭐ Telegram Stars</b>': (' ⭐ Telegram Stars</b>', None),
+    'IELTS Writing tahlili': ('Разбор IELTS Writing', 'IELTS Writing review'),
+    'Inshongiz uchun band ball, xatolar tahlili va yaxshilangan variant.': ('Балл band, разбор ошибок и улучшенный вариант вашего эссе.', 'A band score, a mistake analysis and an improved version of your essay.'),
+    "❌ To'lov oynasini ochib bo'lmadi. Birozdan so'ng qayta urinib ko'ring.": ('❌ Не удалось открыть окно оплаты. Попробуйте чуть позже.', "❌ Couldn't open the payment window. Please try again a little later."),
+    "To'lov ma'lumotlari mos kelmadi. /writing orqali qayta urinib ko'ring.": ('Данные платежа не совпали. Попробуйте ещё раз через /writing.', "The payment details didn't match. Please try again via /writing."),
+    "✅ <b>To'lov qabul qilindi, rahmat!</b> ⭐\n\n": ('✅ <b>Оплата получена, спасибо!</b> ⭐\n\n', '✅ <b>Payment received, thank you!</b> ⭐\n\n'),
+    'Bu sessiya tugagan. /writing bilan qayta boshlang.': ('Эта сессия закончена. Начните заново: /writing', 'This session is over. Start again with /writing'),
+    '✍️ Insho juda qisqa (': ('✍️ Эссе слишком короткое (', '✍️ Your essay is too short ('),
+    " so'z). Kamida ": (' слов). Нужно не менее ', ' words). You need at least '),
+    " so'z yozing va qayta yuboring.": (' слов. Допишите и отправьте снова.', ' words. Add more and send it again.'),
+    '✂️ Insho juda uzun. Iltimos, ': ('✂️ Эссе слишком длинное. Пожалуйста, не более ', '✂️ Your essay is too long. Please keep it under '),
+    ' belgidan oshmasin.': (' символов.', ' characters.'),
+    '🔎 Inshoyingiz tahlil qilinmoqda, 20–40 soniya kuting...': ('🔎 Ваше эссе анализируется, подождите 20–40 секунд...', '🔎 Analysing your essay — please wait 20–40 seconds...'),
+    "❌ Tahlilda xatolik yuz berdi. To'lovingiz saqlandi — inshongizni qayta yuboring.": ('❌ При анализе произошла ошибка. Оплата сохранена — отправьте эссе ещё раз.', '❌ Something went wrong during the analysis. Your payment is safe — please send your essay again.'),
+    "</i>\n📏 So'zlar soni: <b>": ('</i>\n📏 Слов: <b>', '</i>\n📏 Word count: <b>'),
+    '🔁 Yana tahlil qildirish uchun /writing yuboring.': ('🔁 Чтобы разобрать ещё одно эссе, отправьте /writing.', '🔁 To get another essay reviewed, send /writing.'),
+    '📅 <b>Bugungi fan: ': ('📅 <b>Тема дня: ', "📅 <b>Today's subject: "),
+    '💡 <b>Bilasizmi?</b>\n': ('💡 <b>А вы знали?</b>\n', '💡 <b>Did you know?</b>\n'),
+    '🇬🇧 <b>Kunlik ingliz tili: ': ('🇬🇧 <b>Английский на каждый день: ', '🇬🇧 <b>Daily English: '),
+    '🎯 Kunlik testni boshlash (': ('🎯 Начать тест дня (', "🎯 Start today's quiz ("),
+    '⏳ Bugungi kontent tayyorlanmoqda...': ('⏳ Готовлю сегодняшний материал...', "⏳ Preparing today's content..."),
+    "❌ Bugungi kontentni tayyorlab bo'lmadi. Birozdan keyin /kunlik bilan qayta urinib ko'ring.": ('❌ Не удалось подготовить сегодняшний материал. Попробуйте чуть позже: /kunlik', "❌ Couldn't prepare today's content. Please try again shortly with /kunlik."),
+    '⚠️ Bugungi test hozir mavjud emas. Boshqa viktorina uchun /quiz yuboring.': ('⚠️ Сегодняшний тест сейчас недоступен. Другую викторину можно запустить командой /quiz.', "⚠️ Today's quiz isn't available right now. Try another quiz with /quiz."),
+    '⚠️ Bu xizmat hozir sozlanmagan.': ('⚠️ Этот сервис сейчас не настроен.', "⚠️ This service isn't set up right now."),
+    '🔔 Kunlik xabarlar <b>yoqildi</b>. Har kuni yangi fan va ingliz tili maslahatini olasiz!': ('🔔 Ежедневные сообщения <b>включены</b>. Каждый день вы будете получать новую тему и совет по английскому!', "🔔 Daily messages are <b>on</b>. Every day you'll get a new subject and an English tip!"),
+    "🔕 Kunlik xabarlar <b>o'chirildi</b>. Qayta yoqish uchun yana /xabarnoma yuboring.\n\nKunlik kontentni /kunlik orqali o'zingiz ham ochishingiz mumkin.": ('🔕 Ежедневные сообщения <b>отключены</b>. Чтобы включить снова, отправьте /xabarnoma.\n\nЕжедневный материал можно открыть и самому командой /kunlik.', '🔕 Daily messages are <b>off</b>. To turn them back on, send /xabarnoma.\n\nYou can also open the daily content yourself with /kunlik.'),
+    "❌ Xatolik yuz berdi. Keyinroq qayta urinib ko'ring.": ('❌ Произошла ошибка. Попробуйте позже.', '❌ Something went wrong. Please try again later.'),
+    "\n\n<i>Kunlik xabarni o'chirish: /xabarnoma</i>": ('\n\n<i>Отключить ежедневные сообщения: /xabarnoma</i>', '\n\n<i>Turn off daily messages: /xabarnoma</i>'),
+    '⏳ Sertifikat testi uchun ': ('⏳ Готовлю вопросы для сертификатного теста: ', '⏳ Preparing questions for the certificate test: '),
+    ' ta savol tayyorlanmoqda... (bu biroz vaqt olishi mumkin, iltimos kuting)': (' шт. (это может занять немного времени, подождите)', ' (this may take a little while, please wait)'),
+    "❌ Savollarni tayyorlashda xatolik yuz berdi. Iltimos /sertifikat bilan qayta urinib ko'ring.": ('❌ Не удалось подготовить вопросы. Попробуйте ещё раз: /sertifikat', "❌ Couldn't prepare the questions. Please try again with /sertifikat."),
+    '🎓 <b>Sertifikat testi boshlandi!</b>\n\n📝 Jami ': ('🎓 <b>Сертификатный тест начался!</b>\n\n📝 Всего вопросов: ', '🎓 <b>The certificate test has started!</b>\n\n📝 Total questions: '),
+    ' ta savol. Agar natijangiz <b>': ('. Если ваш результат будет <b>', '. If your score is <b>'),
+    "%</b> yoki undan yuqori bo'lsa, test yakunida shaxsiy sertifikat rasmini olasiz 🏅\n\nOmad! 🍀": ('%</b> или выше, в конце вы получите именной сертификат 🏅\n\nУдачи! 🍀', "%</b> or higher, you'll receive a personal certificate at the end 🏅\n\nGood luck! 🍀"),
+    '⏳ Reading testi tayyorlanmoqda... (bu biroz vaqt olishi mumkin)': ('⏳ Готовлю тест Reading... (это может занять немного времени)', '⏳ Preparing the Reading test... (this may take a little while)'),
+    "❌ Testni tayyorlashda xatolik yuz berdi. Iltimos /reading_test bilan qayta urinib ko'ring.": ('❌ Не удалось подготовить тест. Попробуйте ещё раз: /reading_test', "❌ Couldn't prepare the test. Please try again with /reading_test."),
+    '📝 Endi quyidagi ': ('📝 Теперь ответьте на ', '📝 Now answer the following '),
+    ' ta savolga javob bering 👇': (' вопросов 👇', ' questions 👇'),
+    '⏳ Listening testi tayyorlanmoqda... (bu biroz vaqt olishi mumkin)': ('⏳ Готовлю тест Listening... (это может занять немного времени)', '⏳ Preparing the Listening test... (this may take a little while)'),
+    "❌ Testni tayyorlashda xatolik yuz berdi. Iltimos /listening_test bilan qayta urinib ko'ring.": ('❌ Не удалось подготовить тест. Попробуйте ещё раз: /listening_test', "❌ Couldn't prepare the test. Please try again with /listening_test."),
+    '🎧 <b>Listening — tinglang va savollarga javob bering:</b>': ('🎧 <b>Listening — послушайте и ответьте на вопросы:</b>', '🎧 <b>Listening — listen and answer the questions:</b>'),
+    "⚠️ Audio yaratib bo'lmadi, lekin matn asosida davom etamiz:\n\n": ('⚠️ Не удалось создать аудио, продолжим по тексту:\n\n', "⚠️ Couldn't create the audio, so we'll continue with the text:\n\n"),
+    "⏱ Bu sessiya tugagan yoki muddati o'tgan. Yangi test uchun /quiz yuboring.": ('⏱ Эта сессия закончилась или устарела. Для нового теста отправьте /quiz.', '⏱ This session has ended or expired. Send /quiz to start a new test.'),
+    'Xatolik yuz berdi.': ('Произошла ошибка.', 'Something went wrong.'),
+    "✅ <b>To'g'ri javob!</b>": ('✅ <b>Правильно!</b>', '✅ <b>Correct!</b>'),
+    "❌ <b>Noto'g'ri.</b> To'g'ri javob: <b>": ('❌ <b>Неверно.</b> Правильный ответ: <b>', '❌ <b>Incorrect.</b> The correct answer: <b>'),
+    ' <b>Savol ': (' <b>Вопрос ', ' <b>Question '),
+    "Noto'g'ri 😔": ('Неверно 😔', 'Incorrect 😔'),
+    'Foydalanuvchi': ('Пользователь', 'User'),
+    '🏁 <b>Sertifikat testi yakunlandi!</b>\n\n🎯 Natijangiz: <b>': ('🏁 <b>Сертификатный тест завершён!</b>\n\n🎯 Ваш результат: <b>', '🏁 <b>Certificate test complete!</b>\n\n🎯 Your score: <b>'),
+    '%)\n\n🎉 Tabriklaymiz! Sertifikatingiz tayyorlanmoqda...': ('%)\n\n🎉 Поздравляем! Ваш сертификат готовится...', '%)\n\n🎉 Congratulations! Your certificate is being prepared...'),
+    '🎓 <b>Tabriklaymiz, ': ('🎓 <b>Поздравляем, ', '🎓 <b>Congratulations, '),
+    '!</b>\nSiz ': ('!</b>\nИз ', '!</b>\nOut of '),
+    ' savoldan ': (' вопросов вы ответили правильно на ', ' questions you answered '),
+    " tasiga to'g'ri javob berib, (": (' и получили сертификат (', ' correctly and earned a certificate ('),
+    "%) sertifikatga sazovor bo'ldingiz!\n\n🏆 Reytingni /reyting orqali ko'rishingiz mumkin.": ('%)!\n\n🏆 Рейтинг можно посмотреть командой /reyting.', '%)!\n\n🏆 You can see the leaderboard with /reyting.'),
+    '⚠️ Sertifikat rasmini yaratishda xatolik yuz berdi, lekin natijangiz hisobga olindi.': ('⚠️ Не удалось создать изображение сертификата, но ваш результат засчитан.', "⚠️ Couldn't create the certificate image, but your result has been recorded."),
+    '%)\n\n😔 Afsuski, sertifikat olish uchun kamida ': ('%)\n\n😔 К сожалению, для получения сертификата нужно набрать не менее ', '%)\n\n😔 Unfortunately, you need at least '),
+    "% kerak. Ko'proq mashq qilib, yana urinib ko'ring!\n\n🔁 Qayta urinish uchun /sertifikat yuboring.": ('%. Потренируйтесь ещё и попробуйте снова!\n\n🔁 Чтобы попробовать снова, отправьте /sertifikat.', '% to earn a certificate. Practise some more and try again!\n\n🔁 To retry, send /sertifikat.'),
+    '🏆 Ajoyib natija!': ('🏆 Отличный результат!', '🏆 Excellent result!'),
+    '👍 Yomon emas, yana mashq qiling!': ('👍 Неплохо, продолжайте тренироваться!', '👍 Not bad — keep practising!'),
+    "📚 Ko'proq mashq qilish kerak.": ('📚 Нужно больше практики.', '📚 More practice is needed.'),
+    ' testi yakunlandi!</b>\n\n🎯 Natijangiz: <b>': (' — тест завершён!</b>\n\n🎯 Ваш результат: <b>', ' test complete!</b>\n\n🎯 Your score: <b>'),
+    '\n\n🔁 Yangi test uchun ': ('\n\n🔁 Для нового теста — ', '\n\n🔁 For a new test, send '),
+    ", reytingni ko'rish uchun /reyting yuboring.": (', чтобы посмотреть рейтинг — /reyting.', ' — to see the leaderboard, send /reyting.'),
+    "🏆 Zo'r! Bugungi fanni yaxshi bilar ekansiz.": ('🏆 Отлично! Вы хорошо знаете сегодняшнюю тему.', "🏆 Great! You know today's subject well."),
+    '👍 Yaxshi, ertaga yangi fan sizni kutadi!': ('👍 Хорошо, завтра вас ждёт новая тема!', '👍 Good — a new subject awaits you tomorrow!'),
+    "📚 Hechqisi yo'q — yangi narsa o'rganish ham yutuq!": ('📚 Ничего страшного — узнать новое тоже достижение!', '📚 No worries — learning something new is an achievement too!'),
+    '🏁 <b>Kunlik test yakunlandi!</b>\n\n🎯 Natijangiz: <b>': ('🏁 <b>Тест дня завершён!</b>\n\n🎯 Ваш результат: <b>', '🏁 <b>Daily quiz complete!</b>\n\n🎯 Your score: <b>'),
+    "\n\n🧩 Yana o'ynash uchun /quiz, jumboq uchun /teaser yuboring.": ('\n\n🧩 Чтобы сыграть ещё — /quiz, за головоломкой — /teaser.', '\n\n🧩 To play more, send /quiz — for a puzzle, send /teaser.'),
+    '🏆 Ajoyib natija! Bilimingiz juda yaxshi.': ('🏆 Отличный результат! У вас очень хорошие знания.', '🏆 Excellent result! Your knowledge is really solid.'),
+    "👍 Yomon emas! Yana mashq qilsangiz yanada yaxshi bo'ladi.": ('👍 Неплохо! С небольшой практикой будет ещё лучше.', "👍 Not bad! A bit more practice and you'll do even better."),
+    "📚 Ko'proq o'rganishga arziydi, lekin harakat qildingiz!": ('📚 Стоит узнать больше, но вы старались!', "📚 There's more to learn, but you gave it a good try!"),
+    '🏁 <b>Viktorina yakunlandi!</b>\n\n🎯 Natijangiz: <b>': ('🏁 <b>Викторина завершена!</b>\n\n🎯 Ваш результат: <b>', '🏁 <b>Quiz complete!</b>\n\n🎯 Your score: <b>'),
+    "\n\n🔁 Yana o'ynash uchun /quiz, sertifikat testi uchun /sertifikat, reytingni ko'rish uchun /reyting yuboring.": ('\n\n🔁 Чтобы сыграть ещё — /quiz, тест с сертификатом — /sertifikat, рейтинг — /reyting.', '\n\n🔁 To play again send /quiz, for the certificate test /sertifikat, for the leaderboard /reyting.'),
+    '⏳ IELTS Speaking testi tayyorlanmoqda, biroz kuting...': ('⏳ Готовлю тест IELTS Speaking, немного подождите...', '⏳ Preparing your IELTS Speaking test, please wait a moment...'),
+    "❌ Savollarni generatsiya qilishda xatolik yuz berdi. Iltimos /test bilan qayta urinib ko'ring.": ('❌ Не удалось сгенерировать вопросы. Попробуйте ещё раз: /test', "❌ Couldn't generate the questions. Please try again with /test."),
+    '✅ <b>Test tayyor!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview\n🎙 Har bir savolga ovozli xabar bilan javob bering.': ('✅ <b>Тест готов!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview\n🎙 Отвечайте на каждый вопрос голосовым сообщением.', '✅ <b>Your test is ready!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview\n🎙 Answer each question with a voice message.'),
+    '🗣 <b>Savol 1/': ('🗣 <b>Вопрос 1/', '🗣 <b>Question 1/'),
+    '❌ Ovozli xabarni yuklab olishda xatolik. Iltimos qayta yuboring.': ('❌ Не удалось загрузить голосовое сообщение. Отправьте ещё раз.', "❌ Couldn't download your voice message. Please send it again."),
+    '❌ Ovozni matnga aylantirishda xatolik. Iltimos qayta yuboring.': ('❌ Не удалось преобразовать голос в текст. Отправьте ещё раз.', "❌ Couldn't convert your speech to text. Please send it again."),
+    '⚠️ Ovozingizda nutq aniqlanmadi. Iltimos, aniqroq gapirib qayta yuboring.': ('⚠️ В записи не распознана речь. Скажите чётче и отправьте снова.', '⚠️ No speech was detected. Please speak more clearly and send it again.'),
+    "Baholab bo'lmadi (texnik xatolik).": ('Не удалось оценить (техническая ошибка).', "Couldn't be assessed (technical error)."),
+    '📝 Javob qabul qilindi.': ('📝 Ответ принят.', '📝 Answer received.'),
+    '🗣 <b>Savol ': ('🗣 <b>Вопрос ', '🗣 <b>Question '),
+    "✅ <b>Part 1 tugadi!</b>\n\n🎬 <b>PART 2</b> — Cue Card\n⏱ O'zingizni tayyorlang va so'ng 1-2 daqiqa gapirib, ovozli xabar sifatida yuboring.": ('✅ <b>Part 1 завершена!</b>\n\n🎬 <b>PART 2</b> — Cue Card\n⏱ Подготовьтесь, затем говорите 1–2 минуты и отправьте голосовое сообщение.', '✅ <b>Part 1 complete!</b>\n\n🎬 <b>PART 2</b> — Cue Card\n⏱ Take a moment to prepare, then speak for 1–2 minutes and send a voice message.'),
+    '🎴 <b>Cue Card:</b>\n': ('🎴 <b>Cue Card:</b>\n', None),
+    '✅ <b>Part 2 tugadi!</b>\n\n💭 <b>PART 3</b> — Discussion': ('✅ <b>Part 2 завершена!</b>\n\n💭 <b>PART 3</b> — Discussion', '✅ <b>Part 2 complete!</b>\n\n💭 <b>PART 3</b> — Discussion'),
+    '✅ <b>Part 3 tugadi!</b>\n\n📊 Yakuniy natija tayyorlanmoqda, biroz kuting...': ('✅ <b>Part 3 завершена!</b>\n\n📊 Готовлю итоговый результат, подождите...', '✅ <b>Part 3 complete!</b>\n\n📊 Preparing your final result, please wait...'),
+    '❌ Yakuniy hisobotni tayyorlashda xatolik yuz berdi.': ('❌ Не удалось подготовить итоговый отчёт.', "❌ Couldn't prepare the final report."),
+    '🏁 <b>IELTS SPEAKING — YAKUNIY NATIJA</b>\n\n🗣 Fluency & Coherence: <b>': ('🏁 <b>IELTS SPEAKING — ИТОГОВЫЙ РЕЗУЛЬТАТ</b>\n\n🗣 Fluency & Coherence: <b>', '🏁 <b>IELTS SPEAKING — FINAL RESULT</b>\n\n🗣 Fluency & Coherence: <b>'),
+    '</b>\n\n💬 <b>Examiner fikri:</b>\n': ('</b>\n\n💬 <b>Мнение экзаменатора:</b>\n', "</b>\n\n💬 <b>Examiner's feedback:</b>\n"),
+    "🔁 Yangi test uchun /test buyrug'ini yuboring.": ('🔁 Для нового теста отправьте команду /test.', '🔁 Send /test to start a new test.'),
+    '🎙 Iltimos, javobingizni faqat <b>ovozli xabar (voice)</b> shaklida yuboring.': ('🎙 Пожалуйста, отправьте ответ именно <b>голосовым сообщением (voice)</b>.', '🎙 Please send your answer as a <b>voice message</b>.'),
+    '❓ Bunday buyruqni tanimadim. Lekin menga oddiygina yozsangiz — suhbatlashishga tayyorman!': ('❓ Такую команду я не знаю. Но если просто напишете мне — с радостью пообщаюсь!', "❓ I don't recognise that command. But if you simply write to me, I'm happy to chat!"),
+    "❌ Javob berishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.": ('❌ Не удалось ответить. Пожалуйста, попробуйте ещё раз.', "❌ Couldn't reply. Please try again."),
+    '🎙 <i>Siz aytdingiz:</i> ': ('🎙 <i>Вы сказали:</i> ', None),
+    "ℹ️ Menga oddiy matn yoki ovozli xabar yuborishingiz mumkin — suhbatlashamiz. IELTS testi uchun /test, to'xtatish uchun /stop buyrug'ini yuboring.": ('ℹ️ Можете прислать мне обычный текст или голосовое сообщение — поболтаем. Для теста IELTS — /test, чтобы остановить — /stop.', "ℹ️ You can send me plain text or a voice message — let's chat. For an IELTS test use /test, to stop use /stop."),
+    'Asosiy menyu (Ilm / Ingliz tili)': ('Главное меню (Наука / Английский)', 'Main menu (Science / English)'),
+    'Boshlash va barcha imkoniyatlar': ('Начать и все возможности', 'Start and all features'),
+    'Istalgan fandan viktorina': ('Викторина по любой науке', 'A quiz on any subject'),
+    'Miya jumboqlari va topishmoqlar': ('Головоломки и загадки', 'Brain teasers and riddles'),
+    "Men o'ylagan narsani top (o'yin)": ('Я угадаю, что вы загадали', "I'll guess what you're thinking of"),
+    "Interaktiv hikoya — yo'lni o'zingiz tanlang": ('Интерактивная история — выбирайте путь сами', 'Interactive story — choose your own path'),
+    "3 ta gapdan yolg'onini toping": ('Найдите ложь среди 3 фактов', 'Spot the lie among 3 statements'),
+    "Nima bo'ladi? Fan jumboqlari": ('Что будет? Научные загадки', 'What happens? Science riddles'),
+    'Bugungi fan, fakt va ingliz tili maslahati': ('Тема дня, факт и совет по английскому', "Today's subject, fact and English tip"),
+    'IELTS Writing tahlili (': ('Разбор IELTS Writing (', 'IELTS Writing review ('),
+    'Ingliz grammatikasi: dars va mashqlar': ('Грамматика английского: уроки и упражнения', 'English grammar: lessons and exercises'),
+    'Ingliz tilida suhbat (xatolarni tuzatadi)': ('Разговор на английском (исправляю ошибки)', 'Chat in English (I correct your mistakes)'),
+    '25 savolli sertifikat testi': ('Тест из 25 вопросов с сертификатом', '25-question certificate test'),
+    'TOP 10 reyting jadvallari': ('ТОП 10: таблицы лидеров', 'TOP 10 leaderboards'),
+    'IELTS Speaking mock testi': ('Пробный тест IELTS Speaking', 'IELTS Speaking mock test'),
+    'IELTS Reading testi': ('Тест IELTS Reading', 'IELTS Reading test'),
+    'IELTS Listening testi': ('Тест IELTS Listening', 'IELTS Listening test'),
+    "Profil va o'quv materiallari": ('Профиль и учебные материалы', 'Profile and study materials'),
+    "Kunlik xabarni yoqish/o'chirish": ('Включить/выключить ежедневные сообщения', 'Turn daily messages on/off'),
+    "Foydalanuvchilar ro'yxati (faqat egasi)": ('Список пользователей (только владелец)', 'User list (owner only)'),
+    'Bot statistikasi': ('Статистика бота', 'Bot statistics'),
+    "Joriy jarayonni to'xtatish": ('Остановить текущий процесс', 'Stop the current process'),
+    '✅ Ha': ('✅ Да', '✅ Yes'),
+    "❌ Yo'q": ('❌ Нет', '❌ No'),
+    "🎯 Ha, to'g'ri!": ('🎯 Да, верно!', "🎯 Yes, that's right!"),
+    "✅ <b>To'g'ri!</b>": ('✅ <b>Верно!</b>', '✅ <b>Correct!</b>'),
+    "✅ To'g'ri!": ('✅ Верно!', '✅ Correct!'),
+    "🎉 To'g'ri!": ('🎉 Верно!', '🎉 Correct!'),
+    "To'g'ri! 🎉": ('Верно! 🎉', 'Correct! 🎉'),
+    ' savol)': (' вопросов)', ' questions)'),
+    "  — bo'sh —": ('  — пусто —', '  — empty —'),
+    'Writing tahlili': ('Разбор Writing', 'Writing review'),
+}
+
+_frag_rx: dict = {}
+
+
+def _compile_fragments(lang: str):
+    idx = 0 if lang == "ru" else 1
+    items = []
+    for key, vals in I18N_FRAGMENTS.items():
+        val = vals[idx]
+        if val is not None:
+            items.append((key, val))
+    items.sort(key=lambda kv: len(kv[0]), reverse=True)
+    parts, mapping = [], {}
+    for key, val in items:
+        pat = re.escape(key)
+        if key[0].isalnum() or key[0] == "_":
+            pat = r"(?<!\w)" + pat
+        if key[-1].isalnum() or key[-1] == "_":
+            pat = pat + r"(?!\w)"
+        parts.append(pat)
+        mapping[key] = val
+    return re.compile("|".join(parts)), mapping
+
+
+def translate_text(text: str, lang: str) -> str:
+    """O'zbekcha statik bo'laklarni lang (ru/en) tiliga almashtiradi."""
+    if not text or lang not in ("ru", "en"):
+        return text
+    if lang not in _frag_rx:
+        _frag_rx[lang] = _compile_fragments(lang)
+    rx, mapping = _frag_rx[lang]
+    return rx.sub(lambda m: mapping.get(m.group(0), m.group(0)), text)
+
+
+def _translate_markup(markup, lang: str):
+    """InlineKeyboardMarkup ichidagi tugma yozuvlarini o'giradi."""
+    if not isinstance(markup, InlineKeyboardMarkup):
+        return markup
+    new_rows = []
+    changed = False
+    for row in markup.inline_keyboard:
+        new_row = []
+        for btn in row:
+            t = translate_text(btn.text, lang)
+            if t != btn.text:
+                btn = btn.model_copy(update={"text": t})
+                changed = True
+            new_row.append(btn)
+        new_rows.append(new_row)
+    return markup.model_copy(update={"inline_keyboard": new_rows}) if changed else markup
+
+
+async def _outgoing_lang(method) -> str:
+    chat_id = getattr(method, "chat_id", None)
+    if isinstance(chat_id, int) and chat_id > 0:
+        return (await get_lang(chat_id)) or DEFAULT_LANG
+    return current_lang.get()
+
+
+class TranslateOutgoingMiddleware(BaseRequestMiddleware):
+    """Telegram'ga ketayotgan har bir so'rovdagi matn, sarlavha va tugmalarni
+    foydalanuvchi tiliga o'giradi (o'zbek tili uchun hech narsa o'zgarmaydi)."""
+
+    async def __call__(self, make_request, bot, method):
+        try:
+            lang = await _outgoing_lang(method)
+            if lang in ("ru", "en"):
+                for field in ("text", "caption", "title", "description", "error_message"):
+                    val = getattr(method, field, None)
+                    if isinstance(val, str):
+                        setattr(method, field, translate_text(val, lang))
+                markup = getattr(method, "reply_markup", None)
+                if markup is not None:
+                    setattr(method, "reply_markup", _translate_markup(markup, lang))
+                prices = getattr(method, "prices", None)
+                if prices:
+                    setattr(method, "prices", [p.model_copy(update={"label": translate_text(p.label, lang)}) for p in prices])
+        except Exception as e:
+            logger.warning("Tarjima qatlamida xatolik: %s", e)
+        return await make_request(bot, method)
+
+
+bot.session.middleware(TranslateOutgoingMiddleware())
 
 
 # --- Majburiy obuna tekshiruvi -------------------------------------------
@@ -1062,6 +1455,37 @@ def _load_font(path: str, size: int):
         return ImageFont.load_default()
 
 
+CERT_TEXTS = {
+    "uz": {
+        "title": "SERTIFIKAT",
+        "subtitle": "Bilim va yutuqlar sertifikati",
+        "awarded": "Ushbu sertifikat quyidagi shaxsga topshiriladi:",
+        "line1": "IELTS Speaking AI Examiner Bot tomonidan tashkil etilgan {total} savolli",
+        "line2": "umumiy bilim sertifikat testidan muvaffaqiyatli o'tgani uchun.",
+        "result": "Natija: {score}/{total} ({pct}%)",
+        "date": "Sana: {date}",
+    },
+    "ru": {
+        "title": "СЕРТИФИКАТ",
+        "subtitle": "Сертификат знаний и достижений",
+        "awarded": "Настоящий сертификат вручается:",
+        "line1": "За успешное прохождение теста общих знаний из {total} вопросов,",
+        "line2": "организованного ботом IELTS Speaking AI Examiner.",
+        "result": "Результат: {score}/{total} ({pct}%)",
+        "date": "Дата: {date}",
+    },
+    "en": {
+        "title": "CERTIFICATE",
+        "subtitle": "Certificate of Knowledge and Achievement",
+        "awarded": "This certificate is proudly awarded to:",
+        "line1": "For successfully completing the {total}-question general knowledge test",
+        "line2": "organised by the IELTS Speaking AI Examiner Bot.",
+        "result": "Score: {score}/{total} ({pct}%)",
+        "date": "Date: {date}",
+    },
+}
+
+
 def _generate_certificate_image_sync(full_name: str, score: int, total: int, percentage: int) -> str:
     """Pillow yordamida chiroyli sertifikat rasmini (PNG) yaratadi va fayl
     yo'lini qaytaradi."""
@@ -1090,28 +1514,26 @@ def _generate_certificate_image_sync(full_name: str, score: int, total: int, per
         text_width = bbox[2] - bbox[0]
         draw.text(((width - text_width) / 2, y), text, font=font, fill=fill)
 
-    center_text(120, "SERTIFIKAT", font_title, border_gold)
-    center_text(215, "Bilim va yutuqlar sertifikati", font_subtitle, text_gray)
+    lang = current_lang.get()
+    ct = CERT_TEXTS.get(lang, CERT_TEXTS["uz"])
+
+    center_text(120, ct["title"], font_title, border_gold)
+    center_text(215, ct["subtitle"], font_subtitle, text_gray)
 
     draw.line([(300, 290), (width - 300, 290)], fill=border_gold, width=2)
 
-    center_text(350, "Ushbu sertifikat quyidagi shaxsga topshiriladi:", font_body, text_dark)
+    center_text(350, ct["awarded"], font_body, text_dark)
     center_text(410, full_name, font_name, text_dark)
 
     draw.line([(400, 500), (width - 400, 500)], fill=border_gold, width=1)
 
-    center_text(
-        560,
-        f"IELTS Speaking AI Examiner Bot tomonidan tashkil etilgan {total} savolli",
-        font_body,
-        text_dark,
-    )
-    center_text(605, "umumiy bilim sertifikat testidan muvaffaqiyatli o'tgani uchun.", font_body, text_dark)
+    center_text(560, ct["line1"].format(total=total), font_body, text_dark)
+    center_text(605, ct["line2"], font_body, text_dark)
 
-    center_text(690, f"Natija: {score}/{total} ({percentage}%)", font_score, border_gold)
+    center_text(690, ct["result"].format(score=score, total=total, pct=percentage), font_score, border_gold)
 
     date_str = datetime.now().strftime("%d.%m.%Y")
-    center_text(770, f"Sana: {date_str}", font_body, text_gray)
+    center_text(770, ct["date"].format(date=date_str), font_body, text_gray)
 
     center_text(height - 90, "IELTS Speaking AI Examiner Bot", font_footer, text_gray)
 
@@ -3228,20 +3650,22 @@ def _generate_daily_content_sync(date_str: str) -> dict:
     }
 
 
-async def get_daily_content() -> dict | None:
-    """Bugungi kunlik kontentni qaytaradi: avval xotiradan, keyin Redis'dan,
+async def get_daily_content(lang: str | None = None) -> dict | None:
+    """Bugungi kunlik kontentni (foydalanuvchi tilida) qaytaradi: avval xotiradan, keyin Redis'dan,
     yo'q bo'lsa yangi generatsiya qilib saqlaydi."""
+    lang = lang or cur_lang()
     date_str = _today_str()
-    cached = _daily_cache.get(date_str)
+    cache_key = date_str + ("" if lang == "uz" else ":" + lang)
+    cached = _daily_cache.get(cache_key)
     if cached:
         return cached
 
     async with _daily_lock:
-        cached = _daily_cache.get(date_str)
+        cached = _daily_cache.get(cache_key)
         if cached:
             return cached
 
-        key = DAILY_CONTENT_KEY_PREFIX + date_str
+        key = DAILY_CONTENT_KEY_PREFIX + cache_key
         if redis_client is not None:
             try:
                 raw = await redis_client.get(key)
@@ -3249,13 +3673,15 @@ async def get_daily_content() -> dict | None:
                     if isinstance(raw, bytes):
                         raw = raw.decode("utf-8")
                     content = json.loads(raw)
-                    _daily_cache.clear()
-                    _daily_cache[date_str] = content
+                    for k in [k for k in _daily_cache if not k.startswith(date_str)]:
+                        _daily_cache.pop(k, None)
+                    _daily_cache[cache_key] = content
                     return content
             except Exception as e:
                 logger.warning("Kunlik kontentni Redis'dan o'qishda xatolik: %s", e)
 
         try:
+            current_lang.set(lang)
             content = await asyncio.to_thread(_generate_daily_content_sync, date_str)
         except Exception as e:
             logger.exception("Kunlik kontentni generatsiya qilishda xatolik: %s", e)
@@ -3267,8 +3693,9 @@ async def get_daily_content() -> dict | None:
             except Exception as e:
                 logger.warning("Kunlik kontentni Redis'ga yozishda xatolik: %s", e)
 
-        _daily_cache.clear()
-        _daily_cache[date_str] = content
+        for k in [k for k in _daily_cache if not k.startswith(date_str)]:
+            _daily_cache.pop(k, None)
+        _daily_cache[cache_key] = content
         return content
 
 
@@ -3346,21 +3773,39 @@ async def cmd_xabarnoma(message: Message):
         await message.answer("❌ Xatolik yuz berdi. Keyinroq qayta urinib ko'ring.")
 
 
-async def broadcast_daily_content(content: dict) -> tuple[int, int]:
+async def broadcast_daily_content(content: dict | None = None) -> tuple[int, int]:
     """Kunlik kontentni barcha foydalanuvchilarga (o'chirib qo'yganlardan tashqari) yuboradi.
     (yuborildi, xato) sonini qaytaradi. Telegram limitiga tushmaslik uchun sekin yuboradi."""
     from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 
     users = await redis_client.smembers(BOT_USERS_SET_KEY) or []
     optouts = set(str(x) for x in (await redis_client.smembers(DAILY_OPTOUT_KEY) or []))
-    text = _format_daily_text(content) + "\n\n<i>Kunlik xabarni o'chirish: /xabarnoma</i>"
-    keyboard = _daily_keyboard(content)
+    lang_map = {}
+    try:
+        lang_map = await redis_client.hgetall(BOT_USER_LANG_KEY) or {}
+    except Exception:
+        pass
+    lang_map = {(k.decode() if isinstance(k, bytes) else str(k)): (v.decode() if isinstance(v, bytes) else str(v)) for k, v in lang_map.items()}
+    per_lang = {}
 
     sent = failed = 0
     for uid in users:
         uid = str(uid)
         if uid in optouts:
             continue
+        ulang = lang_map.get(uid, DEFAULT_LANG)
+        if ulang not in LANGS:
+            ulang = DEFAULT_LANG
+        if ulang not in per_lang:
+            c = content if (ulang == "uz" and content) else await get_daily_content(ulang)
+            if not c:
+                c = content or await get_daily_content("uz")
+            if not c:
+                failed += 1
+                continue
+            per_lang[ulang] = (c, _format_daily_text(c) + "\n\n<i>Kunlik xabarni o'chirish: /xabarnoma</i>", _daily_keyboard(c))
+        _c, text, keyboard = per_lang[ulang]
+        current_lang.set(ulang)
         try:
             try:
                 await bot.send_message(int(uid), text, reply_markup=keyboard)
@@ -3392,7 +3837,7 @@ async def daily_broadcast_loop():
                 sent_key = DAILY_SENT_KEY_PREFIX + today
                 claimed = await redis_client.set(sent_key, "1", nx=True, ex=172800)
                 if claimed:
-                    content = await get_daily_content()
+                    content = await get_daily_content("uz")
                     if not content:
                         # Kontent yo'q — keyingi urinish uchun belgini qaytaramiz
                         await redis_client.delete(sent_key)
@@ -3979,7 +4424,7 @@ async def handle_fallback(message: Message):
 # 7) DASHBOARD MINI APP (Telegram WebApp) — Profil, Reading, Listening, Grammar
 # --------------------------------------------------------------------------
 
-DASHBOARD_HTML = """<!DOCTYPE html>
+DASHBOARD_HTML = r"""<!DOCTYPE html>
 <html lang="uz">
 <head>
 <meta charset="UTF-8">
@@ -4206,13 +4651,55 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 """
 
 
+DASH_I18N = {
+    "Yuklanmoqda…": ("Загрузка…", "Loading…"),
+    "👤 Profil": ("👤 Профиль", "👤 Profile"),
+    "🏆 Viktorina (eng yaxshi)": ("🏆 Викторина (лучший результат)", "🏆 Quiz (best score)"),
+    "🎓 Sertifikat testi (eng yaxshi)": ("🎓 Тест с сертификатом (лучший результат)", "🎓 Certificate test (best score)"),
+    "📖 Reading testlari yechilgan": ("📖 Пройдено тестов Reading", "📖 Reading tests completed"),
+    "🎧 Listening testlari yechilgan": ("🎧 Пройдено тестов Listening", "🎧 Listening tests completed"),
+    "Viktorina reytingidagi o\\'rni": ("Место в рейтинге викторины", "Quiz leaderboard rank"),
+    "Sertifikat reytingidagi o\\'rni": ("Место в рейтинге сертификатов", "Certificate leaderboard rank"),
+    "⚠️ Xatolik yuz berdi.": ("⚠️ Произошла ошибка.", "⚠️ Something went wrong."),
+    "📭 Hozircha kontent yo\\'q.": ("📭 Пока нет материалов.", "📭 No content yet."),
+    " ta savol": (" вопросов", " questions"),
+    "📖 O\\'qish/tinglash uchun": ("📖 Для чтения и прослушивания", "📖 For reading and listening"),
+    "▶️ Ochish": ("▶️ Открыть", "▶️ Open"),
+    "← Orqaga": ("← Назад", "← Back"),
+    "<p>Savol ": ("<p>Вопрос ", "<p>Question "),
+    "🧮 Baholanmoqda…": ("🧮 Проверяем ответы…", "🧮 Scoring your answers…"),
+    "🏁 Natija: ": ("🏁 Результат: ", "🏁 Result: "),
+    "↩️ Ro\\'yxatga qaytish": ("↩️ К списку", "↩️ Back to the list"),
+    '"Foydalanuvchi"': ('"Пользователь"', '"User"'),
+}
+
+
+def _dashboard_html_for(lang: str) -> str:
+    html_text = DASHBOARD_HTML
+    if lang in ("ru", "en"):
+        idx = 0 if lang == "ru" else 1
+        for key in sorted(DASH_I18N, key=len, reverse=True):
+            html_text = html_text.replace(key, DASH_I18N[key][idx])
+        html_text = html_text.replace('<html lang="uz">', f'<html lang="{lang}">')
+    return html_text
+
+
 async def dashboard_page(request: web.Request):
-    return web.Response(text=DASHBOARD_HTML, content_type="text/html")
+    lang = DEFAULT_LANG
+    try:
+        lang = (await get_lang(int(request.query.get("uid", "")))) or DEFAULT_LANG
+    except (TypeError, ValueError):
+        pass
+    return web.Response(text=_dashboard_html_for(lang), content_type="text/html")
 
 
 async def api_dashboard_profile(request: web.Request):
     uid = request.query.get("uid", "")
     name = "Foydalanuvchi"
+    try:
+        name = {"ru": "Пользователь", "en": "User"}.get(await get_lang(int(uid)), name)
+    except (TypeError, ValueError):
+        pass
     try:
         chat = await bot.get_chat(int(uid))
         name = chat.full_name or (f"@{chat.username}" if chat.username else name)
@@ -4473,6 +4960,15 @@ async def setup_bot_commands():
         BotCommand(command="stop", description="Joriy jarayonni to'xtatish"),
     ]
     await bot.set_my_commands(commands)
+    # Telegram ilovasi tili rus/ingliz bo'lgan foydalanuvchilar menyuni o'z tilida ko'radi
+    for lc in ("ru", "en"):
+        try:
+            await bot.set_my_commands(
+                [BotCommand(command=c.command, description=translate_text(c.description, lc)) for c in commands],
+                language_code=lc,
+            )
+        except Exception as e:
+            logger.warning("%s tilidagi buyruqlar menyusini o'rnatib bo'lmadi: %s", lc, e)
     logger.info("Bot buyruqlar menyusi o'rnatildi.")
 
 
