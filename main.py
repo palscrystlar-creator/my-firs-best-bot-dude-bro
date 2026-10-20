@@ -43,6 +43,8 @@ import secrets
 import base64
 import html
 import contextvars
+import hmac
+import hashlib
 import random
 import urllib.parse
 from datetime import datetime, timedelta, timezone
@@ -129,6 +131,8 @@ BOT_USERS_SET_KEY = "ielts_bot:unique_users"
 BOT_STARTS_COUNTER_KEY = "ielts_bot:total_starts"
 WRITING_PRICE_STARS = 5   # IELTS Writing tahlili narxi (⭐ Telegram Stars) — faqat shu raqamni o'zgartirish kifoya
 SPEAKING_PRICE_STARS = 3   # IELTS Speaking to'liq mock narxi (⭐ Telegram Stars)
+PRO_PRICE_STARS = 10   # PRO obuna narxi (⭐ Telegram Stars)
+PRO_DAYS = 30
 BOT_USER_INFO_KEY = "ielts_bot:user_info"      # hash: user_id -> JSON {n, u, d}
 BOT_ACTIVE_DAY_PREFIX = "ielts_bot:active:"   # + YYYY-MM-DD (Toshkent vaqti)
 _active_seen: set = set()  # (kun, user_id) — Redis'ga kuniga bir marta yozish uchun
@@ -543,6 +547,7 @@ MENU_LABELS = {
     "english": {"uz": "Ingliz tilida suhbat", "ru": "Разговор на английском", "en": "English chat"},
     "grammar": {"uz": "Grammatika", "ru": "Грамматика", "en": "Grammar"},
     "writing": {"uz": "Writing tahlili", "ru": "Разбор Writing", "en": "Writing review"},
+    "pro": {"uz": "PRO obuna", "ru": "PRO-подписка", "en": "PRO subscription"},
     "speaking": {"uz": "Speaking to'liq mock", "ru": "Полный Speaking мок", "en": "Full Speaking mock"},
     "test": {"uz": "IELTS Speaking", "ru": "IELTS Speaking", "en": "IELTS Speaking"},
     "reading_test": {"uz": "IELTS Reading", "ru": "IELTS Reading", "en": "IELTS Reading"},
@@ -570,6 +575,7 @@ def _lang_keyboard() -> InlineKeyboardMarkup:
 # Kalit — kodda yozilgan o'zbekcha matn bo'lagi, qiymat — (ruscha, inglizcha).
 
 I18N_FRAGMENTS = {
+    '⭐ <i>PRO — tekin.</i>\n\n': ('⭐ <i>PRO — бесплатно.</i>\n\n', '⭐ <i>PRO — included.</i>\n\n'),
     '✅ <b>Test tayyor!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview (qisqa test)\n🎙 Har bir savolga ovozli xabar bilan javob bering.': ('✅ <b>Тест готов!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview (короткий тест)\n🎙 Отвечайте на каждый вопрос голосовым сообщением.', '✅ <b>Test ready!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview (short test)\n🎙 Answer every question with a voice message.'),
     '✅ <b>Part 1 tugadi!</b>\n\n📊 Yakuniy natija tayyorlanmoqda, biroz kuting...': ('✅ <b>Part 1 завершена!</b>\n\n📊 Готовлю итоговый результат, подождите...', '✅ <b>Part 1 complete!</b>\n\n📊 Preparing your final result, please wait...'),
     '🏁 <b>IELTS SPEAKING PART 1 — YAKUNIY NATIJA</b>\n\n🗣 Fluency & Coherence: <b>': ('🏁 <b>IELTS SPEAKING PART 1 — ИТОГОВЫЙ РЕЗУЛЬТАТ</b>\n\n🗣 Fluency & Coherence: <b>', '🏁 <b>IELTS SPEAKING PART 1 — FINAL RESULT</b>\n\n🗣 Fluency & Coherence: <b>'),
@@ -1678,6 +1684,7 @@ WELCOME_TEXT = (
     "/grammar — grammatika: dars + mashqlar 📝\n"
     f"/writing — 💎 IELTS Writing tahlili ({WRITING_PRICE_STARS} ⭐)\n"
     f"/speaking — 🎙 IELTS Speaking to'liq mock ({SPEAKING_PRICE_STARS} ⭐)\n"
+    f"/pro — ⭐ PRO obuna: Writing va Speaking tekin ({PRO_PRICE_STARS} ⭐ / {PRO_DAYS} kun)\n"
     "/test — IELTS Speaking mock testi (ovozli javoblar)\n"
     "/reading_test, /listening_test — IELTS uslubidagi testlar\n"
     "/dashboard — profil va o'quv materiallari\n\n"
@@ -1694,7 +1701,7 @@ MENU_SCIENCE = [
     ("📖", "story"), ("📅", "daily"), ("🎓", "certificate"), ("🏆", "leaderboard"),
 ]
 MENU_ENGLISH = [
-    ("💬", "english"), ("📝", "grammar"), ("💎", "writing"), ("🎙", "speaking"), ("🎤", "test"),
+    ("💬", "english"), ("📝", "grammar"), ("⭐", "pro"), ("💎", "writing"), ("🎙", "speaking"), ("🎤", "test"),
     ("📖", "reading_test"), ("🎧", "listening_test"), ("📚", "dashboard"),
 ]
 
@@ -1718,6 +1725,7 @@ ALL_COMMANDS = {
         "/grammar — грамматика: урок + упражнения 📝\n"
         f"/writing — 💎 разбор IELTS Writing ({WRITING_PRICE_STARS} ⭐)\n"
         f"/speaking — 🎙 полный мок IELTS Speaking ({SPEAKING_PRICE_STARS} ⭐)\n"
+        f"/pro — ⭐ PRO-подписка: Writing и Speaking бесплатно ({PRO_PRICE_STARS} ⭐ / {PRO_DAYS} дней)\n"
         "/test — IELTS Speaking (голосовые ответы)\n"
         "/reading_test, /listening_test — тесты в стиле IELTS\n"
         "/dashboard — профиль и материалы\n\n"
@@ -1743,6 +1751,7 @@ ALL_COMMANDS = {
         "/grammar — grammar: lesson + exercises 📝\n"
         f"/writing — 💎 IELTS Writing review ({WRITING_PRICE_STARS} ⭐)\n"
         f"/speaking — 🎙 IELTS Speaking full mock ({SPEAKING_PRICE_STARS} ⭐)\n"
+        f"/pro — ⭐ PRO: Writing and Speaking included ({PRO_PRICE_STARS} ⭐ / {PRO_DAYS} days)\n"
         "/test — IELTS Speaking mock (voice answers)\n"
         "/reading_test, /listening_test — IELTS-style tests\n"
         "/dashboard — profile and study materials\n\n"
@@ -1759,6 +1768,8 @@ def _menu_label(cmd: str) -> str:
         base += f" (⭐{WRITING_PRICE_STARS})"
     if cmd == "speaking":
         base += f" (⭐{SPEAKING_PRICE_STARS})"
+    if cmd == "pro":
+        base += f" (⭐{PRO_PRICE_STARS})"
     return base
 
 
@@ -1785,11 +1796,19 @@ def _submenu_keyboard(items: list) -> InlineKeyboardMarkup:
 
 
 @dp.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext):
+async def cmd_start(message: Message, state: FSMContext, command: CommandObject):
     await state.clear()
     if await get_lang(message.from_user.id) is None:
         await message.answer(tr("pick"), reply_markup=_lang_keyboard())
         return
+    # Mini App'dan kelgan chuqur havola: t.me/<bot>?start=run_<buyruq>
+    payload = (command.args or "").strip()
+    if payload.startswith("run_"):
+        cmd = payload[4:]
+        if cmd in {c for _e, c in MENU_SCIENCE + MENU_ENGLISH}:
+            fake = message.model_copy(update={"text": f"/{cmd}", "entities": None})
+            await dp.feed_update(bot, Update(update_id=0, message=fake))
+            return
     await message.answer(tr("intro"), reply_markup=_main_menu_keyboard())
 
 
@@ -2004,18 +2023,25 @@ async def cmd_reyting(message: Message):
     await message.answer(listening_text)
 
 
+_DASH_T = {
+    "btn": {"uz": "🎓 Dashboard'ni ochish", "ru": "🎓 Открыть дашборд", "en": "🎓 Open dashboard"},
+    "txt": {
+        "uz": "🎓 <b>Talk Dashboard</b>\n\nStatistika, mashqlar, Reading/Listening/Grammar kutubxonasi va ⭐ PRO — hammasi bir joyda:",
+        "ru": "🎓 <b>Talk Dashboard</b>\n\nСтатистика, практика, библиотека Reading/Listening/Grammar и ⭐ PRO — всё в одном месте:",
+        "en": "🎓 <b>Talk Dashboard</b>\n\nYour stats, practice, the Reading/Listening/Grammar library and ⭐ PRO — all in one place:",
+    },
+}
+
+
 @dp.message(Command("dashboard"))
 async def cmd_dashboard(message: Message):
-    """Dashboard Mini App'ni ochadi: Profil, Reading, Listening, Grammar bo'limlari."""
-    url = f"{WEBHOOK_BASE_URL.rstrip('/')}/miniapp/dashboard?uid={message.from_user.id}"
+    """Yangi Mini App dashboard: bosh sahifa, mashqlar, kutubxona, PRO."""
+    url = f"{WEBHOOK_BASE_URL.rstrip('/')}/miniapp/dashboard"
+    lang = cur_lang()
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="🎓 Dashboard'ni ochish", web_app=WebAppInfo(url=url))]]
+        inline_keyboard=[[InlineKeyboardButton(text=_DASH_T["btn"][lang], web_app=WebAppInfo(url=url))]]
     )
-    await message.answer(
-        "🎓 <b>IELTS Dashboard</b>\n\n"
-        "Profilingiz, Reading, Listening va Grammar materiallarini shu yerdan ko'rishingiz mumkin:",
-        reply_markup=keyboard,
-    )
+    await message.answer(_DASH_T["txt"][lang], reply_markup=keyboard)
 
 
 @dp.message(Command("english"))
@@ -3475,8 +3501,13 @@ async def cmd_writing(message: Message, state: FSMContext):
         await message.answer("⏳ Avval joriy testni tugating yoki /stop yuboring.")
         return
 
-    if _is_admin(uid) or await _has_writing_credit(uid):
-        free = "🎁 <i>Siz uchun bepul.</i>\n\n" if _is_admin(uid) else "✅ <i>To'lov qabul qilingan.</i>\n\n"
+    pro_ok = False
+    if not _is_admin(uid) and not await _has_writing_credit(uid) and await _is_pro(uid):
+        pro_ok = await _pro_use(uid, "writing")
+        if not pro_ok:
+            await message.answer(_pr("limit", l=PRO_DAILY_LIMIT))
+    if _is_admin(uid) or pro_ok or await _has_writing_credit(uid):
+        free = "🎁 <i>Siz uchun bepul.</i>\n\n" if _is_admin(uid) else ("⭐ <i>PRO — tekin.</i>\n\n" if pro_ok else "✅ <i>To'lov qabul qilingan.</i>\n\n")
         await _give_writing_task(message, uid, f"💎 {free}")
         return
 
@@ -3508,7 +3539,7 @@ async def cmd_writing(message: Message, state: FSMContext):
 @dp.pre_checkout_query()
 async def handle_pre_checkout(query: PreCheckoutQuery):
     uid = query.from_user.id
-    prices = {f"writing:{uid}": WRITING_PRICE_STARS, f"speaking:{uid}": SPEAKING_PRICE_STARS}
+    prices = {f"writing:{uid}": WRITING_PRICE_STARS, f"speaking:{uid}": SPEAKING_PRICE_STARS, f"pro:{uid}": PRO_PRICE_STARS}
     ok = query.currency == "XTR" and prices.get(query.invoice_payload) == query.total_amount
     if ok:
         await query.answer(ok=True)
@@ -3522,6 +3553,10 @@ async def handle_successful_payment(message: Message, state: FSMContext):
     uid = message.from_user.id
     logger.info("Stars to'lov: user=%s amount=%s payload=%s charge_id=%s", uid, pay.total_amount,
                 pay.invoice_payload, pay.telegram_payment_charge_id)
+    if pay.invoice_payload.startswith("pro:"):
+        exp = await _grant_pro(uid)
+        await message.answer(_pr("thanks", date=_pro_date(exp), l=PRO_DAILY_LIMIT))
+        return
     if pay.invoice_payload.startswith("speaking:"):
         await _grant_speaking_credit(uid)
         await _start_full_speaking(message, state, uid, _sp("thanks"))
@@ -3979,6 +4014,11 @@ async def cmd_speaking(message: Message, state: FSMContext):
     if await _has_speaking_credit(uid):
         await _start_full_speaking(message, state, uid, _sp("paid"))
         return
+    if await _is_pro(uid):
+        if await _pro_use(uid, "speaking"):
+            await _start_full_speaking(message, state, uid, "⭐ <i>PRO</i>\n\n")
+            return
+        await message.answer(_pr("limit", l=PRO_DAILY_LIMIT))
 
     await message.answer(_sp("intro", p=SPEAKING_PRICE_STARS))
     try:
@@ -4067,6 +4107,158 @@ async def handle_full_speaking_wrong_type(message: Message):
         await message.answer(_sp("busy"))
         return
     await message.answer(_sp("voice_only"))
+
+
+# --- ⭐ PRO obuna (Telegram Stars) ---------------------------------------------
+# PRO_DAYS kunlik PRO: /writing va /speaking tekin (adolatli foydalanish limiti bilan).
+# Bir martalik to'lov (avtomatik yangilanmaydi) — muddat tugagach qayta olish mumkin;
+# faol PRO'da qayta to'lansa muddat ustiga qo'shiladi. Admin uchun doim bepul.
+
+PRO_DAILY_LIMIT = 5          # PRO'da kuniga har bir premium funksiya (writing / speaking) uchun
+PRO_KEY_PREFIX = "ielts_bot:pro:"
+PRO_USE_PREFIX = "ielts_bot:pro_use:"
+_pro_mem: dict = {}          # user_id -> tugash vaqti (unix)
+_pro_use_mem: dict = {}      # (kind, user_id, sana) -> son
+
+_PRO = {
+    "offer": {
+        "uz": "⭐ <b>PRO obuna</b>\n\nUshbu imkoniyatlar {d} kun davomida:\n💎 <b>/writing</b> — IELTS Writing tahlili tekin (kuniga {l} tagacha)\n🎙 <b>/speaking</b> — to'liq Speaking mock tekin (kuniga {l} tagacha)\n🏅 Profilda ⭐ PRO belgisi\n\nAlohida olsangiz: Writing {w} ⭐ + Speaking {s} ⭐ — PRO bilan esa hammasi bir joyda.\n\nNarxi: <b>{p} ⭐ Telegram Stars</b> ({d} kun, avtomatik yangilanmaydi)",
+        "ru": "⭐ <b>PRO-подписка</b>\n\nНа {d} дней вы получаете:\n💎 <b>/writing</b> — разбор IELTS Writing бесплатно (до {l} в день)\n🎙 <b>/speaking</b> — полный Speaking мок бесплатно (до {l} в день)\n🏅 Значок ⭐ PRO в профиле\n\nПо отдельности: Writing {w} ⭐ + Speaking {s} ⭐ — с PRO всё в одном.\n\nЦена: <b>{p} ⭐ Telegram Stars</b> ({d} дней, без автопродления)",
+        "en": "⭐ <b>PRO subscription</b>\n\nFor {d} days you get:\n💎 <b>/writing</b> — IELTS Writing review included (up to {l} per day)\n🎙 <b>/speaking</b> — full Speaking mock included (up to {l} per day)\n🏅 A ⭐ PRO badge on your profile\n\nBought separately: Writing {w} ⭐ + Speaking {s} ⭐ — with PRO it's all in one.\n\nPrice: <b>{p} ⭐ Telegram Stars</b> ({d} days, does not auto-renew)",
+    },
+    "active": {
+        "uz": "⭐ <b>PRO faol!</b>\n\n📅 Tugash sanasi: <b>{date}</b> ({left} kun qoldi)\n💎 /writing va 🎙 /speaking — kuniga {l} tagacha tekin.\n\nMuddatni uzaytirish uchun pastdagi to'lovni amalga oshiring: +{d} kun ({p} ⭐).",
+        "ru": "⭐ <b>PRO активна!</b>\n\n📅 Действует до: <b>{date}</b> (осталось дней: {left})\n💎 /writing и 🎙 /speaking — бесплатно до {l} раз в день.\n\nЧтобы продлить, оплатите ниже: +{d} дней ({p} ⭐).",
+        "en": "⭐ <b>PRO is active!</b>\n\n📅 Valid until: <b>{date}</b> ({left} days left)\n💎 /writing and 🎙 /speaking — free up to {l} times a day.\n\nTo extend, pay below: +{d} days ({p} ⭐).",
+    },
+    "admin": {
+        "uz": "⭐ Siz bot egasisiz — barcha premium funksiyalar siz uchun doim tekin.",
+        "ru": "⭐ Вы владелец бота — все премиум-функции для вас всегда бесплатны.",
+        "en": "⭐ You're the bot owner — all premium features are always free for you.",
+    },
+    "inv_title": {"uz": "PRO obuna", "ru": "PRO-подписка", "en": "PRO subscription"},
+    "inv_desc": {
+        "uz": "{d} kun: Writing va Speaking mock tekin.",
+        "ru": "{d} дней: Writing и Speaking мок бесплатно.",
+        "en": "{d} days: Writing and Speaking mock included.",
+    },
+    "inv_label": {"uz": "PRO {d} kun", "ru": "PRO {d} дней", "en": "PRO {d} days"},
+    "thanks": {
+        "uz": "🎉 <b>PRO faollashtirildi, rahmat!</b> ⭐\n\n📅 Tugash sanasi: <b>{date}</b>\n💎 /writing va 🎙 /speaking endi tekin (kuniga {l} tagacha). Mashq qilishni boshlang!",
+        "ru": "🎉 <b>PRO активирована, спасибо!</b> ⭐\n\n📅 Действует до: <b>{date}</b>\n💎 /writing и 🎙 /speaking теперь бесплатны (до {l} в день). Начинайте тренироваться!",
+        "en": "🎉 <b>PRO activated, thank you!</b> ⭐\n\n📅 Valid until: <b>{date}</b>\n💎 /writing and 🎙 /speaking are now included (up to {l} per day). Start practising!",
+    },
+    "limit": {
+        "uz": "⏳ PRO'da bugungi limit ({l} ta) tugadi. Ertaga yana tekin bo'ladi, hozir esa bitta marta to'lab foydalanishingiz mumkin.",
+        "ru": "⏳ Дневной лимит PRO ({l}) исчерпан. Завтра снова бесплатно, а сейчас можно оплатить разовое использование.",
+        "en": "⏳ Today's PRO limit ({l}) is used up. It's free again tomorrow, or you can pay for a single use now.",
+    },
+    "fail": {
+        "uz": "❌ To'lov oynasini ochib bo'lmadi. Birozdan so'ng qayta urinib ko'ring.",
+        "ru": "❌ Не удалось открыть окно оплаты. Попробуйте чуть позже.",
+        "en": "❌ Couldn't open the payment window. Please try again shortly.",
+    },
+}
+
+
+def _pr(key: str, **kw) -> str:
+    d = _PRO[key]
+    t = d.get(cur_lang()) or d["en"]
+    return t.format(**kw) if kw else t
+
+
+def _pro_date(ts: float) -> str:
+    return datetime.fromtimestamp(ts, UZ_TZ).strftime("%d.%m.%Y")
+
+
+async def _pro_expiry(user_id: int) -> float:
+    """PRO tugash vaqti (unix). Faol bo'lmasa 0."""
+    now = datetime.now(timezone.utc).timestamp()
+    exp = _pro_mem.get(user_id, 0)
+    if exp <= now and redis_client is not None:
+        try:
+            raw = await redis_client.get(f"{PRO_KEY_PREFIX}{user_id}")
+            if raw:
+                exp = float(raw.decode() if isinstance(raw, bytes) else raw)
+                _pro_mem[user_id] = exp
+        except Exception as e:
+            logger.warning("PRO holatini o'qishda xatolik: %s", e)
+    return exp if exp > now else 0
+
+
+async def _is_pro(user_id: int) -> bool:
+    return await _pro_expiry(user_id) > 0
+
+
+async def _grant_pro(user_id: int) -> float:
+    now = datetime.now(timezone.utc).timestamp()
+    base = max(now, await _pro_expiry(user_id))
+    exp = base + PRO_DAYS * 86400
+    _pro_mem[user_id] = exp
+    if redis_client is not None:
+        try:
+            await redis_client.set(f"{PRO_KEY_PREFIX}{user_id}", str(exp), ex=int(exp - now) + 86400)
+        except Exception as e:
+            logger.warning("PRO holatini yozishda xatolik: %s", e)
+    return exp
+
+
+async def _pro_use(user_id: int, kind: str, consume: bool = True) -> bool:
+    """PRO foydalanuvchi bugungi limitdan oshmagan bo'lsa True (consume=True bo'lsa hisoblaydi)."""
+    day = datetime.now(UZ_TZ).strftime("%Y-%m-%d")
+    mk = (kind, user_id, day)
+    count = _pro_use_mem.get(mk, 0)
+    rk = f"{PRO_USE_PREFIX}{kind}:{user_id}:{day}"
+    if redis_client is not None:
+        try:
+            raw = await redis_client.get(rk)
+            if raw:
+                count = max(count, int(raw.decode() if isinstance(raw, bytes) else raw))
+        except Exception as e:
+            logger.warning("PRO limitini o'qishda xatolik: %s", e)
+    if count >= PRO_DAILY_LIMIT:
+        return False
+    if consume:
+        _pro_use_mem[mk] = count + 1
+        if redis_client is not None:
+            try:
+                await redis_client.set(rk, str(count + 1), ex=2 * 86400)
+            except Exception as e:
+                logger.warning("PRO limitini yozishda xatolik: %s", e)
+    return True
+
+
+async def _send_pro_invoice(message: Message):
+    uid = message.chat.id
+    try:
+        await bot.send_invoice(
+            chat_id=message.chat.id,
+            title=_pr("inv_title"),
+            description=_pr("inv_desc", d=PRO_DAYS),
+            payload=f"pro:{uid}",
+            currency="XTR",
+            prices=[LabeledPrice(label=_pr("inv_label", d=PRO_DAYS), amount=PRO_PRICE_STARS)],
+            provider_token="",
+        )
+    except Exception as e:
+        logger.exception("PRO invoice yuborishda xatolik: %s", e)
+        await message.answer(_pr("fail"))
+
+
+@dp.message(Command("pro"))
+async def cmd_pro(message: Message):
+    uid = message.from_user.id
+    if _is_admin(uid):
+        await message.answer(_pr("admin"))
+        return
+    exp = await _pro_expiry(uid)
+    if exp:
+        left = max(1, int((exp - datetime.now(timezone.utc).timestamp()) // 86400) + 1)
+        await message.answer(_pr("active", date=_pro_date(exp), left=left, l=PRO_DAILY_LIMIT, d=PRO_DAYS, p=PRO_PRICE_STARS))
+    else:
+        await message.answer(_pr("offer", d=PRO_DAYS, l=PRO_DAILY_LIMIT, w=WRITING_PRICE_STARS,
+                                 s=SPEAKING_PRICE_STARS, p=PRO_PRICE_STARS))
+    await _send_pro_invoice(message)
 
 
 # --- Kunlik fan + ingliz tili maslahati ----------------------------------
@@ -4959,225 +5151,354 @@ async def handle_fallback(message: Message):
 # --------------------------------------------------------------------------
 
 DASHBOARD_HTML = r"""<!DOCTYPE html>
-<html lang="uz">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>IELTS Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Talk Dashboard</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   :root {
-    --bg: #0f1220; --card: #171b2e; --accent: #6c8bff; --accent2: #ff6cab;
-    --text: #eef0ff; --muted: #9aa0c0; --good: #52d68a; --bad: #ff6b6b;
+    --bg: var(--tg-theme-bg-color, #0e1117);
+    --card: var(--tg-theme-secondary-bg-color, #181c27);
+    --text: var(--tg-theme-text-color, #eef0f6);
+    --muted: var(--tg-theme-hint-color, #8b93a7);
+    --accent: var(--tg-theme-button-color, #5b8cff);
+    --accent-text: var(--tg-theme-button-text-color, #ffffff);
+    --line: rgba(127,135,160,.22);
+    --good: #3ecf8e; --bad: #ff6b6b; --gold: #f5b942;
+    --r: 16px;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 80px;
-  }
-  header { padding: 18px 20px 10px; text-align: center; }
-  header h1 { font-size: 19px; margin: 0; }
-  #tabs {
-    position: sticky; top: 0; z-index: 10; display: flex; background: var(--bg);
-    border-bottom: 1px solid #262b48; padding: 0 8px;
-  }
-  .tab {
-    flex: 1; text-align: center; padding: 12px 4px; font-size: 13px; color: var(--muted);
-    cursor: pointer; border-bottom: 2px solid transparent;
-  }
-  .tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
-  #content { padding: 16px; }
-  .card {
-    background: var(--card); border-radius: 14px; padding: 16px; margin-bottom: 12px;
-  }
-  .card h3 { margin: 0 0 6px; font-size: 15px; }
-  .card p { margin: 4px 0; color: var(--muted); font-size: 13px; }
-  .pill {
-    display: inline-block; background: #262b48; color: var(--muted); font-size: 11px;
-    padding: 3px 9px; border-radius: 999px; margin-top: 6px;
-  }
-  button.primary {
-    background: linear-gradient(90deg, var(--accent), var(--accent2)); color: white;
-    border: none; border-radius: 10px; padding: 10px 18px; font-size: 14px;
-    font-weight: 600; cursor: pointer; margin-top: 10px;
-  }
-  button.secondary {
-    background: #262b48; color: var(--text); border: none; border-radius: 10px;
-    padding: 10px 18px; font-size: 14px; cursor: pointer; margin-top: 10px; margin-right: 8px;
-  }
-  .option-btn {
-    display: block; width: 100%; text-align: left; background: #1f2440; color: var(--text);
-    border: 1px solid #2e3358; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
-    font-size: 14px; cursor: pointer;
-  }
-  .option-btn.correct { background: rgba(82,214,138,0.18); border-color: var(--good); }
-  .option-btn.wrong { background: rgba(255,107,107,0.18); border-color: var(--bad); }
-  .body-text { white-space: pre-wrap; line-height: 1.6; font-size: 14px; color: var(--text); }
-  #back-btn { color: var(--accent); font-size: 13px; cursor: pointer; margin-bottom: 12px; display: inline-block; }
-  .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #262b48; font-size: 13px; }
-  .stat-row:last-child { border-bottom: none; }
-  .loading { text-align: center; color: var(--muted); padding: 40px 0; font-size: 13px; }
-  audio { width: 100%; margin-top: 10px; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { padding: 0 16px calc(84px + env(safe-area-inset-bottom)); min-height: 100vh; }
+  h1, h2, h3, p { margin: 0; }
+  .top { display: flex; align-items: center; gap: 12px; padding: 18px 0 8px; }
+  .avatar { width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #b06cff);
+    display: grid; place-items: center; font-weight: 700; font-size: 19px; color: #fff; flex: none; }
+  .top h1 { font-size: 18px; line-height: 1.2; }
+  .top .sub { color: var(--muted); font-size: 13px; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
+    background: linear-gradient(90deg, #f5b942, #ff8a5c); color: #1b1305; vertical-align: 2px; margin-left: 6px; }
+  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+    margin: 20px 2px 8px; font-weight: 600; }
+  .card { background: var(--card); border-radius: var(--r); padding: 16px; margin-bottom: 12px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { background: var(--card); border-radius: var(--r); padding: 14px; }
+  .stat .v { font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+  .stat .l { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .stat .r { color: var(--gold); font-size: 12px; margin-top: 4px; font-weight: 600; }
+  .tile { background: var(--card); border: 0; color: var(--text); border-radius: var(--r); padding: 14px 12px;
+    text-align: left; font: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-height: 84px; }
+  .tile:active { transform: scale(.98); }
+  .tile .e { font-size: 24px; }
+  .tile .n { font-size: 13.5px; font-weight: 600; line-height: 1.25; }
+  .tile .p { font-size: 11px; color: var(--gold); font-weight: 600; }
+  .btn { display: block; width: 100%; border: 0; border-radius: 12px; padding: 13px 16px; font: inherit; font-weight: 600;
+    background: var(--accent); color: var(--accent-text); cursor: pointer; text-align: center; }
+  .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  .btn[disabled] { opacity: .55; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .list-item { background: var(--card); border-radius: var(--r); padding: 14px 16px; margin-bottom: 10px; cursor: pointer;
+    display: flex; align-items: center; gap: 12px; }
+  .list-item .t { flex: 1; font-weight: 600; }
+  .list-item .m { color: var(--muted); font-size: 12px; font-weight: 400; margin-top: 2px; }
+  .chev { color: var(--muted); font-size: 18px; }
+  .seg { display: flex; background: var(--card); border-radius: 12px; padding: 3px; margin-bottom: 14px; }
+  .seg button { flex: 1; border: 0; background: transparent; color: var(--muted); padding: 9px 4px; border-radius: 10px;
+    font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .seg button.on { background: var(--accent); color: var(--accent-text); }
+  .perk { display: flex; gap: 10px; padding: 8px 0; }
+  .perk .ic { font-size: 20px; width: 28px; text-align: center; }
+  .price { font-size: 34px; font-weight: 800; letter-spacing: -.02em; }
+  .body-text { white-space: pre-wrap; line-height: 1.65; }
+  .opt { display: block; width: 100%; text-align: left; background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px 14px; margin-top: 8px; font: inherit; cursor: pointer; }
+  .progress { height: 5px; background: var(--line); border-radius: 9px; overflow: hidden; margin-bottom: 14px; }
+  .progress i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
+  .center { text-align: center; padding: 48px 12px; color: var(--muted); }
+  .back { color: var(--accent); background: none; border: 0; font: inherit; padding: 14px 0 6px; cursor: pointer; }
+  audio { width: 100%; margin-top: 12px; }
+  nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: var(--card);
+    border-top: 1px solid var(--line); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); }
+  nav button { flex: 1; border: 0; background: none; color: var(--muted); font: inherit; font-size: 11px; padding: 6px 0;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; font-weight: 600; }
+  nav button .i { font-size: 20px; }
+  nav button.on { color: var(--accent); }
+  .toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); background: #000c; color: #fff;
+    padding: 10px 16px; border-radius: 99px; font-size: 13px; z-index: 50; }
 </style>
 </head>
 <body>
-<header><h1>🎓 IELTS Dashboard</h1></header>
-<div id="tabs">
-  <div class="tab active" data-tab="profile">👤 Profil</div>
-  <div class="tab" data-tab="reading">📖 Reading</div>
-  <div class="tab" data-tab="listening">🎧 Listening</div>
-  <div class="tab" data-tab="grammar">📚 Grammar</div>
-</div>
-<div id="content"><div class="loading">⏳ Yuklanmoqda…</div></div>
+<div id="app"><div class="center">…</div></div>
+<nav id="nav"></nav>
 
 <script>
 (function () {
-  const tg = window.Telegram ? window.Telegram.WebApp : null;
-  if (tg) { tg.ready(); tg.expand(); }
+  "use strict";
+  var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+  var initData = tg && tg.initData ? tg.initData : "";
 
-  const params = new URLSearchParams(window.location.search);
-  let uid = params.get("uid") || "anonymous";
-  try {
-    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
-      uid = String(tg.initDataUnsafe.user.id);
-    }
-  } catch (e) {}
-
-  const contentEl = document.getElementById("content");
-  const tabs = document.querySelectorAll(".tab");
-  let currentTab = "profile";
-
-  tabs.forEach((t) => {
-    t.addEventListener("click", () => {
-      tabs.forEach((x) => x.classList.remove("active"));
-      t.classList.add("active");
-      currentTab = t.dataset.tab;
-      render(currentTab);
-    });
-  });
-
-  function escapeHtml(str) {
-    const d = document.createElement("div");
-    d.textContent = str;
-    return d.innerHTML;
-  }
-
-  async function fetchJSON(url, opts) {
-    const resp = await fetch(url, opts);
-    return await resp.json();
-  }
-
-  async function render(tab) {
-    contentEl.innerHTML = '<div class="loading">⏳ Yuklanmoqda…</div>';
-    if (tab === "profile") return renderProfile();
-    if (tab === "reading") return renderList("reading");
-    if (tab === "listening") return renderList("listening");
-    if (tab === "grammar") return renderList("grammar");
-  }
-
-  async function renderProfile() {
-    try {
-      const data = await fetchJSON("/api/dashboard/profile?uid=" + encodeURIComponent(uid));
-      let html = '<div class="card"><h3>' + escapeHtml(data.name || "Foydalanuvchi") + '</h3>';
-      html += '<div class="stat-row"><span>🏆 Viktorina (eng yaxshi)</span><span>' + (data.quiz_best !== null ? data.quiz_best + '%' : '—') + '</span></div>';
-      html += '<div class="stat-row"><span>🎓 Sertifikat testi (eng yaxshi)</span><span>' + (data.cert_best !== null ? data.cert_best + '%' : '—') + '</span></div>';
-      html += '<div class="stat-row"><span>📖 Reading testlari yechilgan</span><span>' + data.reading_done + '</span></div>';
-      html += '<div class="stat-row"><span>🎧 Listening testlari yechilgan</span><span>' + data.listening_done + '</span></div>';
-      if (data.quiz_rank) html += '<div class="stat-row"><span>Viktorina reytingidagi o\'rni</span><span>#' + data.quiz_rank + '</span></div>';
-      if (data.cert_rank) html += '<div class="stat-row"><span>Sertifikat reytingidagi o\'rni</span><span>#' + data.cert_rank + '</span></div>';
-      html += '</div>';
-      contentEl.innerHTML = html;
-    } catch (e) {
-      contentEl.innerHTML = '<div class="loading">⚠️ Xatolik yuz berdi.</div>';
-    }
-  }
-
-  async function renderList(type) {
-    try {
-      const items = await fetchJSON("/api/dashboard/content/" + type);
-      if (!items.length) {
-        contentEl.innerHTML = '<div class="loading">📭 Hozircha kontent yo\'q.</div>';
-        return;
-      }
-      let html = "";
-      items.forEach((item) => {
-        html += '<div class="card" data-id="' + item.id + '">';
-        html += '<h3>' + escapeHtml(item.title) + '</h3>';
-        if (item.has_questions) html += '<span class="pill">📝 ' + item.question_count + ' ta savol</span>';
-        else html += '<span class="pill">📖 O\'qish/tinglash uchun</span>';
-        html += '<br><button class="primary" onclick="window.__openItem(\'' + type + '\',' + item.id + ')">▶️ Ochish</button>';
-        html += '</div>';
-      });
-      contentEl.innerHTML = html;
-    } catch (e) {
-      contentEl.innerHTML = '<div class="loading">⚠️ Xatolik yuz berdi.</div>';
-    }
-  }
-
-  window.__openItem = async function (type, id) {
-    contentEl.innerHTML = '<div class="loading">⏳ Yuklanmoqda…</div>';
-    const item = await fetchJSON("/api/dashboard/content/" + type + "/" + id);
-
-    let html = '<div id="back-btn" onclick="window.__back(\'' + type + '\')">← Orqaga</div>';
-    html += '<div class="card"><h3>' + escapeHtml(item.title) + '</h3>';
-    if (item.body) html += '<div class="body-text">' + escapeHtml(item.body) + '</div>';
-    if (type === "listening") {
-      html += '<audio controls src="/api/dashboard/audio/' + id + '"></audio>';
-    }
-    html += '</div>';
-
-    if (item.questions && item.questions.length) {
-      html += '<div id="quiz-area"></div>';
-      contentEl.innerHTML = html;
-      renderQuiz(type, id, item.questions);
-    } else {
-      contentEl.innerHTML = html;
-    }
+  var T = {
+    uz: { home: "Bosh sahifa", practice: "Mashq", library: "Kutubxona", pro: "PRO", loading: "Yuklanmoqda…",
+      err: "Xatolik yuz berdi. Qayta urinib ko'ring.", noTg: "Bu ilovani Telegram ichidagi bot orqali oching.",
+      hello: "Salom", quiz: "Viktorina (eng yaxshi)", cert: "Sertifikat testi (eng yaxshi)", reading: "Reading yechilgan",
+      listening: "Listening yechilgan", rank: "Reyting", practiceHint: "Bosing — bot suhbatida boshlanadi.",
+      sci: "Ilm yo'nalishi", eng: "Ingliz tili", reading_t: "Reading", listening_t: "Listening", grammar_t: "Grammar",
+      empty: "Hozircha kontent yo'q.", questions: "ta savol", read: "O'qish / tinglash uchun", back: "← Orqaga",
+      qn: "Savol", result: "Natija", toList: "Ro'yxatga qaytish", scoring: "Baholanmoqda…",
+      proActive: "PRO faol", until: "Tugash sanasi", daysLeft: "kun qoldi", extend: "Muddatni uzaytirish",
+      buy: "PRO olish", offerT: "PRO obuna", days: "kun", perk1: "IELTS Writing tahlili — tekin", perk2: "To'liq Speaking mock — tekin",
+      perk3: "Profilda ⭐ PRO belgisi", perkLimit: "Kuniga {n} tagacha, avtomatik yangilanmaydi.",
+      owner: "Siz bot egasisiz — hamma narsa siz uchun doim tekin.", paidOk: "To'lov qabul qilindi! ⭐", cancelled: "To'lov bekor qilindi.",
+      checking: "Tekshirilmoqda…", asSeparate: "Alohida: Writing {w} ⭐ + Speaking {s} ⭐" },
+    ru: { home: "Главная", practice: "Практика", library: "Материалы", pro: "PRO", loading: "Загрузка…",
+      err: "Произошла ошибка. Попробуйте ещё раз.", noTg: "Откройте приложение через бота в Telegram.",
+      hello: "Привет", quiz: "Викторина (лучший результат)", cert: "Тест с сертификатом (лучший)", reading: "Reading пройдено",
+      listening: "Listening пройдено", rank: "Рейтинг", practiceHint: "Нажмите — начнём в чате с ботом.",
+      sci: "Наука и игры", eng: "Английский язык", reading_t: "Reading", listening_t: "Listening", grammar_t: "Grammar",
+      empty: "Пока нет материалов.", questions: "вопросов", read: "Для чтения и прослушивания", back: "← Назад",
+      qn: "Вопрос", result: "Результат", toList: "К списку", scoring: "Проверяем ответы…",
+      proActive: "PRO активна", until: "Действует до", daysLeft: "дн. осталось", extend: "Продлить",
+      buy: "Получить PRO", offerT: "PRO-подписка", days: "дней", perk1: "Разбор IELTS Writing — бесплатно", perk2: "Полный Speaking мок — бесплатно",
+      perk3: "Значок ⭐ PRO в профиле", perkLimit: "До {n} в день, без автопродления.",
+      owner: "Вы владелец бота — для вас всё всегда бесплатно.", paidOk: "Оплата получена! ⭐", cancelled: "Оплата отменена.",
+      checking: "Проверяем…", asSeparate: "По отдельности: Writing {w} ⭐ + Speaking {s} ⭐" },
+    en: { home: "Home", practice: "Practice", library: "Library", pro: "PRO", loading: "Loading…",
+      err: "Something went wrong. Please try again.", noTg: "Please open this app from the bot inside Telegram.",
+      hello: "Hi", quiz: "Quiz (best score)", cert: "Certificate test (best)", reading: "Reading completed",
+      listening: "Listening completed", rank: "Rank", practiceHint: "Tap to start in the bot chat.",
+      sci: "Science & games", eng: "English learning", reading_t: "Reading", listening_t: "Listening", grammar_t: "Grammar",
+      empty: "No content yet.", questions: "questions", read: "For reading and listening", back: "← Back",
+      qn: "Question", result: "Result", toList: "Back to the list", scoring: "Scoring your answers…",
+      proActive: "PRO is active", until: "Valid until", daysLeft: "days left", extend: "Extend",
+      buy: "Get PRO", offerT: "PRO subscription", days: "days", perk1: "IELTS Writing review included", perk2: "Full Speaking mock included",
+      perk3: "⭐ PRO badge on your profile", perkLimit: "Up to {n} per day, does not auto-renew.",
+      owner: "You're the bot owner — everything is always free for you.", paidOk: "Payment received! ⭐", cancelled: "Payment cancelled.",
+      checking: "Checking…", asSeparate: "Bought separately: Writing {w} ⭐ + Speaking {s} ⭐" }
   };
+  var guess = ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) || "en").slice(0, 2);
+  var lang = T[guess] ? guess : "en";
+  var S = function (k) { return (T[lang] && T[lang][k]) || T.en[k] || k; };
 
-  window.__back = function (type) { render(type); };
+  var me = null, tab = "home", libType = "reading", app = document.getElementById("app"), nav = document.getElementById("nav");
 
-  function renderQuiz(type, id, questions) {
-    const quizArea = document.getElementById("quiz-area");
-    const answers = new Array(questions.length).fill(null);
-    let currentQ = 0;
-
-    function renderQuestion() {
-      const q = questions[currentQ];
-      let html = '<div class="card"><p>Savol ' + (currentQ + 1) + '/' + questions.length + '</p>';
-      html += '<h3>' + escapeHtml(q.question) + '</h3>';
-      q.options.forEach((opt, i) => {
-        html += '<button class="option-btn" data-i="' + i + '">' + escapeHtml(opt) + '</button>';
-      });
-      html += '</div>';
-      quizArea.innerHTML = html;
-      quizArea.querySelectorAll(".option-btn").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          answers[currentQ] = parseInt(btn.dataset.i, 10);
-          currentQ++;
-          if (currentQ < questions.length) renderQuestion();
-          else submitQuiz();
-        });
-      });
+  function h(tag, attrs) {
+    var el = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === "class") el.className = attrs[k];
+      else if (k === "text") el.textContent = attrs[k];
+      else if (k.indexOf("on") === 0) el.addEventListener(k.slice(2), attrs[k]);
+      else el.setAttribute(k, attrs[k]);
+    });
+    for (var i = 2; i < arguments.length; i++) {
+      var c = arguments[i];
+      if (c == null) continue;
+      el.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
     }
+    return el;
+  }
+  function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+  function mount() { clear(app); for (var i = 0; i < arguments.length; i++) if (arguments[i]) app.appendChild(arguments[i]); window.scrollTo(0, 0); }
+  function toast(msg) {
+    var t = h("div", { class: "toast", text: msg }); document.body.appendChild(t);
+    setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2200);
+  }
+  function haptic(kind) { try { tg.HapticFeedback.notificationOccurred(kind); } catch (e) {} }
 
-    async function submitQuiz() {
-      quizArea.innerHTML = '<div class="loading">🧮 Baholanmoqda…</div>';
-      const result = await fetchJSON("/api/dashboard/content/" + type + "/" + id + "/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: uid, answers: answers }),
-      });
-      let html = '<div class="card"><h3>🏁 Natija: ' + result.score + '/' + result.total + ' (' + result.percentage + '%)</h3>';
-      html += '<button class="secondary" onclick="window.__back(\'' + type + '\')">↩️ Ro\'yxatga qaytish</button>';
-      html += '</div>';
-      quizArea.innerHTML = html;
-    }
-
-    renderQuestion();
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ "X-Init-Data": initData }, opts.headers || {});
+    return fetch(path, opts).then(function (r) {
+      if (!r.ok) throw new Error("http " + r.status);
+      return r.json();
+    });
   }
 
-  render(currentTab);
+  function renderNav() {
+    clear(nav);
+    [["home", "🏠", "home"], ["practice", "🚀", "practice"], ["library", "📚", "library"], ["pro", "⭐", "pro"]].forEach(function (x) {
+      nav.appendChild(h("button", { class: tab === x[0] ? "on" : "", onclick: function () { tab = x[0]; show(); } },
+        h("span", { class: "i", text: x[1] }), h("span", { text: S(x[2]) })));
+    });
+  }
+
+  function show() {
+    renderNav();
+    if (!me) return;
+    if (tab === "home") return viewHome();
+    if (tab === "practice") return viewPractice();
+    if (tab === "library") return viewLibrary();
+    if (tab === "pro") return viewPro();
+  }
+
+  function header() {
+    var initial = (me.name || "?").trim().charAt(0).toUpperCase() || "?";
+    var name = h("h1", { text: me.name || "" });
+    if (me.pro.active || me.admin) name.appendChild(h("span", { class: "badge", text: me.admin ? "OWNER" : "PRO" }));
+    return h("div", { class: "top" }, h("div", { class: "avatar", text: initial }),
+      h("div", {}, name, h("div", { class: "sub", text: S("hello") + " 👋" })));
+  }
+
+  function stat(v, l, rank) {
+    return h("div", { class: "stat" }, h("div", { class: "v", text: v }), h("div", { class: "l", text: l }),
+      rank ? h("div", { class: "r", text: S("rank") + " #" + rank }) : null);
+  }
+
+  function viewHome() {
+    var st = me.stats;
+    mount(header(),
+      h("div", { class: "section-title", text: "📊" }),
+      h("div", { class: "grid2" },
+        stat(st.quiz_best != null ? st.quiz_best + "%" : "—", S("quiz"), st.quiz_rank),
+        stat(st.cert_best != null ? st.cert_best + "%" : "—", S("cert"), st.cert_rank),
+        stat(String(st.reading_done), S("reading")),
+        stat(String(st.listening_done), S("listening"))));
+  }
+
+  function openCmd(cmd) {
+    var url = "https://t.me/" + me.bot + "?start=run_" + cmd;
+    try { tg.openTelegramLink(url); } catch (e) { window.location.href = url; }
+    setTimeout(function () { try { tg.close(); } catch (e) {} }, 250);
+  }
+
+  function tiles(list) {
+    var g = h("div", { class: "grid2" });
+    list.forEach(function (t) {
+      g.appendChild(h("button", { class: "tile", onclick: function () { openCmd(t.cmd); } },
+        h("div", { class: "e", text: t.emoji }), h("div", { class: "n", text: t.label }),
+        t.price ? h("div", { class: "p", text: "⭐ " + t.price }) : null));
+    });
+    return g;
+  }
+
+  function viewPractice() {
+    mount(h("div", { class: "top" }, h("div", {}, h("h1", { text: S("practice") }), h("div", { class: "sub", text: S("practiceHint") }))),
+      h("div", { class: "section-title", text: "🔬 " + S("sci") }), tiles(me.tiles.science),
+      h("div", { class: "section-title", text: "🇬🇧 " + S("eng") }), tiles(me.tiles.english));
+  }
+
+  // ---- Kutubxona (Reading / Listening / Grammar) ----
+  function viewLibrary() {
+    var seg = h("div", { class: "seg" });
+    [["reading", "reading_t"], ["listening", "listening_t"], ["grammar", "grammar_t"]].forEach(function (x) {
+      seg.appendChild(h("button", { class: libType === x[0] ? "on" : "", onclick: function () { libType = x[0]; viewLibrary(); } }, S(x[1])));
+    });
+    var box = h("div", {}, h("div", { class: "center", text: S("loading") }));
+    mount(h("div", { class: "top" }, h("h1", { text: S("library") })), seg, box);
+    api("/api/dashboard/content/" + libType).then(function (items) {
+      clear(box);
+      if (!items.length) { box.appendChild(h("div", { class: "center", text: S("empty") })); return; }
+      items.forEach(function (it) {
+        box.appendChild(h("div", { class: "list-item", onclick: function () { openItem(libType, it.id); } },
+          h("div", { class: "t" }, document.createTextNode(it.title),
+            h("div", { class: "m", text: it.has_questions ? it.question_count + " " + S("questions") : S("read") })),
+          h("div", { class: "chev", text: "›" })));
+      });
+    }).catch(function () { clear(box); box.appendChild(h("div", { class: "center", text: S("err") })); });
+  }
+
+  function openItem(type, id) {
+    mount(h("div", { class: "center", text: S("loading") }));
+    api("/api/dashboard/content/" + type + "/" + id).then(function (item) {
+      var card = h("div", { class: "card" }, h("h3", { text: item.title }));
+      if (item.body) card.appendChild(h("div", { class: "body-text", text: item.body, style: "margin-top:10px" }));
+      if (type === "listening") card.appendChild(h("audio", { controls: "", src: "/api/dashboard/audio/" + id }));
+      var area = h("div", {});
+      mount(h("button", { class: "back", onclick: viewLibrary, text: S("back") }), card, area);
+      if (item.questions && item.questions.length) runQuiz(type, id, item.questions, area);
+    }).catch(function () { mount(h("button", { class: "back", onclick: viewLibrary, text: S("back") }), h("div", { class: "center", text: S("err") })); });
+  }
+
+  function runQuiz(type, id, qs, area) {
+    var answers = [], i = 0;
+    function ask() {
+      clear(area);
+      var q = qs[i];
+      var card = h("div", { class: "card" },
+        h("div", { class: "progress" }, h("i", { style: "width:" + Math.round(i / qs.length * 100) + "%" })),
+        h("div", { class: "muted small", text: S("qn") + " " + (i + 1) + "/" + qs.length }),
+        h("h3", { text: q.question, style: "margin-top:4px" }));
+      q.options.forEach(function (o, k) {
+        card.appendChild(h("button", { class: "opt", text: o, onclick: function () {
+          answers.push(k); i++;
+          if (i < qs.length) ask(); else finish();
+        } }));
+      });
+      area.appendChild(card);
+    }
+    function finish() {
+      clear(area);
+      area.appendChild(h("div", { class: "center", text: S("scoring") }));
+      api("/api/dashboard/content/" + type + "/" + id + "/submit", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answers: answers })
+      }).then(function (r) {
+        clear(area); haptic(r.percentage >= 60 ? "success" : "warning");
+        area.appendChild(h("div", { class: "card" },
+          h("div", { class: "muted small", text: S("result") }),
+          h("div", { class: "price", text: r.score + "/" + r.total + "  ·  " + r.percentage + "%" }),
+          h("button", { class: "btn ghost", style: "margin-top:12px", onclick: viewLibrary, text: S("toList") })));
+        me.stats[type + "_done"] = (me.stats[type + "_done"] || 0) + 1;
+      }).catch(function () { clear(area); area.appendChild(h("div", { class: "center", text: S("err") })); });
+    }
+    ask();
+  }
+
+  // ---- PRO ----
+  function viewPro() {
+    var p = me.pro, parts = [h("div", { class: "top" }, h("h1", { text: "⭐ " + S("offerT") }))];
+    if (me.admin) { parts.push(h("div", { class: "card", text: S("owner") })); mount.apply(null, parts); return; }
+    if (p.active) {
+      parts.push(h("div", { class: "card" },
+        h("h3", { text: "✅ " + S("proActive") }),
+        h("p", { class: "muted", style: "margin-top:6px", text: S("until") + ": " + p.until + "  (" + p.left + " " + S("daysLeft") + ")" })));
+    }
+    parts.push(h("div", { class: "card" },
+      h("div", { class: "perk" }, h("div", { class: "ic", text: "💎" }), h("div", { text: S("perk1") })),
+      h("div", { class: "perk" }, h("div", { class: "ic", text: "🎙" }), h("div", { text: S("perk2") })),
+      h("div", { class: "perk" }, h("div", { class: "ic", text: "🏅" }), h("div", { text: S("perk3") })),
+      h("p", { class: "muted small", style: "margin-top:6px", text: S("perkLimit").replace("{n}", me.prices.pro_daily_limit) }),
+      h("p", { class: "muted small", text: S("asSeparate").replace("{w}", me.prices.writing).replace("{s}", me.prices.speaking) })));
+    var btn = h("button", { class: "btn", onclick: function () { buyPro(btn); } },
+      (p.active ? S("extend") : S("buy")) + " · ⭐ " + me.prices.pro + " / " + me.prices.pro_days + " " + S("days"));
+    parts.push(btn);
+    mount.apply(null, parts);
+  }
+
+  function refreshMe() {
+    return api("/api/dashboard/me").then(function (d) { me = d; });
+  }
+
+  function buyPro(btn) {
+    btn.disabled = true;
+    api("/api/dashboard/pro/invoice", { method: "POST" }).then(function (r) {
+      if (!tg || !tg.openInvoice) { window.location.href = r.link; return; }
+      tg.openInvoice(r.link, function (status) {
+        if (status === "paid") {
+          haptic("success"); toast(S("paidOk")); btn.textContent = S("checking");
+          var tries = 0;
+          (function poll() {
+            refreshMe().then(function () {
+              if (me.pro.active || tries++ > 6) { btn.disabled = false; viewPro(); } else setTimeout(poll, 1200);
+            }).catch(function () { btn.disabled = false; });
+          })();
+        } else { btn.disabled = false; if (status === "cancelled") toast(S("cancelled")); }
+      });
+    }).catch(function () { btn.disabled = false; toast(S("err")); });
+  }
+
+  // ---- start ----
+  if (!initData) { renderNav(); mount(h("div", { class: "center", text: S("noTg") })); return; }
+  renderNav();
+  mount(h("div", { class: "center", text: S("loading") }));
+  refreshMe().then(function () {
+    if (T[me.lang]) lang = me.lang;
+    show();
+  }).catch(function () { mount(h("div", { class: "center", text: S("err") })); });
 })();
 </script>
 </body>
@@ -5185,109 +5506,130 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 """
 
 
-DASH_I18N = {
-    "Yuklanmoqda…": ("Загрузка…", "Loading…"),
-    "👤 Profil": ("👤 Профиль", "👤 Profile"),
-    "🏆 Viktorina (eng yaxshi)": ("🏆 Викторина (лучший результат)", "🏆 Quiz (best score)"),
-    "🎓 Sertifikat testi (eng yaxshi)": ("🎓 Тест с сертификатом (лучший результат)", "🎓 Certificate test (best score)"),
-    "📖 Reading testlari yechilgan": ("📖 Пройдено тестов Reading", "📖 Reading tests completed"),
-    "🎧 Listening testlari yechilgan": ("🎧 Пройдено тестов Listening", "🎧 Listening tests completed"),
-    "Viktorina reytingidagi o\\'rni": ("Место в рейтинге викторины", "Quiz leaderboard rank"),
-    "Sertifikat reytingidagi o\\'rni": ("Место в рейтинге сертификатов", "Certificate leaderboard rank"),
-    "⚠️ Xatolik yuz berdi.": ("⚠️ Произошла ошибка.", "⚠️ Something went wrong."),
-    "📭 Hozircha kontent yo\\'q.": ("📭 Пока нет материалов.", "📭 No content yet."),
-    " ta savol": (" вопросов", " questions"),
-    "📖 O\\'qish/tinglash uchun": ("📖 Для чтения и прослушивания", "📖 For reading and listening"),
-    "▶️ Ochish": ("▶️ Открыть", "▶️ Open"),
-    "← Orqaga": ("← Назад", "← Back"),
-    "<p>Savol ": ("<p>Вопрос ", "<p>Question "),
-    "🧮 Baholanmoqda…": ("🧮 Проверяем ответы…", "🧮 Scoring your answers…"),
-    "🏁 Natija: ": ("🏁 Результат: ", "🏁 Result: "),
-    "↩️ Ro\\'yxatga qaytish": ("↩️ К списку", "↩️ Back to the list"),
-    '"Foydalanuvchi"': ('"Пользователь"', '"User"'),
-}
+def _verify_init_data(init_data: str, max_age: int = 86400) -> dict | None:
+    """Telegram Mini App initData imzosini (HMAC-SHA256) tekshiradi va foydalanuvchi ma'lumotini qaytaradi.
+    Imzo noto'g'ri yoki eskirgan bo'lsa None — shu tufayli foydalanuvchi o'zini boshqasi deb ko'rsata olmaydi."""
+    if not init_data:
+        return None
+    try:
+        pairs = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
+        received = pairs.pop("hash", None)
+        if not received:
+            return None
+        check = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
+        secret = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+        calc = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(calc, received):
+            return None
+        age = datetime.now(timezone.utc).timestamp() - int(pairs.get("auth_date", "0"))
+        if age > max_age:
+            return None
+        user = json.loads(pairs.get("user", "{}"))
+        return user if isinstance(user, dict) and user.get("id") else None
+    except Exception:
+        return None
 
 
-def _dashboard_html_for(lang: str) -> str:
-    html_text = DASHBOARD_HTML
-    if lang in ("ru", "en"):
-        idx = 0 if lang == "ru" else 1
-        for key in sorted(DASH_I18N, key=len, reverse=True):
-            html_text = html_text.replace(key, DASH_I18N[key][idx])
-        html_text = html_text.replace('<html lang="uz">', f'<html lang="{lang}">')
-    return html_text
+def _auth_user(request: web.Request) -> dict | None:
+    return _verify_init_data(request.headers.get("X-Init-Data", ""))
+
+
+_bot_username_cache: str = ""
+
+
+async def _bot_username() -> str:
+    global _bot_username_cache
+    if not _bot_username_cache:
+        try:
+            _bot_username_cache = (await bot.get_me()).username or ""
+        except Exception as e:
+            logger.warning("Bot username olinmadi: %s", e)
+    return _bot_username_cache
 
 
 async def dashboard_page(request: web.Request):
-    lang = DEFAULT_LANG
-    try:
-        lang = (await get_lang(int(request.query.get("uid", "")))) or UNSET_LANG
-    except (TypeError, ValueError):
-        pass
-    return web.Response(text=_dashboard_html_for(lang), content_type="text/html")
+    return web.Response(text=DASHBOARD_HTML, content_type="text/html", headers={"Cache-Control": "no-store"})
 
 
-async def api_dashboard_profile(request: web.Request):
-    uid = request.query.get("uid", "")
-    name = "Foydalanuvchi"
-    try:
-        name = {"ru": "Пользователь", "en": "User"}.get(await get_lang(int(uid)), name)
-    except (TypeError, ValueError):
-        pass
-    try:
-        chat = await bot.get_chat(int(uid))
-        name = chat.full_name or (f"@{chat.username}" if chat.username else name)
-    except Exception:
-        pass
-
-    quiz_best = None
-    cert_best = None
-    quiz_rank = None
-    cert_rank = None
-
-    if redis_client is not None:
+async def _profile_stats(uid: str) -> dict:
+    stats = {"quiz_best": None, "cert_best": None, "quiz_rank": None, "cert_rank": None,
+             "reading_done": 0, "listening_done": 0}
+    if redis_client is None:
+        return stats
+    for key, best, rank in ((LEADERBOARD_QUIZ_KEY, "quiz_best", "quiz_rank"), (LEADERBOARD_CERT_KEY, "cert_best", "cert_rank")):
         try:
-            score = await redis_client.zscore(LEADERBOARD_QUIZ_KEY, uid)
+            score = await redis_client.zscore(key, uid)
             if score is not None:
-                quiz_best = int(float(score))
-                entries = await get_leaderboard_entries(LEADERBOARD_QUIZ_KEY, top_n=10_000)
+                stats[best] = int(float(score))
+                entries = await get_leaderboard_entries(key, top_n=10_000)
                 for i, (member, _) in enumerate(entries):
                     if member == uid:
-                        quiz_rank = i + 1
+                        stats[rank] = i + 1
                         break
         except Exception as e:
-            logger.warning("Profil (viktorina) o'qishda xatolik: %s", e)
+            logger.warning("Profil (%s) o'qishda xatolik: %s", best, e)
+    try:
+        stats["reading_done"] = int(await redis_client.scard(f"ielts_bot:done:reading:{uid}") or 0)
+        stats["listening_done"] = int(await redis_client.scard(f"ielts_bot:done:listening:{uid}") or 0)
+    except Exception as e:
+        logger.warning("Profil (done-sets) o'qishda xatolik: %s", e)
+    return stats
 
-        try:
-            score = await redis_client.zscore(LEADERBOARD_CERT_KEY, uid)
-            if score is not None:
-                cert_best = int(float(score))
-                entries = await get_leaderboard_entries(LEADERBOARD_CERT_KEY, top_n=10_000)
-                for i, (member, _) in enumerate(entries):
-                    if member == uid:
-                        cert_rank = i + 1
-                        break
-        except Exception as e:
-            logger.warning("Profil (sertifikat) o'qishda xatolik: %s", e)
 
-    reading_done = 0
-    listening_done = 0
-    if redis_client is not None:
-        try:
-            reading_done = await redis_client.scard(f"ielts_bot:done:reading:{uid}") or 0
-            listening_done = await redis_client.scard(f"ielts_bot:done:listening:{uid}") or 0
-        except Exception as e:
-            logger.warning("Profil (done-sets) o'qishda xatolik: %s", e)
+def _dash_tiles(lang: str, items: list) -> list:
+    out = []
+    for emoji, cmd in items:
+        if cmd in ("pro", "dashboard"):
+            continue
+        label = (MENU_LABELS.get(cmd) or {}).get(lang) or (MENU_LABELS.get(cmd) or {}).get("en") or cmd
+        price = {"writing": WRITING_PRICE_STARS, "speaking": SPEAKING_PRICE_STARS}.get(cmd)
+        out.append({"cmd": cmd, "emoji": emoji, "label": label, "price": price})
+    return out
 
+
+async def api_dashboard_me(request: web.Request):
+    user = _auth_user(request)
+    if not user:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    uid = int(user["id"])
+    lang = (await get_lang(uid)) or UNSET_LANG
+    name = " ".join(x for x in (user.get("first_name"), user.get("last_name")) if x).strip() \
+        or (f"@{user['username']}" if user.get("username") else "User")
+    exp = await _pro_expiry(uid)
+    now_ts = datetime.now(timezone.utc).timestamp()
+    pro = {"active": bool(exp), "until": _pro_date(exp) if exp else "", "left": max(1, int((exp - now_ts) // 86400) + 1) if exp else 0}
     return web.json_response({
-        "name": name,
-        "quiz_best": quiz_best,
-        "cert_best": cert_best,
-        "quiz_rank": quiz_rank,
-        "cert_rank": cert_rank,
-        "reading_done": int(reading_done),
-        "listening_done": int(listening_done),
+        "uid": uid, "name": name, "lang": lang, "admin": _is_admin(uid), "pro": pro,
+        "stats": await _profile_stats(str(uid)),
+        "bot": await _bot_username(),
+        "tiles": {"science": _dash_tiles(lang, MENU_SCIENCE), "english": _dash_tiles(lang, MENU_ENGLISH)},
+        "prices": {"pro": PRO_PRICE_STARS, "pro_days": PRO_DAYS, "pro_daily_limit": PRO_DAILY_LIMIT,
+                   "writing": WRITING_PRICE_STARS, "speaking": SPEAKING_PRICE_STARS},
     })
+
+
+async def api_dashboard_pro_invoice(request: web.Request):
+    """Mini App ichida PRO uchun Stars invoice havolasini yaratadi (tg.openInvoice bilan ochiladi)."""
+    user = _auth_user(request)
+    if not user:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    uid = int(user["id"])
+    if _is_admin(uid):
+        return web.json_response({"error": "owner"}, status=400)
+    current_lang.set((await get_lang(uid)) or UNSET_LANG)
+    try:
+        link = await bot.create_invoice_link(
+            title=_pr("inv_title"),
+            description=_pr("inv_desc", d=PRO_DAYS),
+            payload=f"pro:{uid}",
+            provider_token="",
+            currency="XTR",
+            prices=[LabeledPrice(label=_pr("inv_label", d=PRO_DAYS), amount=PRO_PRICE_STARS)],
+        )
+    except Exception as e:
+        logger.exception("PRO invoice havolasini yaratishda xatolik: %s", e)
+        return web.json_response({"error": "invoice failed"}, status=500)
+    return web.json_response({"link": link})
 
 
 async def api_dashboard_content_list(request: web.Request):
@@ -5342,10 +5684,13 @@ async def api_dashboard_content_submit(request: web.Request):
     if content_type not in CONTENT_TYPES:
         return web.json_response({"error": "unknown content type"}, status=404)
 
+    user = _auth_user(request)
+    if not user:
+        return web.json_response({"error": "unauthorized"}, status=401)
     try:
         item_id = int(request.match_info.get("id"))
         body = await request.json()
-        uid = str(body.get("uid", "anonymous"))
+        uid = str(user["id"])
         user_answers = body.get("answers", [])
     except Exception:
         return web.json_response({"error": "invalid request"}, status=400)
@@ -5443,7 +5788,8 @@ def create_app() -> web.Application:
 
     # Dashboard Mini App — sahifa va API endpointlari
     app.router.add_get("/miniapp/dashboard", dashboard_page)
-    app.router.add_get("/api/dashboard/profile", api_dashboard_profile)
+    app.router.add_get("/api/dashboard/me", api_dashboard_me)
+    app.router.add_post("/api/dashboard/pro/invoice", api_dashboard_pro_invoice)
     app.router.add_get("/api/dashboard/content/{type}", api_dashboard_content_list)
     app.router.add_get("/api/dashboard/content/{type}/{id}", api_dashboard_content_detail)
     app.router.add_post("/api/dashboard/content/{type}/{id}/submit", api_dashboard_content_submit)
@@ -5481,6 +5827,7 @@ async def setup_bot_commands():
         BotCommand(command="daily", description="Today's science, fact and English tip"),
         BotCommand(command="writing", description=f"IELTS Writing review ({WRITING_PRICE_STARS} Stars)"),
         BotCommand(command="speaking", description=f"IELTS Speaking full mock ({SPEAKING_PRICE_STARS} Stars)"),
+        BotCommand(command="pro", description=f"PRO: Writing + Speaking included ({PRO_PRICE_STARS} Stars)"),
         BotCommand(command="grammar", description="English grammar: lessons and practice"),
         BotCommand(command="english", description="Chat in English (corrects your mistakes)"),
         BotCommand(command="certificate", description="25-question certificate test"),
