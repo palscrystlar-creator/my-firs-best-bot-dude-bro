@@ -69,6 +69,7 @@ from aiogram.types import (
     PreCheckoutQuery,
     BufferedInputFile,
     InputMediaPhoto,
+    MenuButtonWebApp,
 )
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
@@ -132,6 +133,7 @@ BOT_STARTS_COUNTER_KEY = "ielts_bot:total_starts"
 WRITING_PRICE_STARS = 5   # IELTS Writing tahlili narxi (⭐ Telegram Stars) — faqat shu raqamni o'zgartirish kifoya
 SPEAKING_PRICE_STARS = 3   # IELTS Speaking to'liq mock narxi (⭐ Telegram Stars)
 PRO_PRICE_STARS = 10   # PRO obuna narxi (⭐ Telegram Stars)
+GATE_CHAT_ENGLISH = True   # True: ingliz tiliga oid chat buyruqlari (grammar, test, reading/listening) faqat PRO uchun
 PRO_DAYS = 30
 BOT_USER_INFO_KEY = "ielts_bot:user_info"      # hash: user_id -> JSON {n, u, d}
 BOT_ACTIVE_DAY_PREFIX = "ielts_bot:active:"   # + YYYY-MM-DD (Toshkent vaqti)
@@ -556,10 +558,11 @@ MENU_LABELS = {
 }
 
 
-def tr(key: str, lang: str = None) -> str:
+def tr(key: str, lang: str = None, **kw) -> str:
     lang = lang or cur_lang()
     d = I18N.get(key, {})
-    return d.get(lang) or d.get(DEFAULT_LANG) or d.get("_", "")
+    text = d.get(lang) or d.get(DEFAULT_LANG) or d.get("_", "")
+    return text.format(**kw) if kw else text
 
 
 def _lang_keyboard() -> InlineKeyboardMarkup:
@@ -1762,6 +1765,47 @@ ALL_COMMANDS = {
 }
 
 
+I18N.update({
+    "btn_app": {"uz": "🎓 Ilovani ochish", "ru": "🎓 Открыть приложение", "en": "🎓 Open the app"},
+    "btn_pro_go": {"uz": "⭐ PRO bilan davom etish · {p} ⭐", "ru": "⭐ Продолжить с PRO · {p} ⭐", "en": "⭐ Continue with PRO · {p} ⭐"},
+    "btn_free": {"uz": "🆓 Bepul versiya", "ru": "🆓 Бесплатная версия", "en": "🆓 Free version"},
+    "pitch": {
+        "uz": "👋 <b>Salom! Talk botiga xush kelibsiz.</b>\n\n⭐ <b>PRO bilan hammasi ochiladi</b> — atigi {p} ⭐ ga {d} kun:\n💎 IELTS Writing tahlili\n🎙 To'liq Speaking mock (mikrofon bilan)\n📝 Grammar darslari va mashqlar\n📖 Reading va 🎧 Listening testlari\n🌐 Ingliz tili viktorinalari va kutubxona\n\nHar birini alohida olsangiz ancha qimmatroq — PRO eng foydali yo'l 🚀\n\n🆓 <b>Bepul versiyada:</b> fan viktorinalari, jumboqlar, hikoyalar, o'yinlar, kunlik fakt, sertifikat testi va ingliz tilida erkin suhbat.\n\nQaysi birini tanlaysiz? 👇",
+        "ru": "👋 <b>Привет! Добро пожаловать в Talk.</b>\n\n⭐ <b>С PRO открывается всё</b> — всего {p} ⭐ на {d} дней:\n💎 Разбор IELTS Writing\n🎙 Полный Speaking мок (с микрофоном)\n📝 Уроки и упражнения по Grammar\n📖 Тесты Reading и 🎧 Listening\n🌐 Английские викторины и библиотека\n\nПо отдельности каждое стоит заметно дороже — PRO самый выгодный путь 🚀\n\n🆓 <b>В бесплатной версии:</b> викторины по наукам, головоломки, истории, игры, факт дня, тест с сертификатом и свободный разговор на английском.\n\nЧто выбираете? 👇",
+        "en": "👋 <b>Hi! Welcome to Talk.</b>\n\n⭐ <b>PRO unlocks everything</b> — just {p} ⭐ for {d} days:\n💎 IELTS Writing review\n🎙 Full Speaking mock (with your microphone)\n📝 Grammar lessons and practice\n📖 Reading and 🎧 Listening tests\n🌐 English quizzes and the library\n\nBought one by one it costs much more — PRO is the best deal 🚀\n\n🆓 <b>The free version has:</b> science quizzes, brain teasers, stories, games, the daily fact, the certificate test and free chat in English.\n\nWhich do you choose? 👇",
+    },
+    "free_go": {
+        "uz": "🆓 <b>Bepul versiya yoqildi!</b>\n\nFan viktorinalari, o'yinlar, hikoyalar va ingliz tilida suhbat — hammasi bepul. Ingliz tiliga oid vositalar (Writing, Speaking, Grammar, Reading, Listening) PRO'da. Xohlagan payt /pro buyrug'i bilan ulanishingiz mumkin.\n\nIlovani oching yoki menyudan tanlang 👇",
+        "ru": "🆓 <b>Бесплатная версия включена!</b>\n\nВикторины, игры, истории и разговор на английском — всё бесплатно. Инструменты английского (Writing, Speaking, Grammar, Reading, Listening) — в PRO. Подключить можно в любой момент командой /pro.\n\nОткройте приложение или выберите в меню 👇",
+        "en": "🆓 <b>Free version on!</b>\n\nScience quizzes, games, stories and chatting in English are all free. The English tools (Writing, Speaking, Grammar, Reading, Listening) are in PRO — you can switch it on any time with /pro.\n\nOpen the app or pick from the menu 👇",
+    },
+    "welcome_back": {
+        "uz": "👋 <b>Xush kelibsiz!</b> ⭐ PRO faol.\n\nIlovani oching yoki menyudan tanlang 👇",
+        "ru": "👋 <b>С возвращением!</b> ⭐ PRO активна.\n\nОткройте приложение или выберите в меню 👇",
+        "en": "👋 <b>Welcome back!</b> ⭐ PRO is active.\n\nOpen the app or pick from the menu 👇",
+    },
+    "gate": {
+        "uz": "🔒 <b>Bu PRO funksiya</b>\n\nIngliz tiliga oid barcha vositalar (Grammar, Reading, Listening, Speaking, Writing) PRO'da. Ingliz tilida erkin suhbat (/english) esa hamma uchun bepul.\n\n⭐ PRO — {p} ⭐ / {d} kun.",
+        "ru": "🔒 <b>Это функция PRO</b>\n\nВсе инструменты английского (Grammar, Reading, Listening, Speaking, Writing) — в PRO. Свободный разговор на английском (/english) бесплатен для всех.\n\n⭐ PRO — {p} ⭐ / {d} дней.",
+        "en": "🔒 <b>This is a PRO feature</b>\n\nAll English tools (Grammar, Reading, Listening, Speaking, Writing) are in PRO. Free chat in English (/english) stays free for everyone.\n\n⭐ PRO — {p} ⭐ / {d} days.",
+    },
+    "paid_app": {
+        "uz": "✅ <b>To'lov qabul qilindi!</b> ⭐ Ilovaga qaytib, davom eting.",
+        "ru": "✅ <b>Оплата получена!</b> ⭐ Вернитесь в приложение и продолжайте.",
+        "en": "✅ <b>Payment received!</b> ⭐ Go back to the app and continue.",
+    },
+})
+
+
+def _app_url(route: str = "") -> str:
+    base = f"{WEBHOOK_BASE_URL.rstrip('/')}/miniapp/dashboard"
+    return f"{base}?r={route}" if route else base
+
+
+def _app_button(route: str = "") -> InlineKeyboardButton:
+    return InlineKeyboardButton(text=tr("btn_app"), web_app=WebAppInfo(url=_app_url(route)))
+
+
 def _menu_label(cmd: str) -> str:
     base = MENU_LABELS.get(cmd, {}).get(cur_lang()) or MENU_LABELS.get(cmd, {}).get("uz") or cmd
     if cmd == "writing":
@@ -1775,6 +1819,7 @@ def _menu_label(cmd: str) -> str:
 
 def _main_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
+        [_app_button()],
         [InlineKeyboardButton(text=tr("btn_sci"), callback_data="mn:sci")],
         [InlineKeyboardButton(text=tr("btn_eng"), callback_data="mn:eng")],
         [InlineKeyboardButton(text=tr("btn_all"), callback_data="mn:all"),
@@ -1795,6 +1840,20 @@ def _submenu_keyboard(items: list) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def _pitch_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=tr("btn_pro_go", p=PRO_PRICE_STARS), callback_data="pw:buy")],
+        [InlineKeyboardButton(text=tr("btn_free"), callback_data="pw:free")],
+    ])
+
+
+async def _start_screen(uid: int) -> tuple[str, InlineKeyboardMarkup]:
+    """/start dan keyin ko'rsatiladigan ekran: PRO foydalanuvchiga menyu, qolganlarga PRO taklifi."""
+    if await _is_premium(uid):
+        return tr("welcome_back"), _main_menu_keyboard()
+    return tr("pitch", p=PRO_PRICE_STARS, d=PRO_DAYS), _pitch_keyboard()
+
+
 @dp.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, command: CommandObject):
     await state.clear()
@@ -1809,7 +1868,23 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject)
             fake = message.model_copy(update={"text": f"/{cmd}", "entities": None})
             await dp.feed_update(bot, Update(update_id=0, message=fake))
             return
-    await message.answer(tr("intro"), reply_markup=_main_menu_keyboard())
+    text, kb = await _start_screen(message.from_user.id)
+    await message.answer(text, reply_markup=kb)
+
+
+@dp.callback_query(F.data == "pw:buy")
+async def handle_pitch_buy(callback: CallbackQuery):
+    await callback.answer()
+    await _send_pro_invoice(callback.message)
+
+
+@dp.callback_query(F.data == "pw:free")
+async def handle_pitch_free(callback: CallbackQuery):
+    await callback.answer()
+    try:
+        await callback.message.edit_text(tr("free_go"), reply_markup=_main_menu_keyboard())
+    except Exception:
+        await callback.message.answer(tr("free_go"), reply_markup=_main_menu_keyboard())
 
 
 @dp.message(Command("language", "til"))
@@ -1831,11 +1906,12 @@ async def handle_language(callback: CallbackQuery):
     await set_lang(callback.from_user.id, code)
     current_lang.set(code)
     await callback.answer(LANGS[code][0])
-    text = f"{tr('lang_set')}\n\n{tr('intro')}"
+    body, kb = await _start_screen(callback.from_user.id)
+    text = f"{tr('lang_set')}\n\n{body}"
     try:
-        await callback.message.edit_text(text, reply_markup=_main_menu_keyboard())
+        await callback.message.edit_text(text, reply_markup=kb)
     except Exception:
-        await callback.message.answer(text, reply_markup=_main_menu_keyboard())
+        await callback.message.answer(text, reply_markup=kb)
 
 
 @dp.callback_query(F.data.startswith("mn:"))
@@ -2024,11 +2100,11 @@ async def cmd_reyting(message: Message):
 
 
 _DASH_T = {
-    "btn": {"uz": "🎓 Dashboard'ni ochish", "ru": "🎓 Открыть дашборд", "en": "🎓 Open dashboard"},
+    "btn": {"uz": "🎓 Ilovani ochish", "ru": "🎓 Открыть приложение", "en": "🎓 Open the app"},
     "txt": {
-        "uz": "🎓 <b>Talk Dashboard</b>\n\nStatistika, mashqlar, Reading/Listening/Grammar kutubxonasi va ⭐ PRO — hammasi bir joyda:",
-        "ru": "🎓 <b>Talk Dashboard</b>\n\nСтатистика, практика, библиотека Reading/Listening/Grammar и ⭐ PRO — всё в одном месте:",
-        "en": "🎓 <b>Talk Dashboard</b>\n\nYour stats, practice, the Reading/Listening/Grammar library and ⭐ PRO — all in one place:",
+        "uz": "🎓 <b>Talk ilovasi</b>\n\nBarcha o'yinlar, testlar, Writing va Speaking, reyting va ⭐ PRO — bitta joyda:",
+        "ru": "🎓 <b>Приложение Talk</b>\n\nВсе игры, тесты, Writing и Speaking, рейтинг и ⭐ PRO — в одном месте:",
+        "en": "🎓 <b>The Talk app</b>\n\nAll games, tests, Writing and Speaking, the leaderboard and ⭐ PRO — in one place:",
     },
 }
 
@@ -3536,11 +3612,16 @@ async def cmd_writing(message: Message, state: FSMContext):
         await message.answer("❌ To'lov oynasini ochib bo'lmadi. Birozdan so'ng qayta urinib ko'ring.")
 
 
+def _parse_payload(payload: str) -> tuple[str, str, bool]:
+    parts = (payload or "").split(":")
+    return (parts[0] if parts else ""), (parts[1] if len(parts) > 1 else ""), (len(parts) > 2 and parts[2] == "app")
+
+
 @dp.pre_checkout_query()
 async def handle_pre_checkout(query: PreCheckoutQuery):
-    uid = query.from_user.id
-    prices = {f"writing:{uid}": WRITING_PRICE_STARS, f"speaking:{uid}": SPEAKING_PRICE_STARS, f"pro:{uid}": PRO_PRICE_STARS}
-    ok = query.currency == "XTR" and prices.get(query.invoice_payload) == query.total_amount
+    product, uid_s, _app = _parse_payload(query.invoice_payload)
+    price = {"writing": WRITING_PRICE_STARS, "speaking": SPEAKING_PRICE_STARS, "pro": PRO_PRICE_STARS}.get(product)
+    ok = query.currency == "XTR" and price is not None and uid_s == str(query.from_user.id) and price == query.total_amount
     if ok:
         await query.answer(ok=True)
     else:
@@ -3551,18 +3632,26 @@ async def handle_pre_checkout(query: PreCheckoutQuery):
 async def handle_successful_payment(message: Message, state: FSMContext):
     pay = message.successful_payment
     uid = message.from_user.id
+    product, _uid_s, from_app = _parse_payload(pay.invoice_payload)
     logger.info("Stars to'lov: user=%s amount=%s payload=%s charge_id=%s", uid, pay.total_amount,
                 pay.invoice_payload, pay.telegram_payment_charge_id)
-    if pay.invoice_payload.startswith("pro:"):
+    if product == "pro":
         exp = await _grant_pro(uid)
-        await message.answer(_pr("thanks", date=_pro_date(exp), l=PRO_DAILY_LIMIT))
+        await message.answer(_pr("thanks", date=_pro_date(exp), l=PRO_DAILY_LIMIT),
+                             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_app_button()]]))
         return
-    if pay.invoice_payload.startswith("speaking:"):
+    if product == "speaking":
         await _grant_speaking_credit(uid)
-        await _start_full_speaking(message, state, uid, _sp("thanks"))
+        if from_app:
+            await message.answer(tr("paid_app"), reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_app_button("english")]]))
+        else:
+            await _start_full_speaking(message, state, uid, _sp("thanks"))
         return
     await _grant_writing_credit(uid)
-    await _give_writing_task(message, uid, "✅ <b>To'lov qabul qilindi, rahmat!</b> ⭐\n\n")
+    if from_app:
+        await message.answer(tr("paid_app"), reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_app_button("english")]]))
+    else:
+        await _give_writing_task(message, uid, "✅ <b>To'lov qabul qilindi, rahmat!</b> ⭐\n\n")
 
 
 @dp.callback_query(F.data == "wr:new")
@@ -4259,6 +4348,29 @@ async def cmd_pro(message: Message):
         await message.answer(_pr("offer", d=PRO_DAYS, l=PRO_DAILY_LIMIT, w=WRITING_PRICE_STARS,
                                  s=SPEAKING_PRICE_STARS, p=PRO_PRICE_STARS))
     await _send_pro_invoice(message)
+
+
+class EnglishGateMiddleware(BaseMiddleware):
+    """Ingliz tiliga oid chat buyruqlari (Grammar, Reading, Listening, Speaking Part 1) faqat PRO uchun.
+    Erkin ingliz suhbati (/english) hamma uchun bepul. O'chirish: GATE_CHAT_ENGLISH = False."""
+    GATED = {"grammar", "test", "reading_test", "listening_test"}
+
+    async def __call__(self, handler, event, data):
+        if GATE_CHAT_ENGLISH and isinstance(event, Message) and event.text and event.text.startswith("/") and event.from_user:
+            cmd = event.text[1:].split()[0].split("@")[0].lower() if event.text[1:].strip() else ""
+            if cmd in self.GATED and not await _is_premium(event.from_user.id):
+                await event.answer(
+                    tr("gate", p=PRO_PRICE_STARS, d=PRO_DAYS),
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text=tr("btn_pro_go", p=PRO_PRICE_STARS), callback_data="pw:buy")],
+                        [_app_button()],
+                    ]),
+                )
+                return
+        return await handler(event, data)
+
+
+dp.message.outer_middleware(EnglishGateMiddleware())
 
 
 # --- Kunlik fan + ingliz tili maslahati ----------------------------------
@@ -5155,7 +5267,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Talk Dashboard</title>
+<title>Talk</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   :root {
@@ -5165,7 +5277,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     --muted: var(--tg-theme-hint-color, #8b93a7);
     --accent: var(--tg-theme-button-color, #5b8cff);
     --accent-text: var(--tg-theme-button-text-color, #ffffff);
-    --line: rgba(127,135,160,.22);
+    --line: rgba(127,135,160,.25);
     --good: #3ecf8e; --bad: #ff6b6b; --gold: #f5b942;
     --r: 16px;
   }
@@ -5177,114 +5289,219 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   .top { display: flex; align-items: center; gap: 12px; padding: 18px 0 8px; }
   .avatar { width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #b06cff);
     display: grid; place-items: center; font-weight: 700; font-size: 19px; color: #fff; flex: none; }
-  .top h1 { font-size: 18px; line-height: 1.2; }
-  .top .sub { color: var(--muted); font-size: 13px; }
+  .top h1 { font-size: 19px; line-height: 1.2; }
+  .sub { color: var(--muted); font-size: 13px; }
   .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
     background: linear-gradient(90deg, #f5b942, #ff8a5c); color: #1b1305; vertical-align: 2px; margin-left: 6px; }
-  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
-    margin: 20px 2px 8px; font-weight: 600; }
+  .lock { font-size: 11px; font-weight: 700; color: var(--gold); }
+  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 20px 2px 8px; font-weight: 600; }
   .card { background: var(--card); border-radius: var(--r); padding: 16px; margin-bottom: 12px; }
+  .promo { background: linear-gradient(135deg, rgba(245,185,66,.18), rgba(176,108,255,.18)); border: 1px solid rgba(245,185,66,.35); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .stat { background: var(--card); border-radius: var(--r); padding: 14px; }
   .stat .v { font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
   .stat .l { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .stat .r { color: var(--gold); font-size: 12px; margin-top: 4px; font-weight: 600; }
-  .tile { background: var(--card); border: 0; color: var(--text); border-radius: var(--r); padding: 14px 12px;
-    text-align: left; font: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-height: 84px; }
+  .tile { background: var(--card); border: 0; color: var(--text); border-radius: var(--r); padding: 14px 12px; text-align: left;
+    font: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-height: 92px; position: relative; }
   .tile:active { transform: scale(.98); }
-  .tile .e { font-size: 24px; }
+  .tile .e { font-size: 26px; }
   .tile .n { font-size: 13.5px; font-weight: 600; line-height: 1.25; }
-  .tile .p { font-size: 11px; color: var(--gold); font-weight: 600; }
+  .tile .d { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+  .tile .lk { position: absolute; top: 10px; right: 10px; font-size: 12px; }
   .btn { display: block; width: 100%; border: 0; border-radius: 12px; padding: 13px 16px; font: inherit; font-weight: 600;
-    background: var(--accent); color: var(--accent-text); cursor: pointer; text-align: center; }
+    background: var(--accent); color: var(--accent-text); cursor: pointer; text-align: center; margin-top: 10px; }
   .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  .btn.gold { background: linear-gradient(90deg, #f5b942, #ff8a5c); color: #1b1305; }
+  .btn.good { background: var(--good); color: #06240f; }
+  .btn.bad { background: var(--bad); color: #fff; }
   .btn[disabled] { opacity: .55; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
   .muted { color: var(--muted); }
   .small { font-size: 13px; }
-  .list-item { background: var(--card); border-radius: var(--r); padding: 14px 16px; margin-bottom: 10px; cursor: pointer;
-    display: flex; align-items: center; gap: 12px; }
+  .list-item { background: var(--card); border-radius: var(--r); padding: 14px 16px; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; gap: 12px; }
   .list-item .t { flex: 1; font-weight: 600; }
   .list-item .m { color: var(--muted); font-size: 12px; font-weight: 400; margin-top: 2px; }
   .chev { color: var(--muted); font-size: 18px; }
-  .seg { display: flex; background: var(--card); border-radius: 12px; padding: 3px; margin-bottom: 14px; }
-  .seg button { flex: 1; border: 0; background: transparent; color: var(--muted); padding: 9px 4px; border-radius: 10px;
-    font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .seg { display: flex; background: var(--card); border-radius: 12px; padding: 3px; margin-bottom: 14px; overflow-x: auto; }
+  .seg button { flex: 1; border: 0; background: transparent; color: var(--muted); padding: 9px 8px; border-radius: 10px; font: inherit;
+    font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .seg button.on { background: var(--accent); color: var(--accent-text); }
-  .perk { display: flex; gap: 10px; padding: 8px 0; }
+  .perk { display: flex; gap: 10px; padding: 7px 0; }
   .perk .ic { font-size: 20px; width: 28px; text-align: center; }
-  .price { font-size: 34px; font-weight: 800; letter-spacing: -.02em; }
-  .body-text { white-space: pre-wrap; line-height: 1.65; }
+  .big { font-size: 34px; font-weight: 800; letter-spacing: -.02em; }
+  .pre { white-space: pre-wrap; line-height: 1.65; }
   .opt { display: block; width: 100%; text-align: left; background: var(--bg); color: var(--text); border: 1px solid var(--line);
     border-radius: 12px; padding: 12px 14px; margin-top: 8px; font: inherit; cursor: pointer; }
-  .progress { height: 5px; background: var(--line); border-radius: 9px; overflow: hidden; margin-bottom: 14px; }
+  .opt.correct { border-color: var(--good); background: rgba(62,207,142,.16); }
+  .opt.wrong { border-color: var(--bad); background: rgba(255,107,107,.16); }
+  .opt[disabled] { opacity: 1; cursor: default; }
+  .progress { height: 5px; background: var(--line); border-radius: 9px; overflow: hidden; margin-bottom: 12px; }
   .progress i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
-  .center { text-align: center; padding: 48px 12px; color: var(--muted); }
+  .center { text-align: center; padding: 44px 12px; color: var(--muted); }
+  .spin { width: 28px; height: 28px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%;
+    animation: sp .8s linear infinite; margin: 0 auto 12px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
   .back { color: var(--accent); background: none; border: 0; font: inherit; padding: 14px 0 6px; cursor: pointer; }
-  audio { width: 100%; margin-top: 12px; }
-  nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: var(--card);
-    border-top: 1px solid var(--line); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); }
-  nav button { flex: 1; border: 0; background: none; color: var(--muted); font: inherit; font-size: 11px; padding: 6px 0;
+  nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: var(--card); border-top: 1px solid var(--line);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); z-index: 20; }
+  nav button { flex: 1; border: 0; background: none; color: var(--muted); font: inherit; font-size: 10.5px; padding: 6px 0;
     display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; font-weight: 600; }
   nav button .i { font-size: 20px; }
   nav button.on { color: var(--accent); }
-  .toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); background: #000c; color: #fff;
-    padding: 10px 16px; border-radius: 99px; font-size: 13px; z-index: 50; }
+  .toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); background: #000d; color: #fff; padding: 10px 16px;
+    border-radius: 99px; font-size: 13px; z-index: 60; max-width: 90%; text-align: center; }
+  .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 40; display: flex; align-items: flex-end; }
+  .sheet { background: var(--bg); width: 100%; border-radius: 22px 22px 0 0; padding: 20px 18px calc(22px + env(safe-area-inset-bottom));
+    max-height: 88vh; overflow: auto; }
+  textarea { width: 100%; min-height: 220px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px; font: inherit; resize: vertical; }
+  .wc { text-align: right; font-size: 12px; margin-top: 4px; }
+  .rec { width: 86px; height: 86px; border-radius: 50%; border: 0; background: var(--bad); color: #fff; font-size: 34px; margin: 10px auto;
+    display: grid; place-items: center; cursor: pointer; box-shadow: 0 0 0 0 rgba(255,107,107,.6); }
+  .rec.on { animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,107,107,.55); } 100% { box-shadow: 0 0 0 22px rgba(255,107,107,0); } }
+  .pics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+  .pics figure { margin: 0; }
+  .pics img { width: 100%; height: 150px; object-fit: cover; border-radius: 12px; display: block; background: var(--line); }
+  .pics figcaption { font-size: 12px; color: var(--muted); text-align: center; margin-top: 4px; }
+  .errbox { border-left: 3px solid var(--bad); padding: 4px 0 4px 10px; margin: 10px 0; }
+  .qtext { font-size: 17px; font-weight: 600; line-height: 1.4; }
+  .scene { font-size: 16px; line-height: 1.65; white-space: pre-wrap; }
+  .lb-row { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: center; }
+  .lb-row:last-child { border-bottom: 0; }
+  .lb-row.me { color: var(--gold); font-weight: 700; }
+  .lb-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
-<div id="app"><div class="center">…</div></div>
+<div id="app"><div class="center"><div class="spin"></div></div></div>
 <nav id="nav"></nav>
-
 <script>
 (function () {
   "use strict";
   var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
   var initData = tg && tg.initData ? tg.initData : "";
-
   var T = {
-    uz: { home: "Bosh sahifa", practice: "Mashq", library: "Kutubxona", pro: "PRO", loading: "Yuklanmoqda…",
-      err: "Xatolik yuz berdi. Qayta urinib ko'ring.", noTg: "Bu ilovani Telegram ichidagi bot orqali oching.",
-      hello: "Salom", quiz: "Viktorina (eng yaxshi)", cert: "Sertifikat testi (eng yaxshi)", reading: "Reading yechilgan",
-      listening: "Listening yechilgan", rank: "Reyting", practiceHint: "Bosing — bot suhbatida boshlanadi.",
-      sci: "Ilm yo'nalishi", eng: "Ingliz tili", reading_t: "Reading", listening_t: "Listening", grammar_t: "Grammar",
-      empty: "Hozircha kontent yo'q.", questions: "ta savol", read: "O'qish / tinglash uchun", back: "← Orqaga",
-      qn: "Savol", result: "Natija", toList: "Ro'yxatga qaytish", scoring: "Baholanmoqda…",
-      proActive: "PRO faol", until: "Tugash sanasi", daysLeft: "kun qoldi", extend: "Muddatni uzaytirish",
-      buy: "PRO olish", offerT: "PRO obuna", days: "kun", perk1: "IELTS Writing tahlili — tekin", perk2: "To'liq Speaking mock — tekin",
-      perk3: "Profilda ⭐ PRO belgisi", perkLimit: "Kuniga {n} tagacha, avtomatik yangilanmaydi.",
-      owner: "Siz bot egasisiz — hamma narsa siz uchun doim tekin.", paidOk: "To'lov qabul qilindi! ⭐", cancelled: "To'lov bekor qilindi.",
-      checking: "Tekshirilmoqda…", asSeparate: "Alohida: Writing {w} ⭐ + Speaking {s} ⭐" },
-    ru: { home: "Главная", practice: "Практика", library: "Материалы", pro: "PRO", loading: "Загрузка…",
-      err: "Произошла ошибка. Попробуйте ещё раз.", noTg: "Откройте приложение через бота в Telegram.",
-      hello: "Привет", quiz: "Викторина (лучший результат)", cert: "Тест с сертификатом (лучший)", reading: "Reading пройдено",
-      listening: "Listening пройдено", rank: "Рейтинг", practiceHint: "Нажмите — начнём в чате с ботом.",
-      sci: "Наука и игры", eng: "Английский язык", reading_t: "Reading", listening_t: "Listening", grammar_t: "Grammar",
-      empty: "Пока нет материалов.", questions: "вопросов", read: "Для чтения и прослушивания", back: "← Назад",
-      qn: "Вопрос", result: "Результат", toList: "К списку", scoring: "Проверяем ответы…",
-      proActive: "PRO активна", until: "Действует до", daysLeft: "дн. осталось", extend: "Продлить",
-      buy: "Получить PRO", offerT: "PRO-подписка", days: "дней", perk1: "Разбор IELTS Writing — бесплатно", perk2: "Полный Speaking мок — бесплатно",
-      perk3: "Значок ⭐ PRO в профиле", perkLimit: "До {n} в день, без автопродления.",
-      owner: "Вы владелец бота — для вас всё всегда бесплатно.", paidOk: "Оплата получена! ⭐", cancelled: "Оплата отменена.",
-      checking: "Проверяем…", asSeparate: "По отдельности: Writing {w} ⭐ + Speaking {s} ⭐" },
-    en: { home: "Home", practice: "Practice", library: "Library", pro: "PRO", loading: "Loading…",
-      err: "Something went wrong. Please try again.", noTg: "Please open this app from the bot inside Telegram.",
-      hello: "Hi", quiz: "Quiz (best score)", cert: "Certificate test (best)", reading: "Reading completed",
-      listening: "Listening completed", rank: "Rank", practiceHint: "Tap to start in the bot chat.",
-      sci: "Science & games", eng: "English learning", reading_t: "Reading", listening_t: "Listening", grammar_t: "Grammar",
-      empty: "No content yet.", questions: "questions", read: "For reading and listening", back: "← Back",
-      qn: "Question", result: "Result", toList: "Back to the list", scoring: "Scoring your answers…",
-      proActive: "PRO is active", until: "Valid until", daysLeft: "days left", extend: "Extend",
-      buy: "Get PRO", offerT: "PRO subscription", days: "days", perk1: "IELTS Writing review included", perk2: "Full Speaking mock included",
-      perk3: "⭐ PRO badge on your profile", perkLimit: "Up to {n} per day, does not auto-renew.",
-      owner: "You're the bot owner — everything is always free for you.", paidOk: "Payment received! ⭐", cancelled: "Payment cancelled.",
-      checking: "Checking…", asSeparate: "Bought separately: Writing {w} ⭐ + Speaking {s} ⭐" }
+    uz: {
+      home: "Bosh", science: "Ilm", english: "Ingliz tili", top: "Reyting", pro: "PRO",
+      loading: "Yuklanmoqda…", preparing: "Tayyorlanmoqda… (5–20 soniya)", err: "Xatolik. Qayta urinib ko'ring.", expired: "Sessiya tugadi. Qaytadan boshlang.",
+      noTg: "Bu ilovani Telegramdagi bot orqali oching.", hello: "Salom", back: "← Orqaga", again: "🔁 Yana", done: "Tayyor", next: "Keyingisi ➜", start: "Boshlash",
+      freeTag: "Bepul", proTag: "PRO",
+      promoT: "⭐ PRO bilan hammasi ochiladi", promoD: "Writing, Speaking, Grammar, Reading, Listening va ingliz tili viktorinalari — {p} ⭐ / {d} kun.", promoBtn: "PRO ni ko'rish",
+      statQuiz: "Viktorina (eng yaxshi)", statCert: "Sertifikat (eng yaxshi)", statRead: "Reading yechilgan", statListen: "Listening yechilgan", rank: "O'rin",
+      daily: "Kunlik fan va fakt", dailyD: "Bugungi fakt + 5 ta savol", quiz: "Viktorina", quizD: "Istalgan fandan {n} ta savol", cert: "Sertifikat testi", certD: "{n} savol, {p}%+ bo'lsa sertifikat",
+      teaser: "Miya jumboqi", teaserD: "O'ylang, maslahat oling", guess: "Men topaman", guessD: "Siz o'ylang, men topaman", story: "Interaktiv hikoya", storyD: "Tanlovingiz yakunni o'zgartiradi",
+      lie: "Yolg'onni top", lieD: "3 ta gapdan yolg'oni qaysi?", whatif: "Nima bo'ladi?", whatifD: "Ilmiy jumboqlar",
+      chat: "Ingliz tilida suhbat", chatD: "Bepul · botda yozing yoki gapiring", speakFull: "Speaking to'liq mock", speakFullD: "Part 1–3, mikrofon bilan, band hisoboti",
+      speakShort: "Speaking Part 1", speakShortD: "Qisqa mashq (5 savol)", writing: "Writing tahlili", writingD: "Task 2 insho → band va xatolar", grammar: "Grammar", grammarD: "Dars + 5 mashq",
+      reading: "Reading testi", readingD: "Passage + 6 savol", listening: "Listening testi", listeningD: "Audio + 5 savol", library: "Kutubxona", libraryD: "Tayyor Reading / Listening / Grammar",
+      pickSubject: "Fanni tanlang", random: "Tasodifiy", pickLevel: "Daraja", pickTopic: "Mavzu", randomTopic: "Tasodifiy mavzu", pickGenre: "Janrni tanlang",
+      question: "Savol", correct: "To'g'ri! 🎉", wrong: "Noto'g'ri", result: "Natija", score: "Ball", certSent: "🎓 Sertifikat botga (chatga) yuborildi!", certFail: "Sertifikatni yuborib bo'lmadi, lekin natija hisobga olindi.", certNeed: "Sertifikat uchun kamida {p}% kerak.",
+      fact: "Bugungi fakt", tip: "Ingliz tili maslahati", tipLocked: "🔒 Ingliz tili maslahati — PRO'da", passage: "Matn", script: "Audio matni", listenHint: "Audioni tinglab, savollarga javob bering", play: "▶️ Tinglash",
+      lessonRule: "Qoida", lessonEx: "Misollar", lessonMistake: "Ko'p uchraydigan xato", startEx: "Mashqni boshlash",
+      hint: "💡 Maslahat", answer: "✅ Javob", newOne: "🔄 Yangisi", yes: "✅ Ha", no: "❌ Yo'q", maybe: "🤷 Bilmayman", rightGuess: "🎯 To'g'ri!", wrongGuess: "🙅 Xato",
+      iWon: "Yutdim! 😎", iLost: "Yutqazdim! Siz meni chalg'itdingiz 👏", guessIntro: "Biror narsani o'ylang — mashhur inson, hayvon, narsa, ovqat yoki qahramon. Hech qayerga yozmang. Men {n} tagacha savol beraman.",
+      guessQ: "Savol", guessMine: "Menimcha, siz o'ylagan:", thinking: "O'ylayapman…", storyEnd: "Hikoya yakunlandi 🎭", whatDo: "Nima qilasiz?", streak: "Ketma-ket", round: "Raund", findLie: "Ulardan bittasi yolg'on. Qaysi?", whichHappens: "Sizningcha-chi?", stop: "To'xtatish",
+      sci: "Ilmiy izoh",
+      wTask: "Topshiriq", wPlace: "Inshoni shu yerga yozing (inglizcha)…", wWords: "so'z", wMin: "Kamida {n} so'z kerak", wSubmit: "Tekshirishga yuborish", wAnalyzing: "Tahlil qilinmoqda (20–40 soniya)…",
+      rTask: "Task Response", rCoh: "Coherence & Cohesion", rLex: "Lexical Resource", rGra: "Grammar", rOver: "Overall Band", rStrong: "Kuchli tomonlar", rErrors: "Xatolar va tuzatishlar", rVocab: "Lug'at", rImproved: "Yaxshilangan paragraf", rNext: "Keyingi qadamlar",
+      sFlu: "Fluency & Coherence", sLex: "Lexical Resource", sGra: "Grammatical Range & Accuracy", sPro: "Pronunciation (taxminiy)", sSummary: "Examiner xulosasi", sPlan: "O'quv rejasi", sNote: "Talaffuz bahosi taxminiy: u matnga aylantirilgan nutqqa asoslangan.",
+      examiner: "Examiner", listenQ: "🔊 Savolni tinglash", rec: "Yozishni boshlash", recStop: "To'xtatish", recSend: "Yuborish", recRedo: "Qayta yozish", recProcessing: "Javob qayta ishlanmoqda…", recHint: "Mikrofon tugmasini bosing va ingliz tilida javob bering.",
+      part: "Part", prep: "Tayyorlanish", picA: "Rasm A", picB: "Rasm B", picsFail: "Rasmlar yuklanmadi, tavsifi:", micDenied: "Mikrofonga ruxsat berilmadi yoki ishlamayapti.", micChat: "Chatda ovozli xabar bilan davom etish", noSpeech: "Nutq aniqlanmadi. Aniqroq gapirib qayta yozing.", tooBig: "Yozuv juda uzun.", maxTime: "Maksimal vaqt tugadi",
+      pwT: "🔒 Bu PRO funksiya", pwD: "Ingliz tiliga oid hamma vositalar (Writing, Speaking, Grammar, Reading, Listening, Kutubxona) PRO'da. Ingliz tilida erkin suhbat esa bepul.", pwGet: "⭐ PRO olish", later: "Hozir emas",
+      payT: "Premium funksiya", payD: "PRO bilan hammasi tekin yoki bir martalik to'lang.", payOnce: "Faqat shu safar", limitT: "PRO limiti tugadi", limitD: "Bugungi limit ({n} ta) tugadi. Ertaga yana tekin yoki bir martalik to'lang.",
+      upT: "🎉 Zo'r o'ynadingiz!", upD: "PRO bilan ingliz tilidagi Writing, Speaking, Grammar, Reading va Listening ham ochiladi. {p} ⭐ / {d} kun.", upBtn: "⭐ PRO ga o'tish", upLater: "Keyinroq",
+      proActive: "PRO faol", until: "Tugash sanasi", daysLeft: "kun qoldi", extend: "Muddatni uzaytirish", buy: "PRO olish", offerT: "PRO obuna", days: "kun",
+      perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "🎓 Sertifikat, Hikoya va Taxmin o'yini", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
+      owner: "Siz bot egasisiz — hammasi doim tekin.", paidOk: "To'lov qabul qilindi! ⭐", cancelled: "To'lov bekor qilindi.", checking: "Tekshirilmoqda…", asSeparate: "Alohida: Writing {w} ⭐ + Speaking {s} ⭐",
+      empty: "Hozircha kontent yo'q.", questions: "ta savol", readOnly: "O'qish / tinglash", noRank: "Hozircha natijalar yo'q", boardQuiz: "Viktorina", boardCert: "Sertifikat", boardRead: "Reading", boardListen: "Listening",
+      chatLink: "Botga o'tish"
+    },
+    ru: {
+      home: "Главная", science: "Наука", english: "Английский", top: "Рейтинг", pro: "PRO",
+      loading: "Загрузка…", preparing: "Готовлю… (5–20 секунд)", err: "Ошибка. Попробуйте ещё раз.", expired: "Сессия закончилась. Начните заново.",
+      noTg: "Откройте приложение через бота в Telegram.", hello: "Привет", back: "← Назад", again: "🔁 Ещё раз", done: "Готово", next: "Дальше ➜", start: "Начать",
+      freeTag: "Бесплатно", proTag: "PRO",
+      promoT: "⭐ С PRO открывается всё", promoD: "Writing, Speaking, Grammar, Reading, Listening и английские викторины — {p} ⭐ / {d} дней.", promoBtn: "Узнать про PRO",
+      statQuiz: "Викторина (лучший)", statCert: "Сертификат (лучший)", statRead: "Reading пройдено", statListen: "Listening пройдено", rank: "Место",
+      daily: "Наука и факт дня", dailyD: "Факт дня + 5 вопросов", quiz: "Викторина", quizD: "{n} вопросов по любой теме", cert: "Тест с сертификатом", certD: "{n} вопросов, от {p}% — сертификат",
+      teaser: "Головоломка", teaserD: "Думайте, берите подсказку", guess: "Я угадаю", guessD: "Загадайте — я угадаю", story: "Интерактивная история", storyD: "Ваш выбор меняет финал",
+      lie: "Найди ложь", lieD: "Какое из 3 утверждений ложь?", whatif: "Что будет?", whatifD: "Научные загадки",
+      chat: "Разговор на английском", chatD: "Бесплатно · пишите или говорите в боте", speakFull: "Полный Speaking мок", speakFullD: "Part 1–3, с микрофоном, отчёт с баллами",
+      speakShort: "Speaking Part 1", speakShortD: "Короткая практика (5 вопросов)", writing: "Разбор Writing", writingD: "Эссе Task 2 → балл и ошибки", grammar: "Grammar", grammarD: "Урок + 5 упражнений",
+      reading: "Тест Reading", readingD: "Текст + 6 вопросов", listening: "Тест Listening", listeningD: "Аудио + 5 вопросов", library: "Библиотека", libraryD: "Готовые Reading / Listening / Grammar",
+      pickSubject: "Выберите тему", random: "Случайная", pickLevel: "Уровень", pickTopic: "Тема", randomTopic: "Случайная тема", pickGenre: "Выберите жанр",
+      question: "Вопрос", correct: "Верно! 🎉", wrong: "Неверно", result: "Результат", score: "Баллы", certSent: "🎓 Сертификат отправлен вам в чат с ботом!", certFail: "Не удалось отправить сертификат, но результат засчитан.", certNeed: "Для сертификата нужно минимум {p}%.",
+      fact: "Факт дня", tip: "Совет по английскому", tipLocked: "🔒 Совет по английскому — в PRO", passage: "Текст", script: "Текст аудио", listenHint: "Прослушайте аудио и ответьте на вопросы", play: "▶️ Слушать",
+      lessonRule: "Правило", lessonEx: "Примеры", lessonMistake: "Частая ошибка", startEx: "Начать упражнения",
+      hint: "💡 Подсказка", answer: "✅ Ответ", newOne: "🔄 Новая", yes: "✅ Да", no: "❌ Нет", maybe: "🤷 Не знаю", rightGuess: "🎯 Верно!", wrongGuess: "🙅 Нет",
+      iWon: "Я выиграл! 😎", iLost: "Я проиграл! Вы меня запутали 👏", guessIntro: "Загадайте что-нибудь — известного человека, животное, предмет, еду или героя. Нигде не пишите. Я задам до {n} вопросов.",
+      guessQ: "Вопрос", guessMine: "Думаю, вы загадали:", thinking: "Думаю…", storyEnd: "История закончена 🎭", whatDo: "Что вы сделаете?", streak: "Подряд", round: "Раунд", findLie: "Одно из них ложь. Какое?", whichHappens: "А как думаете вы?", stop: "Закончить",
+      sci: "Научное пояснение",
+      wTask: "Задание", wPlace: "Пишите эссе здесь (на английском)…", wWords: "слов", wMin: "Нужно минимум {n} слов", wSubmit: "Отправить на проверку", wAnalyzing: "Идёт разбор (20–40 секунд)…",
+      rTask: "Task Response", rCoh: "Coherence & Cohesion", rLex: "Lexical Resource", rGra: "Grammar", rOver: "Overall Band", rStrong: "Сильные стороны", rErrors: "Ошибки и исправления", rVocab: "Лексика", rImproved: "Улучшенный абзац", rNext: "Следующие шаги",
+      sFlu: "Fluency & Coherence", sLex: "Lexical Resource", sGra: "Grammatical Range & Accuracy", sPro: "Pronunciation (оценка)", sSummary: "Вывод экзаменатора", sPlan: "План обучения", sNote: "Оценка произношения приблизительная: она основана на расшифрованной речи.",
+      examiner: "Экзаменатор", listenQ: "🔊 Прослушать вопрос", rec: "Начать запись", recStop: "Остановить", recSend: "Отправить", recRedo: "Записать заново", recProcessing: "Обрабатываю ответ…", recHint: "Нажмите кнопку микрофона и отвечайте по-английски.",
+      part: "Part", prep: "Подготовка", picA: "Картинка A", picB: "Картинка B", picsFail: "Картинки не загрузились, описание:", micDenied: "Нет доступа к микрофону или он не работает.", micChat: "Продолжить голосовыми в чате", noSpeech: "Речь не распознана. Говорите чётче и запишите снова.", tooBig: "Запись слишком длинная.", maxTime: "Время записи вышло",
+      pwT: "🔒 Это функция PRO", pwD: "Все инструменты английского (Writing, Speaking, Grammar, Reading, Listening, библиотека) — в PRO. Свободный разговор на английском бесплатен.", pwGet: "⭐ Получить PRO", later: "Не сейчас",
+      payT: "Премиум-функция", payD: "С PRO всё бесплатно, либо оплатите разово.", payOnce: "Только в этот раз", limitT: "Лимит PRO исчерпан", limitD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно, либо оплатите разово.",
+      upT: "🎉 Отлично сыграли!", upD: "С PRO откроются Writing, Speaking, Grammar, Reading и Listening по английскому. {p} ⭐ / {d} дней.", upBtn: "⭐ Перейти на PRO", upLater: "Позже",
+      proActive: "PRO активна", until: "Действует до", daysLeft: "дн. осталось", extend: "Продлить", buy: "Получить PRO", offerT: "PRO-подписка", days: "дней",
+      perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "🎓 Сертификат, Истории и «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
+      owner: "Вы владелец бота — для вас всё бесплатно.", paidOk: "Оплата получена! ⭐", cancelled: "Оплата отменена.", checking: "Проверяем…", asSeparate: "По отдельности: Writing {w} ⭐ + Speaking {s} ⭐",
+      empty: "Пока нет материалов.", questions: "вопросов", readOnly: "Для чтения / прослушивания", noRank: "Пока нет результатов", boardQuiz: "Викторина", boardCert: "Сертификат", boardRead: "Reading", boardListen: "Listening",
+      chatLink: "Перейти в бота"
+    },
+    en: {
+      home: "Home", science: "Science", english: "English", top: "Ranking", pro: "PRO",
+      loading: "Loading…", preparing: "Preparing… (5–20 seconds)", err: "Something went wrong. Please try again.", expired: "Session expired. Please start again.",
+      noTg: "Please open this app from the bot inside Telegram.", hello: "Hi", back: "← Back", again: "🔁 Again", done: "Done", next: "Next ➜", start: "Start",
+      freeTag: "Free", proTag: "PRO",
+      promoT: "⭐ PRO unlocks everything", promoD: "Writing, Speaking, Grammar, Reading, Listening and English quizzes — {p} ⭐ / {d} days.", promoBtn: "See PRO",
+      statQuiz: "Quiz (best)", statCert: "Certificate (best)", statRead: "Reading completed", statListen: "Listening completed", rank: "Rank",
+      daily: "Daily science & fact", dailyD: "Today's fact + 5 questions", quiz: "Quiz", quizD: "{n} questions on any subject", cert: "Certificate test", certD: "{n} questions, certificate at {p}%+",
+      teaser: "Brain teaser", teaserD: "Think, ask for a hint", guess: "I'll guess", guessD: "You think, I guess", story: "Interactive story", storyD: "Your choices change the ending",
+      lie: "Spot the lie", lieD: "Which of 3 statements is false?", whatif: "What happens?", whatifD: "Science puzzles",
+      chat: "Chat in English", chatD: "Free · write or speak in the bot", speakFull: "Full Speaking mock", speakFullD: "Parts 1–3, with your mic, band report",
+      speakShort: "Speaking Part 1", speakShortD: "Quick practice (5 questions)", writing: "Writing review", writingD: "Task 2 essay → band and mistakes", grammar: "Grammar", grammarD: "Lesson + 5 exercises",
+      reading: "Reading test", readingD: "Passage + 6 questions", listening: "Listening test", listeningD: "Audio + 5 questions", library: "Library", libraryD: "Ready-made Reading / Listening / Grammar",
+      pickSubject: "Pick a subject", random: "Random", pickLevel: "Level", pickTopic: "Topic", randomTopic: "Random topic", pickGenre: "Pick a genre",
+      question: "Question", correct: "Correct! 🎉", wrong: "Wrong", result: "Result", score: "Score", certSent: "🎓 Your certificate was sent to your chat with the bot!", certFail: "Couldn't send the certificate, but your result counted.", certNeed: "You need at least {p}% for the certificate.",
+      fact: "Today's fact", tip: "English tip", tipLocked: "🔒 English tip — in PRO", passage: "Passage", script: "Audio script", listenHint: "Listen to the audio and answer the questions", play: "▶️ Listen",
+      lessonRule: "Rule", lessonEx: "Examples", lessonMistake: "Common mistake", startEx: "Start exercises",
+      hint: "💡 Hint", answer: "✅ Answer", newOne: "🔄 New one", yes: "✅ Yes", no: "❌ No", maybe: "🤷 Don't know", rightGuess: "🎯 Correct!", wrongGuess: "🙅 Wrong",
+      iWon: "I win! 😎", iLost: "I lost! You fooled me 👏", guessIntro: "Think of something — a famous person, an animal, an object, a food or a character. Don't type it anywhere. I'll ask up to {n} questions.",
+      guessQ: "Question", guessMine: "I think you're thinking of:", thinking: "Thinking…", storyEnd: "The story is over 🎭", whatDo: "What do you do?", streak: "Streak", round: "Round", findLie: "One of them is a lie. Which?", whichHappens: "What do you think?", stop: "Finish",
+      sci: "The science",
+      wTask: "Task", wPlace: "Write your essay here (in English)…", wWords: "words", wMin: "At least {n} words needed", wSubmit: "Submit for review", wAnalyzing: "Reviewing your essay (20–40 seconds)…",
+      rTask: "Task Response", rCoh: "Coherence & Cohesion", rLex: "Lexical Resource", rGra: "Grammar", rOver: "Overall Band", rStrong: "Strengths", rErrors: "Mistakes and corrections", rVocab: "Vocabulary", rImproved: "Improved paragraph", rNext: "Next steps",
+      sFlu: "Fluency & Coherence", sLex: "Lexical Resource", sGra: "Grammatical Range & Accuracy", sPro: "Pronunciation (est.)", sSummary: "Examiner's summary", sPlan: "Study plan", sNote: "The pronunciation score is an estimate based on the transcribed speech.",
+      examiner: "Examiner", listenQ: "🔊 Hear the question", rec: "Start recording", recStop: "Stop", recSend: "Send", recRedo: "Record again", recProcessing: "Processing your answer…", recHint: "Tap the microphone and answer in English.",
+      part: "Part", prep: "Preparation", picA: "Picture A", picB: "Picture B", picsFail: "The pictures didn't load, described in words:", micDenied: "Microphone access was denied or isn't available.", micChat: "Continue with voice messages in chat", noSpeech: "No speech detected. Please speak clearly and record again.", tooBig: "The recording is too long.", maxTime: "Max recording time reached",
+      pwT: "🔒 This is a PRO feature", pwD: "All English tools (Writing, Speaking, Grammar, Reading, Listening, Library) are in PRO. Free chat in English stays free.", pwGet: "⭐ Get PRO", later: "Not now",
+      payT: "Premium feature", payD: "Included with PRO, or pay once for just this.", payOnce: "Just this once", limitT: "PRO limit reached", limitD: "Today's limit ({n}) is used up. Free again tomorrow, or pay for a single use.",
+      upT: "🎉 Nice game!", upD: "PRO also unlocks English Writing, Speaking, Grammar, Reading and Listening. {p} ⭐ / {d} days.", upBtn: "⭐ Go PRO", upLater: "Later",
+      proActive: "PRO is active", until: "Valid until", daysLeft: "days left", extend: "Extend", buy: "Get PRO", offerT: "PRO subscription", days: "days",
+      perk1: "IELTS Writing review", perk2: "Full Speaking mock", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "🎓 Certificate, Story and Guess games", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
+      owner: "You're the bot owner — everything is always free for you.", paidOk: "Payment received! ⭐", cancelled: "Payment cancelled.", checking: "Checking…", asSeparate: "Bought separately: Writing {w} ⭐ + Speaking {s} ⭐",
+      empty: "No content yet.", questions: "questions", readOnly: "For reading / listening", noRank: "No results yet", boardQuiz: "Quiz", boardCert: "Certificate", boardRead: "Reading", boardListen: "Listening",
+      chatLink: "Go to the bot"
+    }
   };
+
   var guess = ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) || "en").slice(0, 2);
   var lang = T[guess] ? guess : "en";
-  var S = function (k) { return (T[lang] && T[lang][k]) || T.en[k] || k; };
+  function S(k, vars) {
+    var s = (T[lang] && T[lang][k]) || T.en[k] || k;
+    if (vars) Object.keys(vars).forEach(function (x) { s = s.split("{" + x + "}").join(vars[x]); });
+    return s;
+  }
 
-  var me = null, tab = "home", libType = "reading", app = document.getElementById("app"), nav = document.getElementById("nav");
+  var me = null, tab = "home", app = document.getElementById("app"), nav = document.getElementById("nav");
+  var cleanupFn = null, lastUpsell = 0;
 
   function h(tag, attrs) {
     var el = document.createElement(tag);
@@ -5293,212 +5510,724 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       if (k === "class") el.className = attrs[k];
       else if (k === "text") el.textContent = attrs[k];
       else if (k.indexOf("on") === 0) el.addEventListener(k.slice(2), attrs[k]);
-      else el.setAttribute(k, attrs[k]);
+      else if (attrs[k] !== false && attrs[k] != null) el.setAttribute(k, attrs[k]);
     });
-    for (var i = 2; i < arguments.length; i++) {
-      var c = arguments[i];
-      if (c == null) continue;
-      el.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
-    }
+    (function add(list) {
+      for (var i = 0; i < list.length; i++) {
+        var c = list[i];
+        if (c == null || c === false) continue;
+        if (Array.isArray(c)) { add(c); continue; }
+        el.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+      }
+    })(Array.prototype.slice.call(arguments, 2));
     return el;
   }
   function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
-  function mount() { clear(app); for (var i = 0; i < arguments.length; i++) if (arguments[i]) app.appendChild(arguments[i]); window.scrollTo(0, 0); }
+  function mount() {
+    if (cleanupFn) { try { cleanupFn(); } catch (e) {} cleanupFn = null; }
+    clear(app);
+    for (var i = 0; i < arguments.length; i++) if (arguments[i]) app.appendChild(arguments[i]);
+    window.scrollTo(0, 0);
+  }
+  function spinner(msg) { return h("div", { class: "center" }, h("div", { class: "spin" }), h("div", { text: msg || S("loading") })); }
   function toast(msg) {
     var t = h("div", { class: "toast", text: msg }); document.body.appendChild(t);
-    setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2200);
+    setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2400);
   }
   function haptic(kind) { try { tg.HapticFeedback.notificationOccurred(kind); } catch (e) {} }
+  function isPremium() { return !!(me && (me.admin || me.pro.active)); }
 
   function api(path, opts) {
     opts = opts || {};
-    opts.headers = Object.assign({ "X-Init-Data": initData }, opts.headers || {});
+    var headers = { "X-Init-Data": initData };
+    if (opts.json !== undefined) { headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(opts.json); delete opts.json; }
+    opts.headers = Object.assign(headers, opts.headers || {});
     return fetch(path, opts).then(function (r) {
-      if (!r.ok) throw new Error("http " + r.status);
-      return r.json();
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) { var e = new Error("http"); e.status = r.status; e.data = d; throw e; }
+        return d;
+      });
     });
   }
+  function post(path, json) { return api(path, { method: "POST", json: json || {} }); }
+  function refreshMe() { return api("/api/app/me").then(function (d) { me = d; }); }
 
+  // ---- umumiy xato ishlovchi ----
+  function fail(e, retry) {
+    var st = e && e.status, d = (e && e.data) || {};
+    if (st === 403 && d.error === "pro_required") { paywall(); return; }
+    if (st === 402) { payPrompt(d.product, retry); return; }
+    if (st === 429) { limitSheet(); return; }
+    if (st === 410) { toast(S("expired")); show(); return; }
+    toast(S("err")); show();
+  }
+
+  // ---- bottom sheet ----
+  function sheet() {
+    var box = h("div", { class: "sheet" });
+    for (var i = 0; i < arguments.length; i++) if (arguments[i]) box.appendChild(arguments[i]);
+    var bg = h("div", { class: "sheet-bg", onclick: function (ev) { if (ev.target === bg) close(); } }, box);
+    function close() { if (bg.parentNode) bg.parentNode.removeChild(bg); }
+    document.body.appendChild(bg);
+    return { close: close };
+  }
+  function perks() {
+    return h("div", { style: "margin:10px 0" },
+      [["💎", "perk1"], ["🎙", "perk2"], ["📝", "perk3"], ["🌐", "perk4"]].map(function (x) {
+        return h("div", { class: "perk" }, h("div", { class: "ic", text: x[0] }), h("div", { text: S(x[1]) }));
+      }));
+  }
+  function paywall() {
+    var s = sheet(h("h2", { text: S("pwT") }), h("p", { class: "muted", style: "margin-top:8px", text: S("pwD") }), perks(),
+      h("button", { class: "btn gold", onclick: function () { s.close(); buyProduct("pro"); }, text: S("pwGet") + " · ⭐ " + me.prices.pro + " / " + me.prices.pro_days + " " + S("days") }),
+      h("button", { class: "btn ghost", onclick: function () { s.close(); }, text: S("later") }));
+  }
+  function payPrompt(product, retry) {
+    var price = product === "writing" ? me.prices.writing : me.prices.speaking;
+    var s = sheet(h("h2", { text: S("payT") }), h("p", { class: "muted", style: "margin-top:8px", text: S("payD") }),
+      h("button", { class: "btn gold", onclick: function () { s.close(); buyProduct("pro", retry); }, text: S("pwGet") + " · ⭐ " + me.prices.pro + " / " + me.prices.pro_days + " " + S("days") }),
+      h("button", { class: "btn", onclick: function () { s.close(); buyProduct(product, retry); }, text: S("payOnce") + " · ⭐ " + price }),
+      h("button", { class: "btn ghost", onclick: function () { s.close(); show(); }, text: S("later") }));
+  }
+  function limitSheet() {
+    var s = sheet(h("h2", { text: S("limitT") }), h("p", { class: "muted", style: "margin-top:8px", text: S("limitD", { n: me.prices.pro_daily_limit }) }),
+      h("button", { class: "btn ghost", onclick: function () { s.close(); show(); }, text: S("done") }));
+  }
+  function upsell() {
+    if (isPremium()) return;
+    var now = Date.now();
+    if (now - lastUpsell < 150000) return;
+    lastUpsell = now;
+    var s = sheet(h("h2", { text: S("upT") }), h("p", { class: "muted", style: "margin-top:8px", text: S("upD", { p: me.prices.pro, d: me.prices.pro_days }) }), perks(),
+      h("button", { class: "btn gold", onclick: function () { s.close(); buyProduct("pro"); }, text: S("upBtn") }),
+      h("button", { class: "btn ghost", onclick: function () { s.close(); }, text: S("upLater") }));
+  }
+
+  function buyProduct(product, onPaid) {
+    post("/api/app/invoice", { product: product }).then(function (r) {
+      if (!tg || !tg.openInvoice) { window.location.href = r.link; return; }
+      tg.openInvoice(r.link, function (status) {
+        if (status === "paid") {
+          haptic("success"); toast(S("paidOk"));
+          var tries = 0;
+          (function poll() {
+            refreshMe().then(function () {
+              var ok = product === "pro" ? me.pro.active : (product === "writing" ? me.credits.writing : me.credits.speaking);
+              if (ok || tries++ > 8) { if (onPaid) onPaid(); else show(); }
+              else setTimeout(poll, 1200);
+            }).catch(function () { show(); });
+          })();
+        } else if (status === "cancelled") toast(S("cancelled"));
+      });
+    }).catch(function () { toast(S("err")); });
+  }
+
+  function openBot(param) {
+    var url = "https://t.me/" + me.bot + (param ? "?start=" + param : "");
+    try { tg.openTelegramLink(url); } catch (e) { window.location.href = url; }
+    setTimeout(function () { try { tg.close(); } catch (e) {} }, 300);
+  }
+
+  // ---- navigatsiya ----
   function renderNav() {
     clear(nav);
-    [["home", "🏠", "home"], ["practice", "🚀", "practice"], ["library", "📚", "library"], ["pro", "⭐", "pro"]].forEach(function (x) {
+    [["home", "🏠"], ["science", "🔬"], ["english", "🇬🇧"], ["top", "🏆"], ["pro", "⭐"]].forEach(function (x) {
       nav.appendChild(h("button", { class: tab === x[0] ? "on" : "", onclick: function () { tab = x[0]; show(); } },
-        h("span", { class: "i", text: x[1] }), h("span", { text: S(x[2]) })));
+        h("span", { class: "i", text: x[1] }), h("span", { text: S(x[0]) })));
     });
   }
-
   function show() {
     renderNav();
     if (!me) return;
-    if (tab === "home") return viewHome();
-    if (tab === "practice") return viewPractice();
-    if (tab === "library") return viewLibrary();
-    if (tab === "pro") return viewPro();
+    ({ home: viewHome, science: viewScience, english: viewEnglish, top: viewTop, pro: viewPro })[tab]();
   }
-
-  function header() {
-    var initial = (me.name || "?").trim().charAt(0).toUpperCase() || "?";
-    var name = h("h1", { text: me.name || "" });
-    if (me.pro.active || me.admin) name.appendChild(h("span", { class: "badge", text: me.admin ? "OWNER" : "PRO" }));
-    return h("div", { class: "top" }, h("div", { class: "avatar", text: initial }),
-      h("div", {}, name, h("div", { class: "sub", text: S("hello") + " 👋" })));
+  function backBtn(fn) { return h("button", { class: "back", onclick: fn || show, text: S("back") }); }
+  function title(txt, sub) {
+    return h("div", { class: "top" }, h("div", {}, h("h1", { text: txt }), sub ? h("div", { class: "sub", text: sub }) : null));
   }
-
+  function tile(emoji, name, desc, onclick, opts) {
+    opts = opts || {};
+    return h("button", { class: "tile", onclick: onclick },
+      h("div", { class: "e", text: emoji }), h("div", { class: "n", text: name }),
+      desc ? h("div", { class: "d", text: desc }) : null,
+      opts.lock ? h("div", { class: "lk", text: "🔒" }) : null,
+      opts.price ? h("div", { class: "lock", text: "⭐ " + opts.price }) : null);
+  }
   function stat(v, l, rank) {
     return h("div", { class: "stat" }, h("div", { class: "v", text: v }), h("div", { class: "l", text: l }),
       rank ? h("div", { class: "r", text: S("rank") + " #" + rank }) : null);
   }
 
+  // ================= BOSH SAHIFA =================
   function viewHome() {
-    var st = me.stats;
-    mount(header(),
-      h("div", { class: "section-title", text: "📊" }),
+    var st = me.stats, initial = (me.name || "?").trim().charAt(0).toUpperCase() || "?";
+    var nm = h("h1", { text: me.name || "" });
+    if (me.admin || me.pro.active) nm.appendChild(h("span", { class: "badge", text: me.admin ? "OWNER" : "PRO" }));
+    var parts = [h("div", { class: "top" }, h("div", { class: "avatar", text: initial }), h("div", {}, nm, h("div", { class: "sub", text: S("hello") + " 👋" })))];
+    if (!isPremium()) {
+      parts.push(h("div", { class: "card promo" }, h("h3", { text: S("promoT") }),
+        h("p", { class: "muted small", style: "margin-top:6px", text: S("promoD", { p: me.prices.pro, d: me.prices.pro_days }) }),
+        h("button", { class: "btn gold", onclick: function () { tab = "pro"; show(); }, text: S("promoBtn") })));
+    }
+    parts.push(h("div", { class: "section-title", text: "🚀" }),
       h("div", { class: "grid2" },
-        stat(st.quiz_best != null ? st.quiz_best + "%" : "—", S("quiz"), st.quiz_rank),
-        stat(st.cert_best != null ? st.cert_best + "%" : "—", S("cert"), st.cert_rank),
-        stat(String(st.reading_done), S("reading")),
-        stat(String(st.listening_done), S("listening"))));
+        tile("📅", S("daily"), S("dailyD"), function () { startQuiz({ kind: "daily" }); }),
+        tile("🧩", S("quiz"), S("quizD", { n: me.limits.quiz_len }), quizPicker)));
+    parts.push(h("div", { class: "section-title", text: "📊" }),
+      h("div", { class: "grid2" },
+        stat(st.quiz_best != null ? st.quiz_best + "%" : "—", S("statQuiz"), st.quiz_rank),
+        stat(st.cert_best != null ? st.cert_best + "%" : "—", S("statCert"), st.cert_rank),
+        stat(String(st.reading_done), S("statRead")), stat(String(st.listening_done), S("statListen"))));
+    mount.apply(null, parts);
   }
 
-  function openCmd(cmd) {
-    var url = "https://t.me/" + me.bot + "?start=run_" + cmd;
-    try { tg.openTelegramLink(url); } catch (e) { window.location.href = url; }
-    setTimeout(function () { try { tg.close(); } catch (e) {} }, 250);
+  function viewScience() {
+    var L = me.limits;
+    mount(title(S("science")),
+      h("div", { class: "grid2" },
+        tile("📅", S("daily"), S("dailyD"), function () { startQuiz({ kind: "daily" }); }),
+        tile("🧩", S("quiz"), S("quizD", { n: L.quiz_len }), quizPicker),
+        tile("🎓", S("cert"), S("certD", { n: L.cert_len, p: L.cert_pass }), function () { isPremium() ? startQuiz({ kind: "certificate" }) : paywall(); }, { lock: !isPremium() }),
+        tile("🧠", S("teaser"), S("teaserD"), teaserGame),
+        tile("🔮", S("guess"), S("guessD"), function () { isPremium() ? guessGame() : paywall(); }, { lock: !isPremium() }),
+        tile("📖", S("story"), S("storyD"), function () { isPremium() ? storyPicker() : paywall(); }, { lock: !isPremium() }),
+        tile("🕵️", S("lie"), S("lieD"), function () { roundGame("lie"); }),
+        tile("🔬", S("whatif"), S("whatifD"), function () { roundGame("whatif"); })));
   }
 
-  function tiles(list) {
-    var g = h("div", { class: "grid2" });
-    list.forEach(function (t) {
-      g.appendChild(h("button", { class: "tile", onclick: function () { openCmd(t.cmd); } },
-        h("div", { class: "e", text: t.emoji }), h("div", { class: "n", text: t.label }),
-        t.price ? h("div", { class: "p", text: "⭐ " + t.price }) : null));
-    });
-    return g;
+  function viewEnglish() {
+    var P = isPremium(), pr = me.prices;
+    mount(title(S("english")),
+      h("div", { class: "grid2" },
+        tile("💬", S("chat"), S("chatD"), function () { openBot("run_english"); }),
+        tile("🎙", S("speakFull"), S("speakFullD"), function () { speakingFlow("full"); }, { price: P ? 0 : pr.speaking }),
+        tile("💎", S("writing"), S("writingD"), writingFlow, { price: P ? 0 : pr.writing }),
+        tile("🎤", S("speakShort"), S("speakShortD"), function () { P ? speakingFlow("short") : paywall(); }, { lock: !P }),
+        tile("📝", S("grammar"), S("grammarD"), function () { P ? grammarPicker() : paywall(); }, { lock: !P }),
+        tile("📖", S("reading"), S("readingD"), function () { P ? startQuiz({ kind: "reading" }) : paywall(); }, { lock: !P }),
+        tile("🎧", S("listening"), S("listeningD"), function () { P ? startQuiz({ kind: "listening" }) : paywall(); }, { lock: !P }),
+        tile("📚", S("library"), S("libraryD"), function () { P ? viewLibrary("reading") : paywall(); }, { lock: !P })));
   }
 
-  function viewPractice() {
-    mount(h("div", { class: "top" }, h("div", {}, h("h1", { text: S("practice") }), h("div", { class: "sub", text: S("practiceHint") }))),
-      h("div", { class: "section-title", text: "🔬 " + S("sci") }), tiles(me.tiles.science),
-      h("div", { class: "section-title", text: "🇬🇧 " + S("eng") }), tiles(me.tiles.english));
-  }
-
-  // ---- Kutubxona (Reading / Listening / Grammar) ----
-  function viewLibrary() {
+  // ================= REYTING =================
+  var boardKey = "quiz";
+  function viewTop() {
     var seg = h("div", { class: "seg" });
-    [["reading", "reading_t"], ["listening", "listening_t"], ["grammar", "grammar_t"]].forEach(function (x) {
-      seg.appendChild(h("button", { class: libType === x[0] ? "on" : "", onclick: function () { libType = x[0]; viewLibrary(); } }, S(x[1])));
+    [["quiz", "boardQuiz"], ["certificate", "boardCert"], ["reading", "boardRead"], ["listening", "boardListen"]].forEach(function (x) {
+      seg.appendChild(h("button", { class: boardKey === x[0] ? "on" : "", onclick: function () { boardKey = x[0]; viewTop(); } }, S(x[1])));
     });
-    var box = h("div", {}, h("div", { class: "center", text: S("loading") }));
-    mount(h("div", { class: "top" }, h("h1", { text: S("library") })), seg, box);
-    api("/api/dashboard/content/" + libType).then(function (items) {
+    var box = h("div", { class: "card" }, spinner());
+    mount(title(S("top")), seg, box);
+    api("/api/app/leaderboard").then(function (d) {
+      var b = d.boards.filter(function (x) { return x.key === boardKey; })[0];
       clear(box);
-      if (!items.length) { box.appendChild(h("div", { class: "center", text: S("empty") })); return; }
-      items.forEach(function (it) {
-        box.appendChild(h("div", { class: "list-item", onclick: function () { openItem(libType, it.id); } },
-          h("div", { class: "t" }, document.createTextNode(it.title),
-            h("div", { class: "m", text: it.has_questions ? it.question_count + " " + S("questions") : S("read") })),
-          h("div", { class: "chev", text: "›" })));
+      if (!b || !b.rows.length) { box.appendChild(h("div", { class: "center", text: S("noRank") })); return; }
+      var medals = ["🥇", "🥈", "🥉"];
+      b.rows.forEach(function (r, i) {
+        box.appendChild(h("div", { class: "lb-row" + (r.me ? " me" : "") },
+          h("div", { text: medals[i] || String(i + 1) + "." }), h("div", { class: "nm", text: r.name }), h("div", { text: r.pct + "%" })));
       });
     }).catch(function () { clear(box); box.appendChild(h("div", { class: "center", text: S("err") })); });
   }
 
-  function openItem(type, id) {
-    mount(h("div", { class: "center", text: S("loading") }));
-    api("/api/dashboard/content/" + type + "/" + id).then(function (item) {
-      var card = h("div", { class: "card" }, h("h3", { text: item.title }));
-      if (item.body) card.appendChild(h("div", { class: "body-text", text: item.body, style: "margin-top:10px" }));
-      if (type === "listening") card.appendChild(h("audio", { controls: "", src: "/api/dashboard/audio/" + id }));
-      var area = h("div", {});
-      mount(h("button", { class: "back", onclick: viewLibrary, text: S("back") }), card, area);
-      if (item.questions && item.questions.length) runQuiz(type, id, item.questions, area);
-    }).catch(function () { mount(h("button", { class: "back", onclick: viewLibrary, text: S("back") }), h("div", { class: "center", text: S("err") })); });
+  // ================= PRO =================
+  function viewPro() {
+    var p = me.pro, parts = [title("⭐ " + S("offerT"))];
+    if (me.admin) { mount(parts[0], h("div", { class: "card", text: S("owner") })); return; }
+    if (p.active) parts.push(h("div", { class: "card" }, h("h3", { text: "✅ " + S("proActive") }),
+      h("p", { class: "muted", style: "margin-top:6px", text: S("until") + ": " + p.until + " (" + p.left + " " + S("daysLeft") + ")" })));
+    parts.push(h("div", { class: "card" },
+      [["💎", "perk1"], ["🎙", "perk2"], ["📝", "perk3"], ["🌐", "perk4"], ["🏅", "perk5"]].map(function (x) {
+        return h("div", { class: "perk" }, h("div", { class: "ic", text: x[0] }), h("div", { text: S(x[1]) }));
+      }),
+      h("p", { class: "muted small", style: "margin-top:6px", text: S("perkLimit", { n: me.prices.pro_daily_limit }) }),
+      h("p", { class: "muted small", text: S("asSeparate", { w: me.prices.writing, s: me.prices.speaking }) })));
+    parts.push(h("button", { class: "btn gold", onclick: function () { buyProduct("pro"); },
+      text: (p.active ? S("extend") : S("buy")) + " · ⭐ " + me.prices.pro + " / " + me.prices.pro_days + " " + S("days") }));
+    mount.apply(null, parts);
   }
 
-  function runQuiz(type, id, qs, area) {
+  // ================= VIKTORINA TURLARI =================
+  function quizPicker() {
+    var grid = h("div", { class: "grid2" });
+    me.subjects.forEach(function (s) {
+      grid.appendChild(tile(s.emoji, s.name, null, function () {
+        if (s.pro && !isPremium()) { paywall(); return; }
+        startQuiz({ kind: "quiz", subject: s.i });
+      }, { lock: s.pro && !isPremium() }));
+    });
+    grid.appendChild(tile("🎲", S("random"), null, function () { startQuiz({ kind: "quiz", subject: "r" }); }));
+    mount(backBtn(), title("🧩 " + S("pickSubject")), grid);
+  }
+
+  function grammarPicker() {
+    var idx = 0;
+    function draw() {
+      var seg = h("div", { class: "seg" });
+      me.levels.forEach(function (l, i) {
+        seg.appendChild(h("button", { class: idx === i ? "on" : "", onclick: function () { idx = i; draw(); } }, l.emoji + " " + l.name.split(" ")[0]));
+      });
+      var lv = me.levels[idx], list = h("div", {});
+      lv.topics.forEach(function (t, j) {
+        list.appendChild(h("div", { class: "list-item", onclick: function () { startQuiz({ kind: "grammar", level: idx, topic: j }); } },
+          h("div", { class: "t", text: t }), h("div", { class: "chev", text: "›" })));
+      });
+      list.appendChild(h("div", { class: "list-item", onclick: function () { startQuiz({ kind: "grammar", level: idx, topic: "r" }); } },
+        h("div", { class: "t", text: "🎲 " + S("randomTopic") }), h("div", { class: "chev", text: "›" })));
+      mount(backBtn(viewEnglish), title("📝 " + S("grammar"), lv.name), seg, list);
+    }
+    draw();
+  }
+
+  function startQuiz(body) {
+    mount(spinner(S("preparing")));
+    post("/api/app/quiz/start", body).then(function (d) { quizIntro(d, body); }).catch(function (e) { fail(e, function () { startQuiz(body); }); });
+  }
+
+  function exitFor(body) { return body.kind === "reading" || body.kind === "listening" || body.kind === "grammar" ? viewEnglish : viewScience; }
+
+  function quizIntro(d, body) {
+    var parts = [];
+    if (d.mode === "daily") {
+      parts.push(h("div", { class: "card" }, h("div", { class: "muted small", text: S("fact") + " · " + d.title }), h("p", { style: "margin-top:8px", class: "pre", text: d.fact })));
+      if (d.tip && d.tip.locked) parts.push(h("div", { class: "card", onclick: paywall }, h("div", { text: S("tipLocked") })));
+      else if (d.tip) parts.push(h("div", { class: "card" }, h("h3", { text: "💡 " + d.tip.title }), h("p", { class: "pre muted", style: "margin-top:6px", text: d.tip.explanation }),
+        (d.tip.examples || []).map(function (x) { return h("p", { class: "small", style: "margin-top:4px", text: "• " + x }); })));
+    } else if (d.lesson) {
+      var L = d.lesson;
+      parts.push(h("div", { class: "card" }, h("h3", { text: "📘 " + L.title }), h("div", { class: "muted small", style: "margin-top:8px", text: S("lessonRule") }), h("p", { class: "pre", text: L.rule }),
+        L.examples.length ? h("div", { class: "muted small", style: "margin-top:10px", text: S("lessonEx") }) : null,
+        L.examples.map(function (x) { return h("div", { style: "margin-top:6px" }, h("b", { text: x.en }), h("div", { class: "muted small", text: x.uz })); }),
+        L.mistake ? h("div", { class: "muted small", style: "margin-top:10px", text: "⚠️ " + S("lessonMistake") }) : null, L.mistake ? h("p", { text: L.mistake }) : null));
+    } else if (d.mode === "reading") {
+      parts.push(h("div", { class: "card" }, h("div", { class: "muted small", text: "📖 " + S("passage") }), h("p", { class: "pre", style: "margin-top:8px", text: d.passage })));
+    } else if (d.mode === "listening") {
+      parts.push(h("div", { class: "card" }, h("div", { class: "muted small", text: "🎧 " + S("listenHint") }),
+        h("audio", { controls: "", src: "/api/app/audio/" + d.sid, style: "width:100%;margin-top:10px" })));
+    }
+    if (d.mode === "reading" || d.mode === "listening") { quizPlay(d, body, parts); return; }
+    if (parts.length) {
+      parts.push(h("button", { class: "btn", onclick: function () { quizPlay(d, body, []); }, text: S(d.lesson ? "startEx" : "start") }));
+      mount.apply(null, [backBtn(exitFor(body))].concat(parts));
+    } else quizPlay(d, body, []);
+  }
+
+  function quizPlay(d, body, topParts) {
+    var i = 0;
+    function render() {
+      var q = d.questions[i], answered = false;
+      var optBox = h("div", {}), info = h("div", {});
+      q.options.forEach(function (o, k) {
+        var b = h("button", { class: "opt", text: o, onclick: function () {
+          if (answered) return; answered = true;
+          Array.prototype.forEach.call(optBox.children, function (x) { x.setAttribute("disabled", ""); });
+          post("/api/app/quiz/answer", { sid: d.sid, i: i, choice: k }).then(function (r) {
+            optBox.children[r.correct_index].classList.add("correct");
+            if (!r.correct) optBox.children[k].classList.add("wrong");
+            haptic(r.correct ? "success" : "error");
+            info.appendChild(h("p", { style: "margin-top:12px;font-weight:600", text: r.correct ? S("correct") : S("wrong") }));
+            if (r.explanation) info.appendChild(h("p", { class: "muted small pre", style: "margin-top:6px", text: "💡 " + r.explanation }));
+            var last = i === d.total - 1;
+            info.appendChild(h("button", { class: "btn", onclick: function () { if (last) finish(); else { i++; render(); } }, text: last ? S("done") : S("next") }));
+          }).catch(function (e) { fail(e); });
+        } });
+        optBox.appendChild(b);
+      });
+      mount.apply(null, [backBtn(exitFor(body))].concat(topParts, [h("div", { class: "card" },
+        h("div", { class: "progress" }, h("i", { style: "width:" + Math.round(i / d.total * 100) + "%" })),
+        h("div", { class: "muted small", text: (d.title ? d.title + " · " : "") + S("question") + " " + (i + 1) + "/" + d.total }),
+        h("div", { class: "qtext", style: "margin-top:6px", text: q.question }), optBox, info)]));
+    }
+    function finish() {
+      mount(spinner());
+      post("/api/app/quiz/finish", { sid: d.sid }).then(function (r) { quizResult(r, body); }).catch(function (e) { fail(e); });
+    }
+    render();
+  }
+
+  function quizResult(r, body) {
+    var parts = [h("div", { class: "card", style: "text-align:center" }, h("div", { class: "muted small", text: S("result") }),
+      h("div", { class: "big", text: r.score + "/" + r.total }), h("div", { class: "muted", text: r.percentage + "%" }))];
+    if (r.mode === "certificate") {
+      var msg = r.certificate === "sent" ? S("certSent") : r.certificate === "failed" ? S("certFail") : S("certNeed", { p: r.pass_percent });
+      parts.push(h("div", { class: "card", text: msg }));
+    }
+    if (r.script) parts.push(h("div", { class: "card" }, h("div", { class: "muted small", text: S("script") }), h("p", { class: "pre", style: "margin-top:6px", text: r.script })));
+    parts.push(h("button", { class: "btn", onclick: function () { startQuiz(body); }, text: S("again") }), h("button", { class: "btn ghost", onclick: exitFor(body), text: S("back") }));
+    haptic(r.percentage >= 60 ? "success" : "warning");
+    mount.apply(null, parts);
+    refreshMe().catch(function () {});
+    setTimeout(upsell, 900);
+  }
+
+  // ================= YOLG'ON / NIMA BO'LADI (raundlar) =================
+  function roundGame(kind) {
+    var round = 0, right = 0, streak = 0;
+    function next() {
+      mount(spinner(S("preparing")));
+      post("/api/app/quiz/start", { kind: kind }).then(function (d) {
+        round++;
+        var q = d.questions[0], answered = false, optBox = h("div", {}), info = h("div", {});
+        q.options.forEach(function (o, k) {
+          optBox.appendChild(h("button", { class: "opt", text: (k + 1) + ". " + o, onclick: function () {
+            if (answered) return; answered = true;
+            Array.prototype.forEach.call(optBox.children, function (x) { x.setAttribute("disabled", ""); });
+            post("/api/app/quiz/answer", { sid: d.sid, i: 0, choice: k }).then(function (r) {
+              optBox.children[r.correct_index].classList.add("correct");
+              if (!r.correct) optBox.children[k].classList.add("wrong");
+              if (r.correct) { right++; streak++; } else streak = 0;
+              haptic(r.correct ? "success" : "error");
+              info.appendChild(h("p", { style: "margin-top:12px;font-weight:600", text: r.correct ? S("correct") : S("wrong") }));
+              if (r.explanation) info.appendChild(h("p", { class: "pre muted small", style: "margin-top:6px", text: "🔎 " + r.explanation }));
+              info.appendChild(h("div", { class: "row" },
+                h("button", { class: "btn", onclick: function () { if (round % 5 === 0) upsell(); next(); }, text: S("next") }),
+                h("button", { class: "btn ghost", onclick: function () { end(); }, text: S("stop") })));
+            }).catch(function (e) { fail(e); });
+          } }));
+        });
+        var head = kind === "lie" ? "🕵️ " + S("lie") + (streak ? " · 🔥 " + streak : "") : "🔬 " + S("whatif") + " · 🎯 " + right + "/" + (round - 1);
+        mount(backBtn(viewScience), h("div", { class: "card" }, h("div", { class: "muted small", text: head + " · " + S("round") + " " + round }),
+          kind === "lie" ? h("div", { class: "qtext", style: "margin-top:6px", text: S("findLie") }) : h("div", { class: "qtext", style: "margin-top:6px", text: q.question }),
+          optBox, info));
+      }).catch(function (e) { fail(e, next); });
+    }
+    function end() {
+      mount(h("div", { class: "card", style: "text-align:center" }, h("div", { class: "muted small", text: S("result") }),
+        h("div", { class: "big", text: right + "/" + (round) }), h("div", { class: "muted", text: "🔥 " + S("streak") + ": " + streak })),
+        h("button", { class: "btn", onclick: function () { roundGame(kind); }, text: S("again") }), h("button", { class: "btn ghost", onclick: viewScience, text: S("back") }));
+      setTimeout(upsell, 700);
+    }
+    next();
+  }
+
+  // ================= JUMBOQ =================
+  function teaserGame() {
+    mount(spinner(S("preparing")));
+    post("/api/app/teaser/new").then(function (d) {
+      var extra = h("div", {});
+      var hintBtn = h("button", { class: "btn ghost", text: S("hint"), onclick: function () {
+        post("/api/app/teaser/reveal", { sid: d.sid, what: "hint" }).then(function (r) { extra.appendChild(h("p", { class: "muted", style: "margin-top:10px", text: "💡 " + r.hint })); }).catch(function (e) { fail(e); });
+      } });
+      var ansBtn = h("button", { class: "btn", text: S("answer"), onclick: function () {
+        post("/api/app/teaser/reveal", { sid: d.sid, what: "answer" }).then(function (r) {
+          clear(extra); hintBtn.remove(); ansBtn.remove();
+          extra.appendChild(h("p", { style: "margin-top:10px;font-weight:700", text: "✅ " + r.answer }));
+          if (r.explanation) extra.appendChild(h("p", { class: "muted small", style: "margin-top:6px", text: r.explanation }));
+          setTimeout(upsell, 1200);
+        }).catch(function (e) { fail(e); });
+      } });
+      mount(backBtn(viewScience), h("div", { class: "card" }, h("div", { class: "muted small", text: "🧠 " + S("teaser") }), h("div", { class: "qtext", style: "margin-top:8px", text: d.puzzle }),
+        h("div", { class: "row" }, hintBtn, ansBtn), extra),
+        h("button", { class: "btn ghost", onclick: teaserGame, text: S("newOne") }));
+    }).catch(function (e) { fail(e, teaserGame); });
+  }
+
+  // ================= MEN TOPAMAN =================
+  function guessGame() {
+    mount(backBtn(viewScience), h("div", { class: "card" }, h("h3", { text: "🔮 " + S("guess") }), h("p", { class: "muted", style: "margin-top:8px", text: S("guessIntro", { n: me.limits.guess_max }) })),
+      h("button", { class: "btn", onclick: begin, text: S("start") }));
+    function begin() {
+      mount(spinner(S("thinking")));
+      post("/api/app/guess/start").then(step).catch(function (e) { fail(e, guessGame); });
+    }
+    function step(d) {
+      if (d.type === "win" || d.type === "lose") {
+        mount(h("div", { class: "card", style: "text-align:center" }, h("div", { class: "big", text: d.type === "win" ? "🎉" : "🏳️" }),
+          h("h3", { style: "margin-top:8px", text: d.type === "win" ? S("iWon") : S("iLost") }), d.type === "win" ? h("p", { class: "muted", style: "margin-top:6px", text: d.text + " · " + d.n + " " + S("guessQ").toLowerCase() }) : null),
+          h("button", { class: "btn", onclick: guessGame, text: S("again") }), h("button", { class: "btn ghost", onclick: viewScience, text: S("back") }));
+        setTimeout(upsell, 900);
+        return;
+      }
+      function send(a) { mount(spinner(S("thinking"))); post("/api/app/guess/answer", { sid: sid, a: a }).then(step).catch(function (e) { fail(e); }); }
+      var sid = d.sid || step.sid; step.sid = sid;
+      if (d.type === "ask") {
+        mount(h("div", { class: "card" }, h("div", { class: "progress" }, h("i", { style: "width:" + Math.round(d.n / d.max * 100) + "%" })),
+          h("div", { class: "muted small", text: "🔮 " + S("guessQ") + " " + d.n + "/" + d.max }), h("div", { class: "qtext", style: "margin-top:8px", text: d.text }),
+          h("div", { class: "row" }, h("button", { class: "btn good", onclick: function () { send("y"); }, text: S("yes") }), h("button", { class: "btn bad", onclick: function () { send("n"); }, text: S("no") })),
+          h("button", { class: "btn ghost", onclick: function () { send("m"); }, text: S("maybe") })));
+      } else {
+        mount(h("div", { class: "card", style: "text-align:center" }, h("div", { class: "muted small", text: "🔮 " + S("guessMine") }), h("div", { class: "big", style: "margin-top:8px;font-size:28px", text: d.text }),
+          h("div", { class: "row" }, h("button", { class: "btn good", onclick: function () { send("win"); }, text: S("rightGuess") }), h("button", { class: "btn bad", onclick: function () { send("lose"); }, text: S("wrongGuess") }))));
+      }
+    }
+  }
+
+  // ================= HIKOYA =================
+  function storyPicker() {
+    var grid = h("div", { class: "grid2" });
+    me.genres.forEach(function (g) { grid.appendChild(tile(g.emoji, g.name, null, function () { storyPlay(g); })); });
+    mount(backBtn(viewScience), title("📖 " + S("pickGenre")), grid);
+  }
+  function storyPlay(g) {
+    var sid = null;
+    mount(spinner(S("preparing")));
+    post("/api/app/story/start", { genre: g.i }).then(function (d) { sid = d.sid; scene(d); }).catch(function (e) { fail(e, function () { storyPlay(g); }); });
+    function scene(d) {
+      var parts = [h("div", { class: "card" }, h("div", { class: "progress" }, h("i", { style: "width:" + Math.round(d.step / d.total * 100) + "%" })),
+        h("div", { class: "muted small", text: g.emoji + " " + g.name + " · " + d.step + "/" + d.total }),
+        d.ending && d.title ? h("h3", { style: "margin-top:8px", text: "🏁 " + d.title }) : null, h("div", { class: "scene", style: "margin-top:10px", text: d.scene }))];
+      if (d.ending) {
+        parts.push(h("div", { class: "card", style: "text-align:center" }, h("div", { text: S("storyEnd") })),
+          h("button", { class: "btn", onclick: storyPicker, text: S("again") }), h("button", { class: "btn ghost", onclick: viewScience, text: S("back") }));
+        mount.apply(null, parts); setTimeout(upsell, 1200); return;
+      }
+      parts.push(h("div", { class: "muted small", style: "margin:4px 2px", text: S("whatDo") }));
+      d.choices.forEach(function (c, k) {
+        parts.push(h("button", { class: "opt", text: (k + 1) + ". " + c, onclick: function () {
+          mount(spinner(S("preparing")));
+          post("/api/app/story/choose", { sid: sid, choice: k }).then(scene).catch(function (e) { fail(e); });
+        } }));
+      });
+      mount.apply(null, parts);
+    }
+  }
+
+  // ================= WRITING =================
+  function writingFlow() {
+    mount(spinner(S("preparing")));
+    post("/api/app/writing/task").then(function (d) {
+      var ta = h("textarea", { placeholder: S("wPlace") }), wc = h("div", { class: "wc muted", text: "0 " + S("wWords") }), btn;
+      ta.addEventListener("input", function () {
+        var n = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
+        wc.textContent = n + " " + S("wWords") + (n < d.min_words ? " · " + S("wMin", { n: d.min_words }) : "");
+        wc.style.color = n >= d.min_words ? "var(--good)" : "";
+      });
+      btn = h("button", { class: "btn", text: S("wSubmit"), onclick: function () {
+        var n = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
+        if (n < d.min_words) { toast(S("wMin", { n: d.min_words })); return; }
+        mount(spinner(S("wAnalyzing")));
+        post("/api/app/writing/submit", { sid: d.sid, essay: ta.value }).then(function (r) { writingReport(r); })
+          .catch(function (e) { if (e.status === 422) { toast(S("wMin", { n: d.min_words })); writingFlow(); } else fail(e); });
+      } });
+      mount(backBtn(viewEnglish), h("div", { class: "card" }, h("div", { class: "muted small", text: "💎 " + S("wTask") }), h("div", { class: "qtext", style: "margin-top:8px", text: d.task })),
+        ta, wc, btn);
+    }).catch(function (e) { fail(e, writingFlow); });
+  }
+
+  function band(v) { var n = parseFloat(v); return isNaN(n) ? "—" : n.toFixed(1); }
+  function bandCard(label, v) { return h("div", { class: "stat" }, h("div", { class: "v", text: band(v) }), h("div", { class: "l", text: label })); }
+  function listBlock(titleTxt, items, mark) {
+    items = (items || []).filter(function (x) { return String(x).trim(); });
+    if (!items.length) return null;
+    return h("div", { class: "card" }, h("h3", { text: titleTxt }), items.map(function (x) { return h("p", { style: "margin-top:6px", text: (mark || "•") + " " + x }); }));
+  }
+  function errorsBlock(titleTxt, errs) {
+    errs = (errs || []).filter(function (x) { return x && typeof x === "object"; });
+    if (!errs.length) return null;
+    return h("div", { class: "card" }, h("h3", { text: titleTxt }), errs.slice(0, 6).map(function (x) {
+      return h("div", { class: "errbox" }, h("div", { class: "muted", style: "text-decoration:line-through", text: String(x.wrong || "") }),
+        h("div", { style: "color:var(--good);font-weight:600", text: String(x.right || "") }), h("div", { class: "small", text: String(x.why || "") }));
+    }));
+  }
+
+  function writingReport(r) {
+    var d = r.report || {};
+    var parts = [title("📝 IELTS Writing"),
+      h("div", { class: "grid2" }, bandCard(S("rTask"), d.task_response), bandCard(S("rCoh"), d.coherence), bandCard(S("rLex"), d.lexical), bandCard(S("rGra"), d.grammar)),
+      h("div", { class: "card promo", style: "text-align:center;margin-top:12px" }, h("div", { class: "muted small", text: S("rOver") }), h("div", { class: "big", text: band(d.overall) }),
+        h("div", { class: "muted small", text: r.words + " " + S("wWords") })),
+      listBlock("💪 " + S("rStrong"), d.strengths, "✅"), errorsBlock("🔧 " + S("rErrors"), d.errors), listBlock("📚 " + S("rVocab"), d.vocab, "▫️"),
+      d.improved_paragraph ? h("div", { class: "card" }, h("h3", { text: "✨ " + S("rImproved") }), h("p", { class: "pre", style: "margin-top:6px;font-style:italic", text: d.improved_paragraph })) : null,
+      listBlock("🚀 " + S("rNext"), d.next_steps, "→"),
+      h("button", { class: "btn", onclick: writingFlow, text: S("again") }), h("button", { class: "btn ghost", onclick: viewEnglish, text: S("back") })];
+    haptic("success"); mount.apply(null, parts); refreshMe().catch(function () {});
+  }
+
+  // ================= SPEAKING =================
+  function speakingFlow(mode) {
+    mount(spinner(S("preparing")));
+    post("/api/app/speaking/start", { mode: mode }).then(function (d) { speakItem(d.sid, d.item, mode); })
+      .catch(function (e) { fail(e, function () { speakingFlow(mode); }); });
+  }
+
+  function pickMime() {
+    var c = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+    for (var i = 0; i < c.length; i++) { try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(c[i])) return c[i]; } catch (e) {} }
+    return "";
+  }
+  function fmtTime(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2); }
+
+  function speakItem(sid, item, mode) {
+    var stream = null, rec = null, chunks = [], mime = pickMime(), startedAt = 0, tick = null, blob = null, previewUrl = null, audioEl = null, prepTick = null;
+    var maxSec = item.part === 2 ? 150 : 90;
+    var ctl = h("div", { style: "text-align:center" }), status = h("div", { class: "muted small", text: S("recHint") });
+    function stopAll() {
+      if (tick) { clearInterval(tick); tick = null; }
+      if (prepTick) { clearInterval(prepTick); prepTick = null; }
+      try { if (rec && rec.state !== "inactive") { rec.onstop = null; rec.stop(); } } catch (e) {}
+      if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+      if (audioEl) { try { audioEl.pause(); } catch (e) {} }
+      if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+    }
+    function playQ() {
+      try { if (audioEl) audioEl.pause(); audioEl = new Audio("/api/app/speaking/tts/" + sid + "/" + item.i); audioEl.play().catch(function () {}); } catch (e) {}
+    }
+    function idle() {
+      clear(ctl);
+      status.textContent = S("recHint");
+      ctl.appendChild(h("button", { class: "rec", onclick: begin, "aria-label": S("rec"), text: "🎙" }));
+      ctl.appendChild(status);
+    }
+    function begin() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) { micFallback(); return; }
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
+        stream = s; chunks = [];
+        try { rec = new MediaRecorder(s, mime ? { mimeType: mime } : undefined); } catch (e) { micFallback(); return; }
+        rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
+        rec.onstop = review;
+        rec.start();
+        startedAt = Date.now();
+        clear(ctl);
+        var timer = h("div", { class: "big", style: "font-size:26px", text: "0:00" });
+        ctl.appendChild(h("button", { class: "rec on", onclick: function () { try { rec.stop(); } catch (e) {} }, text: "⏹" }));
+        ctl.appendChild(timer); ctl.appendChild(h("div", { class: "muted small", text: S("recStop") }));
+        tick = setInterval(function () {
+          var el = (Date.now() - startedAt) / 1000; timer.textContent = fmtTime(el);
+          if (el >= maxSec) { toast(S("maxTime")); try { rec.stop(); } catch (e) {} }
+        }, 250);
+      }).catch(function () { micFallback(); });
+    }
+    function micFallback() {
+      stopAll(); clear(ctl);
+      ctl.appendChild(h("div", { class: "card" }, h("p", { text: "🎙 " + S("micDenied") }),
+        h("button", { class: "btn", onclick: function () { openBot("run_speaking"); }, text: S("micChat") })));
+    }
+    function review() {
+      if (tick) { clearInterval(tick); tick = null; }
+      var dur = (Date.now() - startedAt) / 1000;
+      if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+      blob = new Blob(chunks, { type: (rec && rec.mimeType) || mime || "audio/webm" });
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(blob);
+      clear(ctl);
+      ctl.appendChild(h("audio", { controls: "", src: previewUrl, style: "width:100%;margin:8px 0" }));
+      ctl.appendChild(h("div", { class: "row" }, h("button", { class: "btn ghost", onclick: idle, text: S("recRedo") }),
+        h("button", { class: "btn", onclick: function () { send(dur); }, text: S("recSend") })));
+    }
+    function send(dur) {
+      clear(ctl); ctl.appendChild(spinner(item.i === item.total - 1 ? S("wAnalyzing") : S("recProcessing")));
+      var fd = new FormData();
+      fd.append("sid", sid); fd.append("duration", String(Math.round(dur)));
+      var ext = blob.type.indexOf("mp4") >= 0 ? "mp4" : blob.type.indexOf("ogg") >= 0 ? "ogg" : "webm";
+      fd.append("audio", blob, "answer." + ext);
+      fetch("/api/app/speaking/answer", { method: "POST", headers: { "X-Init-Data": initData }, body: fd }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) { return { status: r.status, j: j }; });
+      }).then(function (res) {
+        if (res.status === 200) {
+          stopAll();
+          if (res.j.done) speakReport(res.j.report, mode); else speakItem(sid, res.j.item, mode);
+        } else if (res.status === 422) { toast(S("noSpeech")); idle(); }
+        else if (res.status === 413) { toast(S("tooBig")); idle(); }
+        else if (res.status === 410) { stopAll(); toast(S("expired")); viewEnglish(); }
+        else { toast(S("err")); review(); }
+      }).catch(function () { toast(S("err")); review(); });
+    }
+
+    var card = h("div", { class: "card" },
+      h("div", { class: "progress" }, h("i", { style: "width:" + Math.round(item.i / item.total * 100) + "%" })),
+      h("div", { class: "muted small", text: "🎙 " + S("part") + " " + item.part + " · " + (item.i + 1) + "/" + item.total }),
+      item.lead ? h("p", { class: "muted", style: "margin-top:8px", text: "🧑‍🏫 " + item.lead }) : null);
+    if (item.part === 2) {
+      if (item.pics) card.appendChild(h("div", { class: "pics" },
+        h("figure", {}, h("img", { src: "/api/app/speaking/pic/" + sid + "/0", alt: "" }), h("figcaption", { text: "🅰️ " + S("picA") })),
+        h("figure", {}, h("img", { src: "/api/app/speaking/pic/" + sid + "/1", alt: "" }), h("figcaption", { text: "🅱️ " + S("picB") }))));
+      else card.appendChild(h("div", { style: "margin:10px 0" }, h("div", { class: "muted small", text: S("picsFail") }),
+        (item.desc || []).map(function (x, k) { return h("p", { style: "margin-top:4px", text: (k ? "🅱️ " : "🅰️ ") + x }); })));
+      var prep = h("div", { class: "muted small", text: "⏱ " + S("prep") + " 1:00" }), left = 60;
+      card.appendChild(prep);
+      prepTick = setInterval(function () { left--; prep.textContent = left > 0 ? "⏱ " + S("prep") + " " + fmtTime(left) : "✅"; if (left <= 0) { clearInterval(prepTick); prepTick = null; } }, 1000);
+    }
+    card.appendChild(h("div", { class: "qtext", style: "margin-top:8px", text: item.q }));
+    card.appendChild(h("button", { class: "btn ghost", onclick: playQ, text: S("listenQ") }));
+    mount(card, h("div", { class: "card" }, ctl));
+    cleanupFn = stopAll;
+    idle();
+    setTimeout(playQ, 300);
+  }
+
+  function speakReport(d, mode) {
+    d = d || {};
+    haptic("success");
+    mount.apply(null, [title("🏁 IELTS Speaking"),
+      h("div", { class: "grid2" }, bandCard(S("sFlu"), d.fluency), bandCard(S("sLex"), d.lexical), bandCard(S("sGra"), d.grammar), bandCard(S("sPro"), d.pronunciation)),
+      h("div", { class: "card promo", style: "text-align:center;margin-top:12px" }, h("div", { class: "muted small", text: S("rOver") }), h("div", { class: "big", text: band(d.overall) })),
+      d.summary ? h("div", { class: "card" }, h("h3", { text: "💬 " + S("sSummary") }), h("p", { class: "pre", style: "margin-top:6px", text: d.summary })) : null,
+      listBlock("💪 " + S("rStrong"), d.strengths, "✅"), errorsBlock("🔧 " + S("rErrors"), d.errors), listBlock("📚 " + S("rVocab"), d.vocab, "▫️"), listBlock("🚀 " + S("sPlan"), d.plan, "→"),
+      h("p", { class: "muted small", style: "margin:8px 2px", text: "ℹ️ " + S("sNote") }),
+      h("button", { class: "btn", onclick: function () { speakingFlow(mode); }, text: S("again") }), h("button", { class: "btn ghost", onclick: viewEnglish, text: S("back") })]);
+    refreshMe().catch(function () {});
+  }
+
+  // ================= KUTUBXONA =================
+  function viewLibrary(type) {
+    var seg = h("div", { class: "seg" });
+    [["reading", "reading"], ["listening", "listening"], ["grammar", "grammar"]].forEach(function (x) {
+      seg.appendChild(h("button", { class: type === x[0] ? "on" : "", onclick: function () { viewLibrary(x[0]); } }, S(x[1])));
+    });
+    var box = h("div", {}, spinner());
+    mount(backBtn(viewEnglish), title("📚 " + S("library")), seg, box);
+    api("/api/dashboard/content/" + type).then(function (items) {
+      clear(box);
+      if (!items.length) { box.appendChild(h("div", { class: "center", text: S("empty") })); return; }
+      items.forEach(function (it) {
+        box.appendChild(h("div", { class: "list-item", onclick: function () { openItem(type, it.id); } },
+          h("div", { class: "t" }, document.createTextNode(it.title), h("div", { class: "m", text: it.has_questions ? it.question_count + " " + S("questions") : S("readOnly") })),
+          h("div", { class: "chev", text: "›" })));
+      });
+    }).catch(function (e) { clear(box); if (e.status === 403) paywall(); else box.appendChild(h("div", { class: "center", text: S("err") })); });
+  }
+
+  function openItem(type, id) {
+    mount(spinner());
+    api("/api/dashboard/content/" + type + "/" + id).then(function (item) {
+      var card = h("div", { class: "card" }, h("h3", { text: item.title }));
+      if (item.body) card.appendChild(h("div", { class: "pre", style: "margin-top:10px", text: item.body }));
+      var area = h("div", {});
+      if (type === "listening") {
+        var au = h("audio", { controls: "", style: "width:100%;margin-top:12px" });
+        card.appendChild(au);
+        fetch("/api/dashboard/audio/" + id, { headers: { "X-Init-Data": initData } }).then(function (r) { return r.blob(); })
+          .then(function (b) { au.src = URL.createObjectURL(b); }).catch(function () {});
+      }
+      mount(backBtn(function () { viewLibrary(type); }), card, area);
+      if (item.questions && item.questions.length) libQuiz(type, id, item.questions, area);
+    }).catch(function (e) { if (e.status === 403) paywall(); else { toast(S("err")); viewLibrary(type); } });
+  }
+
+  function libQuiz(type, id, qs, area) {
     var answers = [], i = 0;
     function ask() {
       clear(area);
-      var q = qs[i];
-      var card = h("div", { class: "card" },
-        h("div", { class: "progress" }, h("i", { style: "width:" + Math.round(i / qs.length * 100) + "%" })),
-        h("div", { class: "muted small", text: S("qn") + " " + (i + 1) + "/" + qs.length }),
-        h("h3", { text: q.question, style: "margin-top:4px" }));
+      var q = qs[i], card = h("div", { class: "card" }, h("div", { class: "progress" }, h("i", { style: "width:" + Math.round(i / qs.length * 100) + "%" })),
+        h("div", { class: "muted small", text: S("question") + " " + (i + 1) + "/" + qs.length }), h("div", { class: "qtext", style: "margin-top:6px", text: q.question }));
       q.options.forEach(function (o, k) {
-        card.appendChild(h("button", { class: "opt", text: o, onclick: function () {
-          answers.push(k); i++;
-          if (i < qs.length) ask(); else finish();
-        } }));
+        card.appendChild(h("button", { class: "opt", text: o, onclick: function () { answers.push(k); i++; if (i < qs.length) ask(); else finish(); } }));
       });
       area.appendChild(card);
     }
     function finish() {
-      clear(area);
-      area.appendChild(h("div", { class: "center", text: S("scoring") }));
-      api("/api/dashboard/content/" + type + "/" + id + "/submit", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answers: answers })
-      }).then(function (r) {
+      clear(area); area.appendChild(spinner());
+      post("/api/dashboard/content/" + type + "/" + id + "/submit", { answers: answers }).then(function (r) {
         clear(area); haptic(r.percentage >= 60 ? "success" : "warning");
-        area.appendChild(h("div", { class: "card" },
-          h("div", { class: "muted small", text: S("result") }),
-          h("div", { class: "price", text: r.score + "/" + r.total + "  ·  " + r.percentage + "%" }),
-          h("button", { class: "btn ghost", style: "margin-top:12px", onclick: viewLibrary, text: S("toList") })));
-        me.stats[type + "_done"] = (me.stats[type + "_done"] || 0) + 1;
+        area.appendChild(h("div", { class: "card", style: "text-align:center" }, h("div", { class: "muted small", text: S("result") }), h("div", { class: "big", text: r.score + "/" + r.total }),
+          h("div", { class: "muted", text: r.percentage + "%" }), h("button", { class: "btn ghost", onclick: function () { viewLibrary(type); }, text: S("back") })));
+        refreshMe().catch(function () {});
       }).catch(function () { clear(area); area.appendChild(h("div", { class: "center", text: S("err") })); });
     }
     ask();
   }
 
-  // ---- PRO ----
-  function viewPro() {
-    var p = me.pro, parts = [h("div", { class: "top" }, h("h1", { text: "⭐ " + S("offerT") }))];
-    if (me.admin) { parts.push(h("div", { class: "card", text: S("owner") })); mount.apply(null, parts); return; }
-    if (p.active) {
-      parts.push(h("div", { class: "card" },
-        h("h3", { text: "✅ " + S("proActive") }),
-        h("p", { class: "muted", style: "margin-top:6px", text: S("until") + ": " + p.until + "  (" + p.left + " " + S("daysLeft") + ")" })));
-    }
-    parts.push(h("div", { class: "card" },
-      h("div", { class: "perk" }, h("div", { class: "ic", text: "💎" }), h("div", { text: S("perk1") })),
-      h("div", { class: "perk" }, h("div", { class: "ic", text: "🎙" }), h("div", { text: S("perk2") })),
-      h("div", { class: "perk" }, h("div", { class: "ic", text: "🏅" }), h("div", { text: S("perk3") })),
-      h("p", { class: "muted small", style: "margin-top:6px", text: S("perkLimit").replace("{n}", me.prices.pro_daily_limit) }),
-      h("p", { class: "muted small", text: S("asSeparate").replace("{w}", me.prices.writing).replace("{s}", me.prices.speaking) })));
-    var btn = h("button", { class: "btn", onclick: function () { buyPro(btn); } },
-      (p.active ? S("extend") : S("buy")) + " · ⭐ " + me.prices.pro + " / " + me.prices.pro_days + " " + S("days"));
-    parts.push(btn);
-    mount.apply(null, parts);
-  }
-
-  function refreshMe() {
-    return api("/api/dashboard/me").then(function (d) { me = d; });
-  }
-
-  function buyPro(btn) {
-    btn.disabled = true;
-    api("/api/dashboard/pro/invoice", { method: "POST" }).then(function (r) {
-      if (!tg || !tg.openInvoice) { window.location.href = r.link; return; }
-      tg.openInvoice(r.link, function (status) {
-        if (status === "paid") {
-          haptic("success"); toast(S("paidOk")); btn.textContent = S("checking");
-          var tries = 0;
-          (function poll() {
-            refreshMe().then(function () {
-              if (me.pro.active || tries++ > 6) { btn.disabled = false; viewPro(); } else setTimeout(poll, 1200);
-            }).catch(function () { btn.disabled = false; });
-          })();
-        } else { btn.disabled = false; if (status === "cancelled") toast(S("cancelled")); }
-      });
-    }).catch(function () { btn.disabled = false; toast(S("err")); });
-  }
-
-  // ---- start ----
+  // ================= BOSHLASH =================
   if (!initData) { renderNav(); mount(h("div", { class: "center", text: S("noTg") })); return; }
   renderNav();
-  mount(h("div", { class: "center", text: S("loading") }));
+  mount(spinner());
   refreshMe().then(function () {
     if (T[me.lang]) lang = me.lang;
+    var r = new URLSearchParams(window.location.search).get("r");
+    if (r && ["home", "science", "english", "top", "pro"].indexOf(r) >= 0) tab = r;
     show();
   }).catch(function () { mount(h("div", { class: "center", text: S("err") })); });
+
 })();
 </script>
 </body>
@@ -5587,52 +6316,12 @@ def _dash_tiles(lang: str, items: list) -> list:
     return out
 
 
-async def api_dashboard_me(request: web.Request):
-    user = _auth_user(request)
-    if not user:
-        return web.json_response({"error": "unauthorized"}, status=401)
-    uid = int(user["id"])
-    lang = (await get_lang(uid)) or UNSET_LANG
-    name = " ".join(x for x in (user.get("first_name"), user.get("last_name")) if x).strip() \
-        or (f"@{user['username']}" if user.get("username") else "User")
-    exp = await _pro_expiry(uid)
-    now_ts = datetime.now(timezone.utc).timestamp()
-    pro = {"active": bool(exp), "until": _pro_date(exp) if exp else "", "left": max(1, int((exp - now_ts) // 86400) + 1) if exp else 0}
-    return web.json_response({
-        "uid": uid, "name": name, "lang": lang, "admin": _is_admin(uid), "pro": pro,
-        "stats": await _profile_stats(str(uid)),
-        "bot": await _bot_username(),
-        "tiles": {"science": _dash_tiles(lang, MENU_SCIENCE), "english": _dash_tiles(lang, MENU_ENGLISH)},
-        "prices": {"pro": PRO_PRICE_STARS, "pro_days": PRO_DAYS, "pro_daily_limit": PRO_DAILY_LIMIT,
-                   "writing": WRITING_PRICE_STARS, "speaking": SPEAKING_PRICE_STARS},
-    })
-
-
-async def api_dashboard_pro_invoice(request: web.Request):
-    """Mini App ichida PRO uchun Stars invoice havolasini yaratadi (tg.openInvoice bilan ochiladi)."""
-    user = _auth_user(request)
-    if not user:
-        return web.json_response({"error": "unauthorized"}, status=401)
-    uid = int(user["id"])
-    if _is_admin(uid):
-        return web.json_response({"error": "owner"}, status=400)
-    current_lang.set((await get_lang(uid)) or UNSET_LANG)
-    try:
-        link = await bot.create_invoice_link(
-            title=_pr("inv_title"),
-            description=_pr("inv_desc", d=PRO_DAYS),
-            payload=f"pro:{uid}",
-            provider_token="",
-            currency="XTR",
-            prices=[LabeledPrice(label=_pr("inv_label", d=PRO_DAYS), amount=PRO_PRICE_STARS)],
-        )
-    except Exception as e:
-        logger.exception("PRO invoice havolasini yaratishda xatolik: %s", e)
-        return web.json_response({"error": "invoice failed"}, status=500)
-    return web.json_response({"link": link})
-
-
 async def api_dashboard_content_list(request: web.Request):
+    _u = _auth_user(request)
+    if not _u:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    if not await _is_premium(int(_u["id"])):
+        return web.json_response({"error": "pro_required"}, status=403)
     content_type = request.match_info.get("type")
     if content_type not in CONTENT_TYPES:
         return web.json_response({"error": "unknown content type"}, status=404)
@@ -5651,6 +6340,11 @@ async def api_dashboard_content_list(request: web.Request):
 
 
 async def api_dashboard_content_detail(request: web.Request):
+    _u = _auth_user(request)
+    if not _u:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    if not await _is_premium(int(_u["id"])):
+        return web.json_response({"error": "pro_required"}, status=403)
     content_type = request.match_info.get("type")
     if content_type not in CONTENT_TYPES:
         return web.json_response({"error": "unknown content type"}, status=404)
@@ -5687,6 +6381,8 @@ async def api_dashboard_content_submit(request: web.Request):
     user = _auth_user(request)
     if not user:
         return web.json_response({"error": "unauthorized"}, status=401)
+    if not await _is_premium(int(user["id"])):
+        return web.json_response({"error": "pro_required"}, status=403)
     try:
         item_id = int(request.match_info.get("id"))
         body = await request.json()
@@ -5718,6 +6414,11 @@ async def api_dashboard_content_submit(request: web.Request):
 
 
 async def api_dashboard_audio(request: web.Request):
+    _u = _auth_user(request)
+    if not _u:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    if not await _is_premium(int(_u["id"])):
+        return web.json_response({"error": "pro_required"}, status=403)
     """Listening kontenti uchun audio faylni Telegram'dan (file_id orqali)
     olib, brauzerga proxy qiladi — bot tokenini mijozga hech qachon ochmaydi."""
     try:
@@ -5746,6 +6447,675 @@ async def api_dashboard_audio(request: web.Request):
 #    Telegram to'g'ridan-to'g'ri /webhook manziliga yangilanish yuboradi)
 # --------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------
+# MINI APP O'YIN DVIGATELI
+# Chatdagi barcha funksiyalar Mini App ichida ham ishlaydi. Server savollarni/o'yinlarni
+# mavjud generatorlar (_generate_*_sync) bilan yaratadi va sessiyani xotirada saqlaydi;
+# to'g'ri javoblar mijozga faqat javob berilgandan keyin yuboriladi.
+# --------------------------------------------------------------------------
+
+APP_SESSIONS: dict = {}
+APP_SESSION_TTL = 3 * 3600
+APP_MAX_SESSIONS_PER_USER = 8
+SPEAKING_MAX_AUDIO_BYTES = 8 * 1024 * 1024
+
+_SUBJECT_L10N = {
+    "Geografiya": ("География", "Geography"), "Fizika": ("Физика", "Physics"), "Kimyo": ("Химия", "Chemistry"),
+    "Biologiya": ("Биология", "Biology"), "Matematika": ("Математика", "Mathematics"),
+    "Texnologiya va IT": ("Технологии и IT", "Technology & IT"),
+    "Adabiyot va madaniyat": ("Литература и культура", "Literature & culture"),
+    "San'at va musiqa": ("Искусство и музыка", "Art & music"), "Koinot": ("Космос", "Space"),
+    "Iqtisodiyot va moliya": ("Экономика и финансы", "Economics & finance"), "Psixologiya": ("Психология", "Psychology"),
+    "Sport": ("Спорт", "Sport"), "Salomatlik va ovqatlanish": ("Здоровье и питание", "Health & nutrition"),
+    "Ingliz tili": ("Английский язык", "English"),
+}
+_GENRE_L10N = {
+    "Detektiv": ("Детектив", "Detective"), "Kosmos": ("Космос", "Space"), "Fantaziya": ("Фэнтези", "Fantasy"),
+    "Omon qolish": ("Выживание", "Survival"), "Qaroqchilar": ("Пираты", "Pirates"),
+    "Vaqt sayohati": ("Путешествие во времени", "Time travel"),
+}
+_GLEVEL_L10N = ["A1–A2", "B1–B2", "C1"]
+_GLEVEL_WORD = {
+    "uz": ["boshlang'ich", "o'rta", "yuqori"], "ru": ["начальный", "средний", "продвинутый"],
+    "en": ["beginner", "intermediate", "advanced"],
+}
+
+
+def _l10n(name: str, table: dict, lang: str) -> str:
+    row = table.get(name)
+    if not row or lang == "uz":
+        return name
+    return row[0] if lang == "ru" else row[1]
+
+
+def _app_purge_sessions(uid: int | None = None):
+    now = datetime.now(timezone.utc).timestamp()
+    for k in [k for k, v in APP_SESSIONS.items() if now - v["t"] > APP_SESSION_TTL]:
+        APP_SESSIONS.pop(k, None)
+    if uid is not None:
+        mine = sorted(((k, v["t"]) for k, v in APP_SESSIONS.items() if v["uid"] == uid), key=lambda x: x[1])
+        for k, _t in mine[:-APP_MAX_SESSIONS_PER_USER]:
+            APP_SESSIONS.pop(k, None)
+
+
+def _app_new_session(uid: int, kind: str, **data) -> tuple[str, dict]:
+    _app_purge_sessions(uid)
+    sid = secrets.token_urlsafe(16)
+    s = {"uid": uid, "kind": kind, "t": datetime.now(timezone.utc).timestamp(), **data}
+    APP_SESSIONS[sid] = s
+    return sid, s
+
+
+def _app_session(sid: str, uid: int | None = None, kinds: tuple | None = None) -> dict | None:
+    s = APP_SESSIONS.get(str(sid))
+    if not s:
+        return None
+    if uid is not None and s["uid"] != uid:
+        return None
+    if kinds and s["kind"] not in kinds:
+        return None
+    s["t"] = datetime.now(timezone.utc).timestamp()
+    return s
+
+
+def app_api(fn):
+    """Mini App API handler uchun o'ram: initData imzosini tekshiradi, foydalanuvchi tilini o'rnatadi,
+    kutilmagan xatolarni JSON qilib qaytaradi."""
+    async def wrapper(request: web.Request):
+        user = _auth_user(request)
+        if not user:
+            return web.json_response({"error": "unauthorized"}, status=401)
+        uid = int(user["id"])
+        lang = (await get_lang(uid)) or UNSET_LANG
+        current_lang.set(lang)
+        try:
+            return await fn(request, uid, lang, user)
+        except web.HTTPException:
+            raise
+        except Exception as e:
+            logger.exception("Mini App API xatosi (%s): %s", fn.__name__, e)
+            return web.json_response({"error": "server"}, status=500)
+    wrapper.__name__ = fn.__name__
+    return wrapper
+
+
+async def _body(request: web.Request) -> dict:
+    try:
+        d = await request.json()
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _err(code: str, status: int = 400, **extra):
+    return web.json_response({"error": code, **extra}, status=status)
+
+
+async def _is_premium(uid: int) -> bool:
+    return _is_admin(uid) or await _is_pro(uid)
+
+
+async def _app_premium_access(uid: int, kind: str) -> str | None:
+    """Writing/Speaking uchun ruxsat: 'admin' | 'credit' | 'pro' | 'limit' | None (to'lov kerak)."""
+    if _is_admin(uid):
+        return "admin"
+    has_credit = await (_has_writing_credit(uid) if kind == "writing" else _has_speaking_credit(uid))
+    if has_credit:
+        return "credit"
+    if await _is_pro(uid):
+        return "pro" if await _pro_use(uid, kind) else "limit"
+    return None
+
+
+def _paywall(kind: str, access: str | None):
+    if access == "limit":
+        return _err("limit", 429, limit=PRO_DAILY_LIMIT)
+    return _err("payment_required", 402, product=kind)
+
+
+# ---- /me --------------------------------------------------------------------
+async def api_app_me(request: web.Request):
+    user = _auth_user(request)
+    if not user:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    uid = int(user["id"])
+    lang = (await get_lang(uid)) or UNSET_LANG
+    name = " ".join(x for x in (user.get("first_name"), user.get("last_name")) if x).strip() \
+        or (f"@{user['username']}" if user.get("username") else "User")
+    exp = await _pro_expiry(uid)
+    now_ts = datetime.now(timezone.utc).timestamp()
+    pro = {"active": bool(exp), "until": _pro_date(exp) if exp else "",
+           "left": max(1, int((exp - now_ts) // 86400) + 1) if exp else 0}
+    subjects = [{"i": i, "emoji": e, "name": _l10n(n, _SUBJECT_L10N, lang), "pro": n == "Ingliz tili"}
+                for i, (e, n, _d) in enumerate(SUBJECTS)]
+    genres = [{"i": i, "emoji": e, "name": _l10n(n, _GENRE_L10N, lang)} for i, (e, n, _d) in enumerate(STORY_GENRES)]
+    levels = []
+    for i, (e, _n, _d) in enumerate(GRAMMAR_LEVELS):
+        levels.append({"i": i, "emoji": e, "name": f"{_GLEVEL_L10N[i]} ({_GLEVEL_WORD[lang][i]})",
+                       "topics": [t.replace(" va ", " & ") for t in GRAMMAR_TOPICS[i]]})
+    return web.json_response({
+        "uid": uid, "name": name, "lang": lang, "admin": _is_admin(uid), "pro": pro,
+        "credits": {"writing": await _has_writing_credit(uid), "speaking": await _has_speaking_credit(uid)},
+        "stats": await _profile_stats(str(uid)),
+        "bot": await _bot_username(),
+        "subjects": subjects, "genres": genres, "levels": levels,
+        "prices": {"pro": PRO_PRICE_STARS, "pro_days": PRO_DAYS, "pro_daily_limit": PRO_DAILY_LIMIT,
+                   "writing": WRITING_PRICE_STARS, "speaking": SPEAKING_PRICE_STARS},
+        "limits": {"writing_min_words": WRITING_MIN_WORDS, "writing_max_chars": WRITING_MAX_CHARS,
+                   "quiz_len": QUIZ_LENGTH, "cert_len": CERTIFICATE_QUIZ_LENGTH,
+                   "cert_pass": CERTIFICATE_PASS_PERCENT, "guess_max": GUESS_MAX_QUESTIONS, "story_steps": STORY_STEPS},
+    })
+
+
+# ---- To'lov (Stars) ---------------------------------------------------------
+@app_api
+async def api_app_invoice(request: web.Request, uid: int, lang: str, user: dict):
+    product = (await _body(request)).get("product")
+    if product == "pro":
+        title, desc, label, amount = _pr("inv_title"), _pr("inv_desc", d=PRO_DAYS), _pr("inv_label", d=PRO_DAYS), PRO_PRICE_STARS
+    elif product == "writing":
+        title, desc, label, amount = "IELTS Writing", "IELTS Writing Task 2 review", "Writing", WRITING_PRICE_STARS
+    elif product == "speaking":
+        title, desc, label, amount = _sp("inv_title"), _sp("inv_desc"), _sp("inv_label"), SPEAKING_PRICE_STARS
+    else:
+        return _err("bad_product")
+    if _is_admin(uid):
+        return _err("owner")
+    link = await bot.create_invoice_link(
+        title=title, description=desc, payload=f"{product}:{uid}:app", provider_token="", currency="XTR",
+        prices=[LabeledPrice(label=label, amount=amount)],
+    )
+    return web.json_response({"link": link})
+
+
+# ---- Test/viktorina turlari (ko'p variantli) ------------------------------
+def _norm_q(q: dict) -> dict:
+    return {"question": str(q.get("question", "")), "options": [str(o) for o in q.get("options", [])],
+            "correct_index": int(q.get("correct_index", 0)), "explanation": str(q.get("explanation", "") or "")}
+
+
+def _public_questions(qs: list) -> list:
+    return [{"question": q["question"], "options": q["options"]} for q in qs]
+
+
+QUIZ_PRO_KINDS = ("grammar", "reading", "listening", "certificate")
+
+
+@app_api
+async def api_app_quiz_start(request: web.Request, uid: int, lang: str, user: dict):
+    import random
+    b = await _body(request)
+    kind = b.get("kind")
+    if kind not in ("quiz", "certificate", "daily", "reading", "listening", "grammar", "lie", "whatif"):
+        return _err("bad_kind")
+    premium = await _is_premium(uid)
+    if kind in QUIZ_PRO_KINDS and not premium:
+        return _err("pro_required", 403)
+
+    extra: dict = {}
+    title = ""
+    if kind == "quiz":
+        subject_name = None
+        sub = b.get("subject")
+        if sub not in (None, "r"):
+            try:
+                emoji, subject_name, _d = SUBJECTS[int(sub)]
+            except (ValueError, IndexError, TypeError):
+                return _err("bad_subject")
+            title = f"{emoji} {_l10n(subject_name, _SUBJECT_L10N, lang)}"
+        else:
+            title = "🎲"
+        if subject_name == "Ingliz tili" and not premium:
+            return _err("pro_required", 403)
+        questions = await asyncio.to_thread(_generate_quiz_set_sync, QUIZ_LENGTH, subject_name)
+        if not questions:
+            return _err("generation_failed", 502)
+        questions = [_norm_q(q) for q in questions]
+    elif kind == "certificate":
+        questions = await asyncio.to_thread(_generate_quiz_set_sync, CERTIFICATE_QUIZ_LENGTH)
+        if len(questions) < CERTIFICATE_QUIZ_LENGTH // 2:
+            return _err("generation_failed", 502)
+        questions = [_norm_q(q) for q in questions]
+    elif kind == "daily":
+        content = await get_daily_content(lang)
+        if not content or not content.get("questions"):
+            return _err("generation_failed", 502)
+        questions = [_norm_q(q) for q in content["questions"]]
+        title = content.get("subject", "")
+        tip = content.get("tip")
+        extra = {"fact": content.get("fact", ""),
+                 "tip": tip if (tip and premium) else ({"locked": True} if tip else None)}
+    elif kind == "reading":
+        data = await asyncio.to_thread(_generate_reading_test_sync)
+        if not data["questions"] or not data["passage"]:
+            return _err("generation_failed", 502)
+        questions = [_norm_q(q) for q in data["questions"]]
+        extra = {"passage": data["passage"]}
+    elif kind == "listening":
+        data = await asyncio.to_thread(_generate_listening_test_sync)
+        if not data["questions"] or not data["script"]:
+            return _err("generation_failed", 502)
+        questions = [_norm_q(q) for q in data["questions"]]
+        extra = {"audio": True}
+    elif kind == "grammar":
+        try:
+            lvl = int(b.get("level"))
+            topics = GRAMMAR_TOPICS[lvl]
+            t = b.get("topic")
+            topic = random.choice(topics) if t in (None, "r") else topics[int(t)]
+            level_desc = GRAMMAR_LEVELS[lvl][2]
+        except (ValueError, IndexError, TypeError):
+            return _err("bad_topic")
+        g = await asyncio.to_thread(_generate_grammar_sync, topic, level_desc)
+        questions = [{"question": e["sentence"], "options": e["options"], "correct_index": e["correct_index"],
+                      "explanation": e["explanation"]} for e in g["exercises"]]
+        title = g["title"]
+        extra = {"lesson": {"title": g["title"], "rule": g["rule"],
+                            "examples": [{"en": en, "uz": uz} for en, uz in g["examples"]], "mistake": g["mistake"]}}
+    elif kind == "lie":
+        rnd = await asyncio.to_thread(_generate_lie_sync, random.choice(_LIE_TOPICS))
+        questions = [{"question": "", "options": rnd["statements"], "correct_index": rnd["lie_index"],
+                      "explanation": rnd["explanation"]}]
+    else:  # whatif
+        rnd = await asyncio.to_thread(_generate_what_sync, random.choice(_WHAT_TOPICS))
+        expl = rnd["explanation"] + (("\n\n🤩 " + rnd["wow"]) if rnd["wow"] else "")
+        questions = [{"question": rnd["scenario"], "options": rnd["options"], "correct_index": rnd["correct_index"],
+                      "explanation": expl}]
+
+    script = data["script"] if kind == "listening" else ""
+    sid, _s = _app_new_session(uid, "quiz", mode=kind, questions=questions, score=0, answered=set(), script=script)
+    return web.json_response({"sid": sid, "mode": kind, "title": title, "total": len(questions),
+                              "questions": _public_questions(questions), **extra})
+
+
+@app_api
+async def api_app_quiz_answer(request: web.Request, uid: int, lang: str, user: dict):
+    b = await _body(request)
+    s = _app_session(b.get("sid"), uid, ("quiz",))
+    if not s:
+        return _err("expired", 410)
+    try:
+        i, choice = int(b.get("i")), int(b.get("choice"))
+        q = s["questions"][i]
+    except (ValueError, TypeError, IndexError):
+        return _err("bad_request")
+    if i in s["answered"]:
+        return _err("already_answered", 409)
+    s["answered"].add(i)
+    correct = choice == q["correct_index"]
+    if correct:
+        s["score"] += 1
+    return web.json_response({"correct": correct, "correct_index": q["correct_index"],
+                              "explanation": q["explanation"], "score": s["score"]})
+
+
+@app_api
+async def api_app_quiz_finish(request: web.Request, uid: int, lang: str, user: dict):
+    b = await _body(request)
+    sid = b.get("sid")
+    s = _app_session(sid, uid, ("quiz",))
+    if not s:
+        return _err("expired", 410)
+    total = len(s["questions"])
+    score = s["score"]
+    pct = round(score / total * 100) if total else 0
+    mode = s["mode"]
+    out = {"score": score, "total": total, "percentage": pct, "mode": mode}
+    board = {"quiz": LEADERBOARD_QUIZ_KEY, "certificate": LEADERBOARD_CERT_KEY,
+             "reading": LEADERBOARD_READING_KEY, "listening": LEADERBOARD_LISTENING_KEY}.get(mode)
+    if board and total:
+        await update_leaderboard(board, uid, pct)
+    if mode == "listening":
+        out["script"] = s.get("script", "")
+    if mode == "certificate":
+        out["pass_percent"] = CERTIFICATE_PASS_PERCENT
+        if pct >= CERTIFICATE_PASS_PERCENT:
+            full_name = user.get("first_name") or user.get("username") or "User"
+            if user.get("last_name"):
+                full_name += " " + user["last_name"]
+            cert_path = None
+            try:
+                cert_path = await asyncio.to_thread(_generate_certificate_image_sync, full_name, score, total, pct)
+                await bot.send_photo(uid, FSInputFile(cert_path),
+                                     caption=f"🎓 {html.escape(full_name)} — {score}/{total} ({pct}%)")
+                out["certificate"] = "sent"
+            except Exception as e:
+                logger.exception("Sertifikatni yuborishda xatolik: %s", e)
+                out["certificate"] = "failed"
+            finally:
+                if cert_path and os.path.exists(cert_path):
+                    try:
+                        os.remove(cert_path)
+                    except OSError:
+                        pass
+    APP_SESSIONS.pop(sid, None)
+    return web.json_response(out)
+
+
+async def api_app_audio(request: web.Request):
+    """Listening testi uchun TTS audio (sid — maxfiy, taxmin qilib bo'lmaydigan token)."""
+    s = _app_session(request.match_info.get("sid", ""), None, ("quiz",))
+    if not s or not s.get("script"):
+        return web.Response(status=404)
+    if "audio" not in s:
+        try:
+            s["audio"] = await asyncio.to_thread(_tts_mp3_bytes_sync, s["script"][:4500])
+        except Exception as e:
+            logger.exception("Listening audio xatosi: %s", e)
+            return web.Response(status=500)
+    return web.Response(body=s["audio"], content_type="audio/mpeg", headers={"Cache-Control": "private, max-age=3600"})
+
+
+def _tts_mp3_bytes_sync(text: str) -> bytes:
+    import io
+    buf = io.BytesIO()
+    gTTS(text=text, lang="en").write_to_fp(buf)
+    return buf.getvalue()
+
+
+# ---- Miya jumboqi -----------------------------------------------------------
+@app_api
+async def api_app_teaser_new(request: web.Request, uid: int, lang: str, user: dict):
+    t = await asyncio.to_thread(_generate_teaser_sync)
+    sid, _s = _app_new_session(uid, "teaser", teaser=t)
+    return web.json_response({"sid": sid, "puzzle": str(t["puzzle"])})
+
+
+@app_api
+async def api_app_teaser_reveal(request: web.Request, uid: int, lang: str, user: dict):
+    b = await _body(request)
+    s = _app_session(b.get("sid"), uid, ("teaser",))
+    if not s:
+        return _err("expired", 410)
+    teaser = s["teaser"]
+    if b.get("what") == "hint":
+        return web.json_response({"hint": str(teaser.get("hint", ""))})
+    return web.json_response({"answer": str(teaser.get("answer", "")), "explanation": str(teaser.get("explanation", ""))})
+
+
+# ---- Men topaman ------------------------------------------------------------
+_GUESS_ANS = {"y": "Ha", "n": "Yo'q", "m": "Ba'zan / bilmayman"}
+
+
+async def _guess_app_step(s: dict) -> dict:
+    n = len(s["history"])
+    step = await asyncio.to_thread(_guess_step_sync, s["history"], n >= GUESS_MAX_QUESTIONS - 1, s["wrong"])
+    if step.get("action") == "guess" and step.get("guess"):
+        s["last_guess"] = str(step["guess"])
+        return {"type": "guess", "text": s["last_guess"], "n": n}
+    s["last_question"] = str(step.get("question") or "Bu tirik mavjudotmi?")
+    return {"type": "ask", "text": s["last_question"], "n": n + 1, "max": GUESS_MAX_QUESTIONS}
+
+
+@app_api
+async def api_app_guess_start(request: web.Request, uid: int, lang: str, user: dict):
+    if not await _is_premium(uid):
+        return _err("pro_required", 403)
+    sid, s = _app_new_session(uid, "guess", history=[], wrong=[], last_question="", last_guess="")
+    return web.json_response({"sid": sid, **(await _guess_app_step(s))})
+
+
+@app_api
+async def api_app_guess_answer(request: web.Request, uid: int, lang: str, user: dict):
+    b = await _body(request)
+    s = _app_session(b.get("sid"), uid, ("guess",))
+    if not s:
+        return _err("expired", 410)
+    a = b.get("a")
+    if a in _GUESS_ANS:
+        s["history"].append((s.get("last_question", ""), _GUESS_ANS[a]))
+    elif a == "win":
+        n = len(s["history"])
+        APP_SESSIONS.pop(b.get("sid"), None)
+        return web.json_response({"type": "win", "text": s.get("last_guess", ""), "n": n})
+    elif a == "lose":
+        s["wrong"].append(s.get("last_guess", ""))
+        s["history"].append((f"Sizning o'ylaganingiz {s.get('last_guess', '')} mi?", "Yo'q"))
+        if len(s["history"]) >= GUESS_MAX_QUESTIONS or len(s["wrong"]) >= 3:
+            APP_SESSIONS.pop(b.get("sid"), None)
+            return web.json_response({"type": "lose"})
+    else:
+        return _err("bad_request")
+    return web.json_response(await _guess_app_step(s))
+
+
+# ---- Interaktiv hikoya --------------------------------------------------------
+async def _story_app_step(s: dict, choice_text: str | None) -> dict:
+    res = await asyncio.to_thread(_generate_story_step_sync, s["story"], choice_text)
+    st = s["story"]
+    st["log"].append(f"Scene {st['step']}: {res['scene']}")
+    st["choices"] = res["choices"]
+    return {"step": st["step"], "total": STORY_STEPS, "scene": res["scene"], "choices": res["choices"],
+            "ending": bool(res["ending"]), "title": res["title"]}
+
+
+@app_api
+async def api_app_story_start(request: web.Request, uid: int, lang: str, user: dict):
+    if not await _is_premium(uid):
+        return _err("pro_required", 403)
+    b = await _body(request)
+    try:
+        emoji, name, desc = STORY_GENRES[int(b.get("genre"))]
+    except (ValueError, IndexError, TypeError):
+        return _err("bad_genre")
+    story = {"emoji": emoji, "name": name, "desc": desc, "step": 1, "log": [], "choices": []}
+    sid, s = _app_new_session(uid, "story", story=story)
+    return web.json_response({"sid": sid, **(await _story_app_step(s, None))})
+
+
+@app_api
+async def api_app_story_choose(request: web.Request, uid: int, lang: str, user: dict):
+    b = await _body(request)
+    sid = b.get("sid")
+    s = _app_session(sid, uid, ("story",))
+    if not s or not s["story"].get("choices"):
+        return _err("expired", 410)
+    st = s["story"]
+    try:
+        choice = st["choices"][int(b.get("choice"))]
+    except (ValueError, IndexError, TypeError):
+        return _err("bad_request")
+    st["choices"] = []
+    st["log"].append(f"Player chose: {choice}")
+    st["step"] += 1
+    try:
+        out = await _story_app_step(s, choice)
+    except Exception:
+        st["step"] -= 1
+        raise
+    if out["ending"]:
+        APP_SESSIONS.pop(sid, None)
+    return web.json_response(out)
+
+
+# ---- Writing ------------------------------------------------------------------
+@app_api
+async def api_app_writing_task(request: web.Request, uid: int, lang: str, user: dict):
+    access = await _app_premium_access(uid, "writing")
+    if access in (None, "limit"):
+        return _paywall("writing", access)
+    task = await asyncio.to_thread(_generate_writing_task_sync)
+    sid, _s = _app_new_session(uid, "writing", task=task, access=access)
+    return web.json_response({"sid": sid, "task": task, "access": access,
+                              "min_words": WRITING_MIN_WORDS, "max_chars": WRITING_MAX_CHARS})
+
+
+@app_api
+async def api_app_writing_submit(request: web.Request, uid: int, lang: str, user: dict):
+    b = await _body(request)
+    s = _app_session(b.get("sid"), uid, ("writing",))
+    if not s:
+        return _err("expired", 410)
+    essay = str(b.get("essay", "")).strip()
+    words = len(essay.split())
+    if words < WRITING_MIN_WORDS:
+        return _err("too_short", 422, words=words, min=WRITING_MIN_WORDS)
+    if len(essay) > WRITING_MAX_CHARS:
+        return _err("too_long", 422, max=WRITING_MAX_CHARS)
+    data = await asyncio.to_thread(_analyze_essay_sync, essay, s["task"])
+    if s["access"] == "credit":
+        await _consume_writing_credit(uid)
+    APP_SESSIONS.pop(b.get("sid"), None)
+    return web.json_response({"report": data, "words": words, "task": s["task"]})
+
+
+# ---- Speaking (mikrofon bilan) -------------------------------------------------
+def _speak_item_public(s: dict, i: int) -> dict:
+    it = s["items"][i]
+    out = {"i": i, "total": len(s["items"]), "part": it["part"], "lead": it.get("lead", ""), "q": it["q"]}
+    if it["part"] == 2:
+        out["pics"] = bool(s.get("pics"))
+        out["desc"] = it.get("desc") or []
+    return out
+
+
+async def _speak_prepare_item(s: dict, i: int):
+    """Part 2 uchun rasmlarni yuklab oladi (bir marta)."""
+    it = s["items"][i]
+    if it["part"] == 2 and "pics" not in s:
+        s["pics"] = await _fetch_two_pictures(it.get("pics") or []) or None
+
+
+@app_api
+async def api_app_speaking_start(request: web.Request, uid: int, lang: str, user: dict):
+    b = await _body(request)
+    mode = "short" if b.get("mode") == "short" else "full"
+    if mode == "short":
+        if not await _is_premium(uid):
+            return _err("pro_required", 403)
+        access = "free"
+    else:
+        access = await _app_premium_access(uid, "speaking")
+        if access in (None, "limit"):
+            return _paywall("speaking", access)
+    items = await asyncio.to_thread(_generate_full_speaking_sync)
+    if mode == "short":
+        items = [x for x in items if x["part"] == 1][:5]
+    sid, s = _app_new_session(uid, "speaking", items=items, answers=[], idx=0, access=access, mode=mode)
+    await _speak_prepare_item(s, 0)
+    return web.json_response({"sid": sid, "mode": mode, "access": access, "item": _speak_item_public(s, 0)})
+
+
+async def api_app_speaking_tts(request: web.Request):
+    s = _app_session(request.match_info.get("sid", ""), None, ("speaking",))
+    try:
+        i = int(request.match_info.get("i", ""))
+        it = s["items"][i]
+    except (TypeError, ValueError, IndexError, KeyError):
+        return web.Response(status=404)
+    cache = s.setdefault("tts", {})
+    if i not in cache:
+        text = _plain_speech(((it.get("lead") or "") + " " + it["q"]).strip())[:900]
+        try:
+            cache[i] = await asyncio.to_thread(_tts_mp3_bytes_sync, text)
+        except Exception as e:
+            logger.exception("Speaking TTS xatosi: %s", e)
+            return web.Response(status=500)
+    return web.Response(body=cache[i], content_type="audio/mpeg", headers={"Cache-Control": "private, max-age=3600"})
+
+
+async def api_app_speaking_pic(request: web.Request):
+    s = _app_session(request.match_info.get("sid", ""), None, ("speaking",))
+    try:
+        n = int(request.match_info.get("n", ""))
+        data = s["pics"][n]
+    except (TypeError, ValueError, IndexError, KeyError):
+        return web.Response(status=404)
+    return web.Response(body=bytes(data), content_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+
+
+@app_api
+async def api_app_speaking_answer(request: web.Request, uid: int, lang: str, user: dict):
+    sid, audio, duration = None, None, 0
+    ext = "webm"
+    reader = await request.multipart()
+    async for part in reader:
+        if part.name == "sid":
+            sid = (await part.text()).strip()
+        elif part.name == "duration":
+            try:
+                duration = int(float(await part.text()))
+            except ValueError:
+                duration = 0
+        elif part.name == "audio":
+            ctype = (part.headers.get("Content-Type") or "").lower()
+            ext = ("mp4" if "mp4" in ctype else "ogg" if "ogg" in ctype else "wav" if "wav" in ctype
+                   else "mp3" if "mpeg" in ctype else "webm")
+            chunks, size = [], 0
+            while True:
+                chunk = await part.read_chunk(256 * 1024)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > SPEAKING_MAX_AUDIO_BYTES:
+                    return _err("too_big", 413)
+                chunks.append(chunk)
+            audio = b"".join(chunks)
+    s = _app_session(sid or "", uid, ("speaking",))
+    if not s:
+        return _err("expired", 410)
+    if not audio or len(audio) < 1500:
+        return _err("no_speech", 422)
+
+    try:
+        def _stt():
+            tr = groq_client.audio.transcriptions.create(
+                file=(f"answer.{ext}", audio), model=STT_MODEL, language="en", response_format="json")
+            return (tr.text or "").strip()
+        transcript = await asyncio.to_thread(_stt)
+    except Exception as e:
+        logger.exception("Speaking transkripsiya xatosi: %s", e)
+        return _err("stt_failed", 502)
+    if not transcript:
+        return _err("no_speech", 422)
+
+    i = s["idx"]
+    it = s["items"][i]
+    s["answers"].append({"part": it["part"], "q": it["q"] + (f" [pictures theme: {it['theme']}]" if it.get("theme") else ""),
+                         "text": transcript, "sec": duration})
+    s["idx"] = i + 1
+    if s["idx"] < len(s["items"]):
+        await _speak_prepare_item(s, s["idx"])
+        return web.json_response({"done": False, "item": _speak_item_public(s, s["idx"])})
+
+    report = await asyncio.to_thread(_evaluate_full_speaking_sync, s["answers"])
+    if s["access"] == "credit":
+        await _consume_speaking_credit(uid)
+    APP_SESSIONS.pop(sid, None)
+    return web.json_response({"done": True, "report": report})
+
+
+# ---- Reyting ------------------------------------------------------------------
+_name_cache: dict = {}
+
+
+async def _display_name(uid_str: str) -> str:
+    hit = _name_cache.get(uid_str)
+    now = datetime.now(timezone.utc).timestamp()
+    if hit and now - hit[1] < 6 * 3600:
+        return hit[0]
+    try:
+        chat = await bot.get_chat(int(uid_str))
+        name = chat.full_name or (f"@{chat.username}" if chat.username else f"User {uid_str[-4:]}")
+    except Exception:
+        name = f"User {uid_str[-4:]}"
+    _name_cache[uid_str] = (name, now)
+    return name
+
+
+@app_api
+async def api_app_leaderboard(request: web.Request, uid: int, lang: str, user: dict):
+    boards = []
+    for key, k in ((LEADERBOARD_QUIZ_KEY, "quiz"), (LEADERBOARD_CERT_KEY, "certificate"),
+                   (LEADERBOARD_READING_KEY, "reading"), (LEADERBOARD_LISTENING_KEY, "listening")):
+        entries = await get_leaderboard_entries(key, top_n=10)
+        names = await asyncio.gather(*[_display_name(m) for m, _ in entries])
+        boards.append({"key": k, "rows": [{"name": n, "pct": int(sc), "me": m == str(uid)}
+                                           for (m, sc), n in zip(entries, names)]})
+    return web.json_response({"boards": boards})
+
+
+
 async def health(request):
     return web.Response(text="IELTS Speaking Bot is running (webhook mode).")
 
@@ -5758,6 +7128,10 @@ async def on_startup(app: web.Application):
     )
     logger.info("Webhook o'rnatildi: %s", WEBHOOK_URL)
     await setup_bot_commands()
+    try:
+        await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text="🎓 App", web_app=WebAppInfo(url=_app_url())))
+    except Exception as e:
+        logger.warning("Menyu tugmasini o'rnatib bo'lmadi: %s", e)
 
     global _daily_task
     if DAILY_PUSH_ENABLED and redis_client is not None:
@@ -5788,8 +7162,25 @@ def create_app() -> web.Application:
 
     # Dashboard Mini App — sahifa va API endpointlari
     app.router.add_get("/miniapp/dashboard", dashboard_page)
-    app.router.add_get("/api/dashboard/me", api_dashboard_me)
-    app.router.add_post("/api/dashboard/pro/invoice", api_dashboard_pro_invoice)
+    app.router.add_get("/api/app/me", api_app_me)
+    app.router.add_post("/api/app/invoice", api_app_invoice)
+    app.router.add_post("/api/app/quiz/start", api_app_quiz_start)
+    app.router.add_post("/api/app/quiz/answer", api_app_quiz_answer)
+    app.router.add_post("/api/app/quiz/finish", api_app_quiz_finish)
+    app.router.add_get("/api/app/audio/{sid}", api_app_audio)
+    app.router.add_post("/api/app/teaser/new", api_app_teaser_new)
+    app.router.add_post("/api/app/teaser/reveal", api_app_teaser_reveal)
+    app.router.add_post("/api/app/guess/start", api_app_guess_start)
+    app.router.add_post("/api/app/guess/answer", api_app_guess_answer)
+    app.router.add_post("/api/app/story/start", api_app_story_start)
+    app.router.add_post("/api/app/story/choose", api_app_story_choose)
+    app.router.add_post("/api/app/writing/task", api_app_writing_task)
+    app.router.add_post("/api/app/writing/submit", api_app_writing_submit)
+    app.router.add_post("/api/app/speaking/start", api_app_speaking_start)
+    app.router.add_get("/api/app/speaking/tts/{sid}/{i}", api_app_speaking_tts)
+    app.router.add_get("/api/app/speaking/pic/{sid}/{n}", api_app_speaking_pic)
+    app.router.add_post("/api/app/speaking/answer", api_app_speaking_answer)
+    app.router.add_get("/api/app/leaderboard", api_app_leaderboard)
     app.router.add_get("/api/dashboard/content/{type}", api_dashboard_content_list)
     app.router.add_get("/api/dashboard/content/{type}/{id}", api_dashboard_content_detail)
     app.router.add_post("/api/dashboard/content/{type}/{id}/submit", api_dashboard_content_submit)
