@@ -63,6 +63,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     BotCommand,
+    BotCommandScopeChat,
     WebAppInfo,
     Update,
     LabeledPrice,
@@ -7952,6 +7953,15 @@ async def setup_bot_commands():
             await bot.set_my_commands(commands, language_code=lc)
         except Exception as e:
             logger.warning("%s tilidagi buyruqlar menyusini o'rnatib bo'lmadi: %s", lc, e)
+    # Faqat bot egasining menyusida /activity ham ko'rinadi (boshqalarda yo'q)
+    if ADMIN_USER_ID and str(ADMIN_USER_ID).lstrip("-").isdigit():
+        admin_cmds = commands + [BotCommand(command="activity", description="Last 10 users and what they did (owner only)")]
+        scope = BotCommandScopeChat(chat_id=int(ADMIN_USER_ID))
+        for lc in (None, "uz", "ru", "en"):
+            try:
+                await bot.set_my_commands(admin_cmds, scope=scope, language_code=lc)
+            except Exception as e:
+                logger.warning("Egasi uchun buyruqlar menyusini o'rnatib bo'lmadi (%s): %s", lc, e)
     logger.info("Bot buyruqlar menyusi o'rnatildi.")
 
 
