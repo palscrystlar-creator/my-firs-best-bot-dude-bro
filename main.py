@@ -215,6 +215,45 @@ async def track_user(user_id: int, name: str = "", username: str = ""):
         logger.warning("Redis orqali statistika yozishda xatolik: %s", e)
 
 
+# ---- Faoliyat jurnali (faqat bot egasi /activity orqali ko'radi) ---------------
+ACTIVITY_KEY = "ielts_bot:activity"
+ACTIVITY_MAX = 300
+_activity_mem: list = []
+
+
+async def log_activity(uid, name: str, username: str, what: str):
+    """Foydalanuvchi nima qilganini qisqa yozuv sifatida jurnalga qo'shadi (oxirgi ACTIVITY_MAX ta)."""
+    try:
+        rec = json.dumps({"t": int(datetime.now(timezone.utc).timestamp()), "id": int(uid),
+                          "n": (name or "")[:40], "u": (username or "")[:32], "w": what[:80]}, ensure_ascii=False)
+        _activity_mem.insert(0, rec)
+        del _activity_mem[ACTIVITY_MAX:]
+        if redis_client is not None:
+            await redis_client.lpush(ACTIVITY_KEY, rec)
+            await redis_client.ltrim(ACTIVITY_KEY, 0, ACTIVITY_MAX - 1)
+    except Exception as e:
+        logger.warning("Faoliyat jurnaliga yozishda xatolik: %s", e)
+
+
+async def read_activity() -> list:
+    raw = []
+    try:
+        if redis_client is not None:
+            raw = await redis_client.lrange(ACTIVITY_KEY, 0, ACTIVITY_MAX - 1) or []
+    except Exception as e:
+        logger.warning("Faoliyat jurnalini o'qishda xatolik: %s", e)
+    if not raw:
+        raw = list(_activity_mem)
+    out = []
+    for r in raw:
+        try:
+            out.append(json.loads(r.decode() if isinstance(r, bytes) else r))
+        except Exception:
+            pass
+    return out
+
+
+
 async def update_leaderboard(leaderboard_key: str, user_id: int, percentage: int):
     """Foydalanuvchining shu leaderboard'dagi eng yaxshi natijasini saqlaydi
     (faqat oldingi natijasidan yuqori bo'lsagina yangilanadi)."""
@@ -401,6 +440,19 @@ class UserTrackingMiddleware(BaseMiddleware):
         user = getattr(event, "from_user", None)
         if user is not None:
             asyncio.create_task(track_user(user.id, user.full_name or "", user.username or ""))
+            what = None
+            if isinstance(event, Message):
+                t = (event.text or "").strip()
+                if t.startswith("/"):
+                    what = "💬 " + t.split()[0].split("@")[0]
+                elif event.voice or event.audio:
+                    what = "🎙 ovozli xabar"
+                elif t:
+                    what = "✉️ matn yubordi"
+            elif isinstance(event, CallbackQuery) and event.data:
+                what = "🔘 " + event.data[:40]
+            if what:
+                asyncio.create_task(log_activity(user.id, user.full_name or "", user.username or "", what))
         return await handler(event, data)
 
 
@@ -2030,6 +2082,37 @@ async def cmd_stats(message: Message):
     )
 
 
+@dp.message(Command("activity"))
+async def cmd_activity(message: Message):
+    """Oxirgi 10 ta foydalanuvchi va ularning so'nggi harakatlari. Faqat bot egasi uchun."""
+    if not _is_admin(message.from_user.id):
+        return  # boshqalarga hech narsa ko'rsatilmaydi (buyruq mavjudligi ham sezilmaydi)
+    rows = await read_activity()
+    if not rows:
+        await message.answer("Hozircha faoliyat yozuvlari yo'q.")
+        return
+    tz = timezone(timedelta(hours=5))
+    users: dict = {}
+    for r in rows:  # yangidan eskiga
+        u = users.setdefault(r["id"], {"n": r.get("n"), "u": r.get("u"), "acts": []})
+        if len(u["acts"]) < 4:
+            u["acts"].append(r)
+        if len(users) >= 10 and r["id"] not in users:
+            break
+    top = list(users.items())[:10]
+    lines = ["🕵️ <b>Oxirgi 10 ta foydalanuvchi</b>\n"]
+    for uid, u in top:
+        who = html.escape(u["n"] or str(uid))
+        if u["u"]:
+            who += f" (@{html.escape(u['u'])})"
+        lines.append(f"👤 <b>{who}</b> · <code>{uid}</code>")
+        for a in u["acts"]:
+            hm = datetime.fromtimestamp(a["t"], tz).strftime("%d.%m %H:%M")
+            lines.append(f"   {hm} — {html.escape(a['w'])}")
+        lines.append("")
+    await message.answer("\n".join(lines)[:4000])
+
+
 @dp.message(Command("users"))
 async def cmd_users(message: Message):
     """Faqat bot egasi uchun: oxirgi faol foydalanuvchilar ro'yxati (ism, username, ID)."""
@@ -3635,6 +3718,8 @@ async def handle_successful_payment(message: Message, state: FSMContext):
     product, _uid_s, from_app = _parse_payload(pay.invoice_payload)
     logger.info("Stars to'lov: user=%s amount=%s payload=%s charge_id=%s", uid, pay.total_amount,
                 pay.invoice_payload, pay.telegram_payment_charge_id)
+    asyncio.create_task(log_activity(uid, message.from_user.full_name or "", message.from_user.username or "",
+                                     f"⭐ to'ladi: {pay.invoice_payload.split(':')[0]} ({pay.total_amount}⭐)"))
     if product == "pro":
         exp = await _grant_pro(uid)
         await message.answer(_pr("thanks", date=_pro_date(exp), l=PRO_DAILY_LIMIT),
@@ -5337,6 +5422,12 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   .opt.correct { border-color: var(--good); background: rgba(62,207,142,.16); }
   .opt.wrong { border-color: var(--bad); background: rgba(255,107,107,.16); }
   .opt[disabled] { opacity: 1; cursor: default; }
+  .sat-split { display: grid; gap: 12px; }
+  .sat-passage { background: var(--bg); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 12px; padding: 12px 14px; font-size: 16.5px; line-height: 1.6; white-space: pre-wrap; }
+  .sat-q { font-size: 17px; line-height: 1.55; font-weight: 600; margin: 4px 0 10px; }
+  .sat-opt { font-size: 16px; line-height: 1.45; padding: 13px 14px; }
+  .katex { font-size: 1.08em; }
+  @media (min-width: 760px) { .sat-split { grid-template-columns: 1fr 1fr; align-items: start; } }
   .progress { height: 5px; background: var(--line); border-radius: 9px; overflow: hidden; margin-bottom: 12px; }
   .progress i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
   .center { text-align: center; padding: 44px 12px; color: var(--muted); }
@@ -5415,9 +5506,51 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium funksiya", payD: "PRO bilan hammasi tekin yoki bir martalik to'lang.", payOnce: "Faqat shu safar", limitT: "PRO limiti tugadi", limitD: "Bugungi limit ({n} ta) tugadi. Ertaga yana tekin yoki bir martalik to'lang.",
       upT: "🎉 Zo'r o'ynadingiz!", upD: "PRO bilan ingliz tilidagi Writing, Speaking, Grammar, Reading va Listening ham ochiladi. {p} ⭐ / {d} kun.", upBtn: "⭐ PRO ga o'tish", upLater: "Keyinroq",
       proActive: "PRO faol", until: "Tugash sanasi", daysLeft: "kun qoldi", extend: "Muddatni uzaytirish", buy: "PRO olish", offerT: "PRO obuna", days: "kun",
-      perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "🎓 Sertifikat, Hikoya va Taxmin o'yini", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
+      perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "⭐ PRO belgisi", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
       owner: "Siz bot egasisiz — hammasi doim tekin.", paidOk: "To'lov qabul qilindi! ⭐", cancelled: "To'lov bekor qilindi.", checking: "Tekshirilmoqda…", asSeparate: "Alohida: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Hozircha kontent yo'q.", questions: "ta savol", readOnly: "O'qish / tinglash", noRank: "Hozircha natijalar yo'q", boardQuiz: "Viktorina", boardCert: "Sertifikat", boardRead: "Reading", boardListen: "Listening",
+      sat: "SAT (xalqaro)",
+      satD: "Digital SAT: Reading & Writing + Math",
+      satMock: "To'liq mock (adaptiv)",
+      satMockD: "4 modul · 2-modul qiyinligi natijangizga qarab tanlanadi · taxminiy ball",
+      satPractice: "Mavzu bo'yicha mashq",
+      satPracticeD: "10 savol · tushuntirishlar bilan",
+      satRW: "Reading & Writing",
+      satMath: "Math",
+      satAllDomains: "Aralash",
+      satStage: "Modul",
+      satSubmit: "Modulni topshirish",
+      satPrev: "←",
+      satFlag: "🚩 Belgilash",
+      satNumPlace: "Javobni yozing (son yoki kasr, masalan 3/4)",
+      satNumHint: "Son yoki kasr kiriting",
+      satRef: "Formulalar (Reference)", satTimeUp: "Vaqt tugadi — xohlasangiz davom etishingiz mumkin.",
+      satConfirm: "Javob berilmagan savollar:",
+      satSure: "Topshiramizmi?",
+      satYes: "Ha, topshirish",
+      satNo: "Yo'q",
+      satModDone: "Modul topshirildi",
+      satNextMod: "Keyingi modul",
+      satHarder: "Qiyinroq modul keladi 🔥",
+      satEasier: "Yengilroq modul keladi",
+      satEst: "Taxminiy ball",
+      satTotal: "Jami (400–1600)",
+      satEstNote: "Bu rasmiy College Board bali emas, AI savollari asosidagi taxminiy baho.",
+      satDomains: "Bo'limlar bo'yicha",
+      satWeak: "Zaif tomonlar",
+      satReview: "Xatolarni ko'rish",
+      satAllQ: "Hammasi",
+      satWrongOnly: "Faqat xatolar",
+      satYour: "Sizning javobingiz",
+      satRight: "To'g'ri javob",
+      satNone: "— javob yo'q —",
+      satSec: "Bo'lim",
+      satRoute: "Yo'nalish",
+      satHardR: "qiyin",
+      satEasyR: "yengil",
+      satScoreOf: "to'g'ri",
+      satLeft: "qoldi",
+      satGenFail: "Savollar tayyorlanmadi. Qayta urinib ko'ring.",
       chatLink: "Botga o'tish"
     },
     ru: {
@@ -5450,9 +5583,51 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Премиум-функция", payD: "С PRO всё бесплатно, либо оплатите разово.", payOnce: "Только в этот раз", limitT: "Лимит PRO исчерпан", limitD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно, либо оплатите разово.",
       upT: "🎉 Отлично сыграли!", upD: "С PRO откроются Writing, Speaking, Grammar, Reading и Listening по английскому. {p} ⭐ / {d} дней.", upBtn: "⭐ Перейти на PRO", upLater: "Позже",
       proActive: "PRO активна", until: "Действует до", daysLeft: "дн. осталось", extend: "Продлить", buy: "Получить PRO", offerT: "PRO-подписка", days: "дней",
-      perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "🎓 Сертификат, Истории и «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
+      perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "⭐ Значок PRO", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
       owner: "Вы владелец бота — для вас всё бесплатно.", paidOk: "Оплата получена! ⭐", cancelled: "Оплата отменена.", checking: "Проверяем…", asSeparate: "По отдельности: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Пока нет материалов.", questions: "вопросов", readOnly: "Для чтения / прослушивания", noRank: "Пока нет результатов", boardQuiz: "Викторина", boardCert: "Сертификат", boardRead: "Reading", boardListen: "Listening",
+      sat: "SAT (международный)",
+      satD: "Digital SAT: Reading & Writing + Math",
+      satMock: "Полный мок (адаптивный)",
+      satMockD: "4 модуля · сложность 2-го модуля зависит от результата · ориентировочный балл",
+      satPractice: "Практика по темам",
+      satPracticeD: "10 вопросов · с объяснениями",
+      satRW: "Reading & Writing",
+      satMath: "Math",
+      satAllDomains: "Микс",
+      satStage: "Модуль",
+      satSubmit: "Сдать модуль",
+      satPrev: "←",
+      satFlag: "🚩 Отметить",
+      satNumPlace: "Введите ответ (число или дробь, например 3/4)",
+      satNumHint: "Введите число или дробь",
+      satRef: "Формулы (Reference)", satTimeUp: "Время вышло — можно продолжить, если хотите.",
+      satConfirm: "Вопросов без ответа:",
+      satSure: "Сдаём?",
+      satYes: "Да, сдать",
+      satNo: "Нет",
+      satModDone: "Модуль сдан",
+      satNextMod: "Следующий модуль",
+      satHarder: "Следующий модуль будет сложнее 🔥",
+      satEasier: "Следующий модуль будет проще",
+      satEst: "Ориентировочный балл",
+      satTotal: "Всего (400–1600)",
+      satEstNote: "Это не официальный балл College Board, а оценка по вопросам, созданным ИИ.",
+      satDomains: "По разделам",
+      satWeak: "Слабые места",
+      satReview: "Разбор ошибок",
+      satAllQ: "Все",
+      satWrongOnly: "Только ошибки",
+      satYour: "Ваш ответ",
+      satRight: "Верный ответ",
+      satNone: "— нет ответа —",
+      satSec: "Раздел",
+      satRoute: "Маршрут",
+      satHardR: "сложный",
+      satEasyR: "лёгкий",
+      satScoreOf: "верно",
+      satLeft: "осталось",
+      satGenFail: "Не удалось подготовить вопросы. Попробуйте ещё раз.",
       chatLink: "Перейти в бота"
     },
     en: {
@@ -5485,9 +5660,51 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium feature", payD: "Included with PRO, or pay once for just this.", payOnce: "Just this once", limitT: "PRO limit reached", limitD: "Today's limit ({n}) is used up. Free again tomorrow, or pay for a single use.",
       upT: "🎉 Nice game!", upD: "PRO also unlocks English Writing, Speaking, Grammar, Reading and Listening. {p} ⭐ / {d} days.", upBtn: "⭐ Go PRO", upLater: "Later",
       proActive: "PRO is active", until: "Valid until", daysLeft: "days left", extend: "Extend", buy: "Get PRO", offerT: "PRO subscription", days: "days",
-      perk1: "IELTS Writing review", perk2: "Full Speaking mock", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "🎓 Certificate, Story and Guess games", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
+      perk1: "IELTS Writing review", perk2: "Full Speaking mock", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "⭐ PRO badge", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
       owner: "You're the bot owner — everything is always free for you.", paidOk: "Payment received! ⭐", cancelled: "Payment cancelled.", checking: "Checking…", asSeparate: "Bought separately: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "No content yet.", questions: "questions", readOnly: "For reading / listening", noRank: "No results yet", boardQuiz: "Quiz", boardCert: "Certificate", boardRead: "Reading", boardListen: "Listening",
+      sat: "SAT (international)",
+      satD: "Digital SAT: Reading & Writing + Math",
+      satMock: "Full mock (adaptive)",
+      satMockD: "4 modules · module 2 difficulty adapts to your result · estimated score",
+      satPractice: "Practice by topic",
+      satPracticeD: "10 questions · with explanations",
+      satRW: "Reading & Writing",
+      satMath: "Math",
+      satAllDomains: "Mixed",
+      satStage: "Module",
+      satSubmit: "Submit module",
+      satPrev: "←",
+      satFlag: "🚩 Flag",
+      satNumPlace: "Type your answer (number or fraction, e.g. 3/4)",
+      satNumHint: "Enter a number or fraction",
+      satRef: "Reference sheet", satTimeUp: "Time is up — you may keep going if you wish.",
+      satConfirm: "Unanswered questions:",
+      satSure: "Submit now?",
+      satYes: "Yes, submit",
+      satNo: "No",
+      satModDone: "Module submitted",
+      satNextMod: "Next module",
+      satHarder: "A harder module is coming 🔥",
+      satEasier: "An easier module is coming",
+      satEst: "Estimated score",
+      satTotal: "Total (400–1600)",
+      satEstNote: "This is not an official College Board score; it is an estimate from AI-written questions.",
+      satDomains: "By domain",
+      satWeak: "Weak spots",
+      satReview: "Review answers",
+      satAllQ: "All",
+      satWrongOnly: "Wrong only",
+      satYour: "Your answer",
+      satRight: "Correct answer",
+      satNone: "— no answer —",
+      satSec: "Section",
+      satRoute: "Route",
+      satHardR: "hard",
+      satEasyR: "easy",
+      satScoreOf: "correct",
+      satLeft: "left",
+      satGenFail: "Couldn't prepare the questions. Try again.",
       chatLink: "Go to the bot"
     }
   };
@@ -5687,10 +5904,10 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       h("div", { class: "grid2" },
         tile("📅", S("daily"), S("dailyD"), function () { startQuiz({ kind: "daily" }); }),
         tile("🧩", S("quiz"), S("quizD", { n: L.quiz_len }), quizPicker),
-        tile("🎓", S("cert"), S("certD", { n: L.cert_len, p: L.cert_pass }), function () { isPremium() ? startQuiz({ kind: "certificate" }) : paywall(); }, { lock: !isPremium() }),
+        tile("🎓", S("cert"), S("certD", { n: L.cert_len, p: L.cert_pass }), function () { startQuiz({ kind: "certificate" }); }),
         tile("🧠", S("teaser"), S("teaserD"), teaserGame),
-        tile("🔮", S("guess"), S("guessD"), function () { isPremium() ? guessGame() : paywall(); }, { lock: !isPremium() }),
-        tile("📖", S("story"), S("storyD"), function () { isPremium() ? storyPicker() : paywall(); }, { lock: !isPremium() }),
+        tile("🔮", S("guess"), S("guessD"), guessGame),
+        tile("📖", S("story"), S("storyD"), storyPicker),
         tile("🕵️", S("lie"), S("lieD"), function () { roundGame("lie"); }),
         tile("🔬", S("whatif"), S("whatifD"), function () { roundGame("whatif"); })));
   }
@@ -5706,7 +5923,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         tile("📝", S("grammar"), S("grammarD"), function () { P ? grammarPicker() : paywall(); }, { lock: !P }),
         tile("📖", S("reading"), S("readingD"), function () { P ? startQuiz({ kind: "reading" }) : paywall(); }, { lock: !P }),
         tile("🎧", S("listening"), S("listeningD"), function () { P ? startQuiz({ kind: "listening" }) : paywall(); }, { lock: !P }),
-        tile("📚", S("library"), S("libraryD"), function () { P ? viewLibrary("reading") : paywall(); }, { lock: !P })));
+        tile("📚", S("library"), S("libraryD"), function () { P ? viewLibrary("reading") : paywall(); }, { lock: !P }),
+        tile("🎓", S("sat"), S("satD"), viewSat, { lock: !P })));
   }
 
   // ================= REYTING =================
@@ -5981,6 +6199,216 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       mount.apply(null, parts);
     }
   }
+
+  // ================= SAT =================
+  // ---- KaTeX (formulalar) ----
+  var katexQ = [], katexState = 0;
+  function loadKatex(cb) {
+    if (katexState === 2) { cb(); return; }
+    katexQ.push(cb);
+    if (katexState === 1) return;
+    katexState = 1;
+    var base = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/";
+    var css = document.createElement("link"); css.rel = "stylesheet"; css.href = base + "katex.min.css"; document.head.appendChild(css);
+    function add(src, next) { var sc = document.createElement("script"); sc.src = src; sc.onload = next; sc.onerror = function () { katexState = 0; katexQ = []; }; document.head.appendChild(sc); }
+    add(base + "katex.min.js", function () { add(base + "contrib/auto-render.min.js", function () { katexState = 2; var q = katexQ; katexQ = []; q.forEach(function (f) { f(); }); }); });
+  }
+  function mj(el) {
+    if (!el) return el;
+    loadKatex(function () {
+      try { window.renderMathInElement(el, { delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }], throwOnError: false }); } catch (e) {}
+    });
+    return el;
+  }
+  var SAT_REF = [
+    ["$A=\\pi r^2$", "$C=2\\pi r$"], ["$A=\\ell w$", "$A=\\tfrac12 bh$"], ["$a^2+b^2=c^2$", "$V=\\ell wh$"],
+    ["$V=\\pi r^2h$", "$V=\\tfrac43\\pi r^3$"], ["$V=\\tfrac13\\pi r^2h$", "$V=\\tfrac13\\ell wh$"],
+    ["30°-60°-90°: $x,\\ x\\sqrt3,\\ 2x$", "45°-45°-90°: $s,\\ s,\\ s\\sqrt2$"],
+    ["$360^\\circ=2\\pi$ rad", "$\\triangle$: $180^\\circ$"]
+  ];
+  function satRef() {
+    var rows = SAT_REF.map(function (r) { return h("div", { class: "row", style: "margin:8px 0;font-size:16px" }, r.map(function (x) { return h("div", { text: x }); })); });
+    var box = h("div", {}, rows);
+    var s = sheet(h("h2", { text: "📐 " + S("satRef") }), mj(box), h("button", { class: "btn ghost", onclick: function () { s.close(); }, text: S("later") }));
+  }
+
+  var SAT_DOMAINS = { rw: ["Craft and Structure", "Information and Ideas", "Standard English Conventions", "Expression of Ideas"],
+    math: ["Algebra", "Advanced Math", "Problem-Solving and Data Analysis", "Geometry and Trigonometry"] };
+
+  function viewSat() {
+    var P = isPremium();
+    function go(body) { if (!P) { paywall(); return; } satStart(body); }
+    var parts = [backBtn(viewEnglish), title("🎓 " + S("sat"), S("satD")),
+      h("button", { class: "tile wide", style: "width:100%;margin-bottom:14px", onclick: function () { go({ mode: "mock" }); } },
+        h("div", { class: "e", text: "🏁" }), h("div", { class: "n", text: S("satMock") }), h("div", { class: "d", text: S("satMockD") }),
+        P ? null : h("div", { class: "lk", text: "🔒" }))];
+    ["rw", "math"].forEach(function (sec) {
+      parts.push(h("h3", { style: "margin:14px 2px 8px", text: (sec === "rw" ? "📖 " : "➗ ") + S(sec === "rw" ? "satRW" : "satMath") + " — " + S("satPractice") }));
+      var g = h("div", { class: "grid2" });
+      g.appendChild(tile("🎲", S("satAllDomains"), S("satPracticeD"), function () { go({ mode: "practice", section: sec }); }, { lock: !P }));
+      SAT_DOMAINS[sec].forEach(function (d) { g.appendChild(tile("▫️", d, S("satPracticeD"), function () { go({ mode: "practice", section: sec, domain: d }); }, { lock: !P })); });
+      parts.push(g);
+    });
+    mount.apply(null, parts);
+  }
+
+  function satStart(body) {
+    mount(spinner(S("preparing")));
+    post("/api/app/sat/start", body).then(function (d) { satPlay(d.sid, d.module, d, body); })
+      .catch(function (e) { if (e.status === 502) { toast(S("satGenFail")); viewSat(); } else fail(e, function () { satStart(body); }); });
+  }
+
+  function fmtMS(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2); }
+
+  function satPlay(sid, mod, meta, startBody) {
+    var n = mod.n, idx = 0, answers = [], flags = {}, left = mod.seconds, tick = null, warned = false;
+    for (var k = 0; k < n; k++) answers.push(null);
+    var timerEl = h("div", { class: "big", style: "font-size:20px", text: fmtMS(left) });
+    var body = h("div", {});
+    function stop() { if (tick) { clearInterval(tick); tick = null; } }
+    tick = setInterval(function () {
+      left--; timerEl.textContent = (left >= 0 ? "" : "+") + fmtMS(Math.abs(left));
+      timerEl.style.color = left < 60 ? "var(--bad)" : "";
+      if (left === 0 && !warned) { warned = true; toast(S("satTimeUp")); haptic("warning"); }
+    }, 1000);
+    cleanupFn = stop;
+
+    function draw() {
+      clear(body);
+      var q = mod.questions[idx];
+      var head = h("div", {},
+        h("div", { class: "progress" }, h("i", { style: "width:" + Math.round((idx + 1) / n * 100) + "%" })),
+        h("div", { class: "row", style: "align-items:center;margin-bottom:8px" },
+          h("div", { class: "muted small", text: (idx + 1) + "/" + n + " · " + q.domain }),
+          h("button", { class: "btn ghost", style: "flex:0 0 auto;padding:4px 10px;margin:0;width:auto", onclick: function () { flags[idx] = !flags[idx]; draw(); },
+            text: flags[idx] ? "🚩" : S("satFlag") })));
+      var right = h("div", { class: "sat-right" }, mj(h("div", { class: "sat-q", text: q.question })));
+      var split = h("div", { class: "sat-split" },
+        q.passage ? mj(h("div", { class: "sat-passage", text: q.passage })) : null, right);
+      var card = h("div", { class: "card" }, head, split);
+      if (q.type === "mc") {
+        q.options.forEach(function (o, k) {
+          var on = answers[idx] === k;
+          right.appendChild(mj(h("button", { class: "opt sat-opt", style: on ? "border-color:var(--accent);background:rgba(90,140,255,.18)" : "",
+            text: "ABCD".charAt(k) + ")  " + o, onclick: function () { answers[idx] = on ? null : k; haptic("light"); draw(); } })));
+        });
+      } else {
+        var inp = h("input", { type: "text", inputmode: "decimal", maxlength: "12", placeholder: S("satNumPlace"), value: answers[idx] == null ? "" : String(answers[idx]),
+          style: "width:100%;margin-top:12px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:18px" });
+        inp.addEventListener("input", function () { answers[idx] = inp.value.trim() === "" ? null : inp.value.trim(); paintGrid(); });
+        right.appendChild(inp); right.appendChild(h("div", { class: "muted small", style: "margin-top:6px", text: S("satNumHint") }));
+      }
+      body.appendChild(card);
+      var nav = h("div", { class: "row" },
+        h("button", { class: "btn ghost", onclick: function () { if (idx > 0) { idx--; draw(); } }, text: "←", disabled: idx === 0 ? "" : false }),
+        idx < n - 1 ? h("button", { class: "btn", onclick: function () { idx++; draw(); }, text: S("next") })
+                    : h("button", { class: "btn gold", onclick: confirmSubmit, text: S("satSubmit") }));
+      body.appendChild(nav);
+      body.appendChild(gridEl());
+      if (idx < n - 1) body.appendChild(h("button", { class: "btn ghost", onclick: confirmSubmit, text: S("satSubmit") }));
+    }
+    var gridBox = null;
+    function gridEl() {
+      gridBox = h("div", { style: "display:flex;flex-wrap:wrap;gap:6px;margin:12px 0" });
+      paintGrid(); return gridBox;
+    }
+    function paintGrid() {
+      if (!gridBox) return; clear(gridBox);
+      for (var i = 0; i < n; i++) (function (i) {
+        var done = answers[i] != null && answers[i] !== "";
+        gridBox.appendChild(h("button", { style: "width:38px;height:38px;border-radius:10px;font:inherit;font-weight:600;border:1px solid " + (i === idx ? "var(--accent)" : "var(--line)") +
+          ";background:" + (done ? "var(--accent)" : "var(--card)") + ";color:" + (done ? "var(--accent-text)" : "var(--text)"),
+          onclick: function () { idx = i; draw(); }, text: (flags[i] ? "🚩" : String(i + 1)) }));
+      })(i);
+    }
+    function confirmSubmit() {
+      var missing = answers.filter(function (a) { return a == null || a === ""; }).length;
+      var s = sheet(h("h2", { text: S("satSure") }), missing ? h("p", { class: "muted", style: "margin-top:8px", text: S("satConfirm") + " " + missing }) : null,
+        h("button", { class: "btn", onclick: function () { s.close(); submit(); }, text: S("satYes") }),
+        h("button", { class: "btn ghost", onclick: function () { s.close(); }, text: S("satNo") }));
+    }
+    function submit() {
+      stop();
+      mount(spinner(meta.mode === "mock" ? S("preparing") : S("wAnalyzing")));
+      post("/api/app/sat/submit", { sid: sid, answers: answers }).then(function (r) {
+        if (r.done) { satReport(r, startBody); return; }
+        satBetween(r, sid, meta, startBody);
+      }).catch(function (e) {
+        if (e.status === 502) { toast(S("satGenFail")); satPlay(sid, mod, meta, startBody); }
+        else fail(e, function () { submit(); });
+      });
+    }
+    mount(backBtn(function () { stop(); viewSat(); }),
+      h("div", { class: "row", style: "align-items:center;margin:4px 2px 10px" },
+        h("div", { class: "muted", text: "🎓 " + mod.label + (meta.mode === "mock" ? " · " + S("satStage") + " " + ((mod.stage % 2) + 1) + "/2" : "") }),
+        h("div", { style: "display:flex;gap:8px;align-items:center;justify-content:flex-end;flex:0 0 auto" },
+          mod.section === "math" ? h("button", { class: "btn ghost", style: "width:auto;margin:0;padding:4px 10px", onclick: satRef, text: "📐" }) : null,
+          h("button", { class: "btn ghost", style: "width:auto;margin:0;padding:4px 10px", onclick: function () { timerEl.style.visibility = timerEl.style.visibility === "hidden" ? "visible" : "hidden"; }, text: "⏱" }),
+          timerEl)), body);
+    cleanupFn = stop;
+    draw();
+  }
+
+  function satBetween(r, sid, meta, startBody) {
+    var nxt = r.module, harder = r.prev.stage === 0 || r.prev.stage === 2 ? r.prev.pct >= 60 : null;
+    haptic("success");
+    mount(title("✅ " + S("satModDone")),
+      h("div", { class: "card promo", style: "text-align:center" },
+        h("div", { class: "muted small", text: S("satNextMod") + ": " + nxt.label + " · " + S("satStage") + " " + ((nxt.stage % 2) + 1) + "/2" }),
+        harder === null ? null : h("p", { style: "margin-top:8px", text: harder ? S("satHarder") : S("satEasier") })),
+      h("button", { class: "btn", onclick: function () { satPlay(sid, nxt, meta, startBody); }, text: S("start") }));
+  }
+
+  function satReport(r, startBody) {
+    var parts = [];
+    haptic("success");
+    if (r.mode === "mock") {
+      parts.push(title("🏁 SAT · " + S("satEst")),
+        h("div", { class: "card promo", style: "text-align:center" }, h("div", { class: "muted small", text: S("satTotal") }), h("div", { class: "big", text: String(r.total) })),
+        h("div", { class: "grid2" },
+          ["rw", "math"].map(function (sec) {
+            var x = r.sections[sec];
+            return h("div", { class: "stat" }, h("div", { class: "v", text: String(x.score) }), h("div", { class: "l", text: S(sec === "rw" ? "satRW" : "satMath") }),
+              h("div", { class: "r", text: x.m1 + "% → " + x.m2 + "% · " + S("satRoute") + ": " + S(x.hard ? "satHardR" : "satEasyR") }));
+          })));
+    } else {
+      parts.push(title("🏁 " + r.right + "/" + r.n + " " + S("satScoreOf")));
+    }
+    var weak = r.domains.filter(function (d) { return d.pct < 60; });
+    parts.push(h("div", { class: "card" }, h("h3", { text: "📊 " + S("satDomains") }),
+      r.domains.map(function (d) {
+        return h("div", { style: "margin-top:10px" }, h("div", { class: "row", style: "justify-content:space-between" }, h("div", { class: "small", text: d.domain }), h("div", { class: "small", text: d.ok + "/" + d.n + " · " + d.pct + "%" })),
+          h("div", { class: "progress", style: "margin:4px 0 0" }, h("i", { style: "width:" + d.pct + "%;background:" + (d.pct >= 60 ? "var(--good)" : "var(--bad)") })));
+      })));
+    if (weak.length) parts.push(h("div", { class: "card" }, h("h3", { text: "🎯 " + S("satWeak") }), weak.map(function (d) { return h("p", { style: "margin-top:6px", text: "• " + d.domain + " (" + d.pct + "%)" }); })));
+    if (r.mode === "mock") parts.push(h("p", { class: "muted small", style: "margin:8px 2px", text: "ℹ️ " + S("satEstNote") }));
+    parts.push(h("button", { class: "btn", onclick: function () { satReview(r, startBody); }, text: "🔍 " + S("satReview") }),
+      h("button", { class: "btn ghost", onclick: function () { satStart(startBody); }, text: S("again") }),
+      h("button", { class: "btn ghost", onclick: viewSat, text: S("back") }));
+    mount.apply(null, parts);
+    refreshMe().catch(function () {});
+  }
+
+  function satReview(r, startBody, onlyWrong) {
+    var list = r.review.map(function (x, i) { x.n = i + 1; return x; }).filter(function (x) { return !onlyWrong || !x.ok; });
+    var seg = h("div", { class: "seg" },
+      h("button", { class: onlyWrong ? "" : "on", onclick: function () { satReview(r, startBody, false); }, text: S("satAllQ") }),
+      h("button", { class: onlyWrong ? "on" : "", onclick: function () { satReview(r, startBody, true); }, text: S("satWrongOnly") }));
+    var parts = [backBtn(function () { satReport(r, startBody); }), title("🔍 " + S("satReview")), seg];
+    list.forEach(function (x) {
+      parts.push(h("div", { class: "card", style: "border-left:4px solid " + (x.ok ? "var(--good)" : "var(--bad)") },
+        h("div", { class: "muted small", text: (x.ok ? "✅ " : "❌ ") + "#" + x.n + " · " + x.domain }),
+        x.passage ? mj(h("div", { class: "sat-passage", style: "margin:6px 0", text: x.passage })) : null,
+        mj(h("div", { class: "sat-q", style: "margin-top:6px", text: x.question })),
+        x.options ? x.options.map(function (o, k) { return mj(h("div", { class: "small muted", style: "margin-top:3px", text: "ABCD".charAt(k) + ") " + o })); }) : null,
+        mj(h("p", { style: "margin-top:8px", text: S("satYour") + ": " + (x.your == null ? S("satNone") : x.your) })),
+        mj(h("p", { style: "color:var(--good);font-weight:600", text: S("satRight") + ": " + x.right })),
+        x.explanation ? mj(h("p", { class: "small", style: "margin-top:6px", text: "💡 " + x.explanation })) : null));
+    });
+    if (!list.length) parts.push(h("div", { class: "center", text: "🎉" }));
+    mount.apply(null, parts);
+  }
+
 
   // ================= WRITING =================
   function writingFlow() {
@@ -6518,6 +6946,15 @@ def _app_session(sid: str, uid: int | None = None, kinds: tuple | None = None) -
     return s
 
 
+_APP_ACTIVITY = {
+    "api_app_quiz_start": "📱 App: o'yin", "api_app_quiz_finish": "📱 App: o'yinni tugatdi",
+    "api_app_teaser_new": "📱 App: brain teaser", "api_app_guess_start": "📱 App: taxmin o'yini",
+    "api_app_story_start": "📱 App: hikoya", "api_app_writing_task": "📱 App: Writing",
+    "api_app_writing_submit": "📱 App: Writing yubordi", "api_app_speaking_start": "📱 App: Speaking",
+    "api_app_invoice": "📱 App: to'lov oynasi", "api_app_sat_start": "📱 App: SAT", "api_app_sat_submit": "📱 App: SAT modulini topshirdi",
+}
+
+
 def app_api(fn):
     """Mini App API handler uchun o'ram: initData imzosini tekshiradi, foydalanuvchi tilini o'rnatadi,
     kutilmagan xatolarni JSON qilib qaytaradi."""
@@ -6529,7 +6966,19 @@ def app_api(fn):
         lang = (await get_lang(uid)) or UNSET_LANG
         current_lang.set(lang)
         try:
-            return await fn(request, uid, lang, user)
+            resp = await fn(request, uid, lang, user)
+            try:
+                if getattr(resp, "status", 500) == 200 and fn.__name__ in _APP_ACTIVITY:
+                    label = _APP_ACTIVITY[fn.__name__]
+                    if fn.__name__ == "api_app_quiz_start":
+                        label += " " + str((await _body(request)).get("kind", ""))
+                    elif fn.__name__ == "api_app_invoice":
+                        label += " " + str((await _body(request)).get("product", ""))
+                    nm = " ".join(x for x in (user.get("first_name"), user.get("last_name")) if x).strip()
+                    asyncio.create_task(log_activity(uid, nm, user.get("username") or "", label))
+            except Exception:
+                pass
+            return resp
         except web.HTTPException:
             raise
         except Exception as e:
@@ -7103,6 +7552,268 @@ async def _display_name(uid_str: str) -> str:
     return name
 
 
+# ======================= SAT (xalqaro, Digital SAT formati) =======================
+SAT_RW_DOMAINS = ["Craft and Structure", "Information and Ideas", "Standard English Conventions", "Expression of Ideas"]
+SAT_MATH_DOMAINS = ["Algebra", "Advanced Math", "Problem-Solving and Data Analysis", "Geometry and Trigonometry"]
+SAT_RW_N, SAT_MATH_N, SAT_PRACTICE_N = 9, 8, 10
+SAT_SEC_SECONDS = {"rw": 70, "math": 95}   # bitta savolga taxminiy vaqt (soniya)
+_SAT_LABEL = {"rw": "Reading & Writing", "math": "Math"}
+
+
+def _sat_parse_num(x) -> float | None:
+    t = str(x or "").strip().replace(" ", "").replace(",", "").replace("−", "-")
+    if not t:
+        return None
+    try:
+        if "/" in t:
+            a, b = t.split("/", 1)
+            return float(a) / float(b)
+        return float(t)
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
+def _sat_is_correct(q: dict, ans) -> bool:
+    if ans is None:
+        return False
+    if q["type"] == "mc":
+        return isinstance(ans, int) and not isinstance(ans, bool) and ans == q["correct_index"]
+    a, b = _sat_parse_num(ans), _sat_parse_num(q["answer"])
+    if a is None or b is None:
+        return str(ans).strip().lower() == str(q["answer"]).strip().lower()
+    return abs(a - b) <= max(1e-3, abs(b) * 0.002)
+
+
+def _sat_fix_tex(t):
+    """JSON'da bitta teskari chiziq (\frac, \times, \beta...) boshqaruv belgisiga aylanib qolgan bo'lsa, tiklaydi."""
+    if not isinstance(t, str):
+        return t
+    for bad, good in (("\x0c", "\\f"), ("\x08", "\\b"), ("\t", "\\t"), ("\r", "\\r"), ("\x07", "\\a"), ("\x0b", "\\v")):
+        t = t.replace(bad, good)
+    return t
+
+
+def _sat_fix_tex_obj(o):
+    if isinstance(o, str):
+        return _sat_fix_tex(o)
+    if isinstance(o, list):
+        return [_sat_fix_tex_obj(x) for x in o]
+    if isinstance(o, dict):
+        return {k: _sat_fix_tex_obj(v) for k, v in o.items()}
+    return o
+
+
+def _generate_sat_module_sync(section: str, domains: list, difficulty: str) -> list:
+    """Bitta SAT moduli: savollar real Digital SAT uslubida, ingliz tilida; izohlar o'zbekcha."""
+    n = len(domains)
+    plan = "\n".join(f"{i + 1}. domain: {d}" for i, d in enumerate(domains))
+    if section == "rw":
+        spec = (
+            "Digital SAT *Reading and Writing* questions. EACH question has its own short ORIGINAL passage "
+            "(25-70 words; literature, science, history or social-science excerpt written by you, NOT copied) and ONE question about it, "
+            "4 options (A-D), exactly one correct. 'Standard English Conventions' = grammar/punctuation/agreement in a blank or underlined portion; "
+            "'Expression of Ideas' = transitions or rhetorical synthesis; 'Craft and Structure' = words in context, text structure, cross-text purpose; "
+            "'Information and Ideas' = central idea, inference, evidence, quantitative detail. "
+            'JSON item: {"domain": "...", "passage": "...", "question": "...", "options": ["...","...","...","..."], "correct_index": 0, "explanation": "..."}')
+    else:
+        spec = (
+            "Digital SAT *Math* questions (no calculator needed but allowed). About one in four items must be a STUDENT-PRODUCED RESPONSE "
+            '(no options; the answer is a single number, a fraction like 3/4 or a decimal): use "type": "num" and "answer": "...". '
+            'The others are multiple choice: "type": "mc", 4 options, "correct_index". Write ALL math (question, passage, options AND explanation) in LaTeX between single dollar signs, '
+            r'e.g. $\frac{3}{4}$, $x^2+5x-6=0$, $\sqrt{x}$, $f(x)=2x^2$, $\angle ABC=40^\circ$. '
+            r"Inside the JSON every LaTeX backslash MUST be doubled (write \\frac, \\sqrt, \\pi, \\times). Plain numbers in normal prose need no dollars. "
+            "The 'answer' of a num item stays plain text (7/2 or 3.5). "
+            "Make sure the answer is mathematically CORRECT and unique; double-check each computation. 'passage' is a short word-problem context or an empty string. "
+            'JSON item: {"domain": "...", "type": "mc", "passage": "", "question": "...", "options": ["...","...","...","..."], "correct_index": 0, "explanation": "..."} '
+            'or {"domain": "...", "type": "num", "passage": "", "question": "...", "answer": "7/2", "explanation": "..."}')
+    data = _llm_json_sync(
+        f"You are an expert College Board SAT item writer. Write {n} questions, difficulty: {difficulty}, one per line of this plan:\n{plan}\n\n{spec}\n"
+        "Write 'explanation' in UZBEK (Latin script): 1-3 short sentences showing why the correct answer is right. "
+        "Everything else (passage, question, options) stays in English. Do not number the options. "
+        'Reply ONLY as JSON: {"questions": [ ...items in plan order... ]}',
+        temperature=0.6)
+    out = []
+    for i, it in enumerate(data.get("questions") or []):
+        if not isinstance(it, dict):
+            continue
+        it = _sat_fix_tex_obj(it)
+        question = str(it.get("question") or "").strip()
+        passage = str(it.get("passage") or "").strip()
+        dom = str(it.get("domain") or (domains[i] if i < len(domains) else "")).strip()
+        expl = str(it.get("explanation") or "").strip()
+        if not question or (section == "rw" and not passage):
+            continue
+        typ = "num" if (section == "math" and str(it.get("type")) == "num") else "mc"
+        q = {"type": typ, "domain": dom, "passage": passage, "question": question, "explanation": expl, "difficulty": difficulty}
+        if typ == "num":
+            ans = str(it.get("answer") or "").strip()
+            if _sat_parse_num(ans) is None:
+                continue
+            q["answer"] = ans
+            q["options"] = None
+        else:
+            try:
+                opts = [str(o).strip() for o in it["options"]][:4]
+                ci = int(it["correct_index"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if len(opts) != 4 or len(set(opts)) != 4 or not (0 <= ci < 4) or not all(opts):
+                continue
+            q["options"], q["correct_index"] = opts, ci
+        out.append(q)
+    if len(out) < max(3, int(n * 0.7)):
+        raise ValueError("SAT moduli to'liq generatsiya bo'lmadi")
+    return out
+
+
+async def _sat_make_module(section: str, domains: list, difficulty: str) -> list:
+    last = None
+    for _ in range(2):
+        try:
+            return await asyncio.to_thread(_generate_sat_module_sync, section, domains, difficulty)
+        except Exception as e:
+            last = e
+            logger.warning("SAT modul generatsiyasi: %s", e)
+    raise last
+
+
+def _sat_domains(section: str, n: int, only: str | None = None) -> list:
+    pool = SAT_RW_DOMAINS if section == "rw" else SAT_MATH_DOMAINS
+    if only in pool:
+        return [only] * n
+    return [pool[i % len(pool)] for i in range(n)]
+
+
+def _sat_public(mod: dict) -> dict:
+    qs = [{"i": i, "type": q["type"], "domain": q["domain"], "passage": q["passage"], "question": q["question"],
+           "options": q["options"]} for i, q in enumerate(mod["questions"])]
+    n = len(qs)
+    return {"section": mod["section"], "label": _SAT_LABEL[mod["section"]], "stage": mod["stage"], "n": n,
+            "seconds": n * SAT_SEC_SECONDS[mod["section"]], "questions": qs}
+
+
+def _sat_est_score(m1: float, m2: float, hard: bool) -> int:
+    base = 450 + 350 * (0.4 * m1 + 0.6 * m2) if hard else 200 + 350 * (0.4 * m1 + 0.6 * m2)
+    return int(max(200, min(800, round(base / 10) * 10)))
+
+
+def _sat_review(mod: dict) -> list:
+    out = []
+    for q, a in zip(mod["questions"], mod["answers"]):
+        right = (q["options"][q["correct_index"]] if q["type"] == "mc" else q["answer"])
+        yours = (None if a is None else (q["options"][a] if q["type"] == "mc" and isinstance(a, int) and 0 <= a < 4 else str(a)))
+        out.append({"domain": q["domain"], "passage": q["passage"], "question": q["question"], "options": q["options"],
+                    "your": yours, "right": right, "ok": _sat_is_correct(q, a), "explanation": q["explanation"],
+                    "section": mod["section"]})
+    return out
+
+
+def _sat_domain_stats(mods: list) -> list:
+    st: dict = {}
+    for mod in mods:
+        for q, a in zip(mod["questions"], mod["answers"]):
+            d = st.setdefault(q["domain"], [0, 0])
+            d[1] += 1
+            d[0] += 1 if _sat_is_correct(q, a) else 0
+    return [{"domain": k, "ok": v[0], "n": v[1], "pct": round(100 * v[0] / v[1])} for k, v in st.items()]
+
+
+@app_api
+async def api_app_sat_start(request: web.Request, uid: int, lang: str, user: dict):
+    b = await _body(request)
+    mode = b.get("mode")
+    if mode not in ("mock", "practice"):
+        return _err("bad_mode")
+    if not await _is_premium(uid):
+        return _err("pro_required", 403)
+    section = b.get("section") if b.get("section") in ("rw", "math") else "rw"
+    only = b.get("domain") if isinstance(b.get("domain"), str) else None
+    if mode == "practice":
+        n = SAT_PRACTICE_N
+        domains = _sat_domains(section, n, only)
+        diff = "mixed: 3 medium, 4 hard-ish, 3 easy" if only is None else "medium to hard"
+    else:
+        section, n = "rw", SAT_RW_N
+        domains = _sat_domains("rw", n)
+        diff = "medium (module 1 of an adaptive test: mix of easy, medium and a few hard)"
+    # kunlik limit (har bir boshlash 1 ta hisoblanadi; admin cheksiz)
+    if not _is_admin(uid) and not await _pro_use(uid, "sat"):
+        return _err("limit", 429, limit=PRO_DAILY_LIMIT)
+    try:
+        qs = await _sat_make_module(section, domains, diff)
+    except Exception:
+        return _err("generation_failed", 502)
+    mod = {"section": section, "stage": 0, "questions": qs, "answers": [], "difficulty": "mixed"}
+    sid, s = _app_new_session(uid, "sat", mode=mode, mods=[], cur=mod, hard={}, total_stages=(4 if mode == "mock" else 1))
+    return web.json_response({"sid": sid, "mode": mode, "total_stages": s["total_stages"], "module": _sat_public(mod)})
+
+
+@app_api
+async def api_app_sat_submit(request: web.Request, uid: int, lang: str, user: dict):
+    b = await _body(request)
+    s = _app_session(b.get("sid"), uid, ("sat",))
+    if not s or not s.get("cur"):
+        return _err("expired", 410)
+    mod = s["cur"]
+    raw = b.get("answers")
+    if not isinstance(raw, list):
+        return _err("bad_answers")
+    answers = []
+    for i, q in enumerate(mod["questions"]):
+        a = raw[i] if i < len(raw) else None
+        if q["type"] == "mc":
+            a = a if (isinstance(a, int) and not isinstance(a, bool) and 0 <= a < 4) else None
+        else:
+            a = str(a).strip()[:12] if a not in (None, "") else None
+        answers.append(a)
+    mod["answers"] = answers
+    mod["frac"] = sum(1 for q, a in zip(mod["questions"], answers) if _sat_is_correct(q, a)) / max(1, len(answers))
+    s["mods"].append(mod)
+    s["cur"] = None
+
+    if s["mode"] == "practice":
+        review = _sat_review(mod)
+        right = sum(1 for r in review if r["ok"])
+        return web.json_response({"done": True, "mode": "practice", "right": right, "n": len(review),
+                                  "domains": _sat_domain_stats([mod]), "review": review})
+
+    stage = mod["stage"]
+    nxt = stage + 1
+    if nxt >= 4:
+        sections = {}
+        for sec, (ia, ib) in (("rw", (0, 1)), ("math", (2, 3))):
+            ma, mb = s["mods"][ia], s["mods"][ib]
+            sections[sec] = {"score": _sat_est_score(ma["frac"], mb["frac"], bool(s["hard"].get(sec))),
+                             "hard": bool(s["hard"].get(sec)), "m1": round(ma["frac"] * 100), "m2": round(mb["frac"] * 100)}
+        review = [r for m_ in s["mods"] for r in _sat_review(m_)]
+        total = sections["rw"]["score"] + sections["math"]["score"]
+        return web.json_response({"done": True, "mode": "mock", "sections": sections, "total": total,
+                                  "domains": _sat_domain_stats(s["mods"]), "review": review})
+    # keyingi modul (adaptiv: 1-moduldan keyin qiyinlik tanlanadi)
+    if nxt == 1:
+        hard = mod["frac"] >= 0.6
+        s["hard"]["rw"] = hard
+        section, n, domains = "rw", SAT_RW_N, _sat_domains("rw", SAT_RW_N)
+        diff = "hard" if hard else "easy to medium"
+    elif nxt == 2:
+        section, n, domains = "math", SAT_MATH_N, _sat_domains("math", SAT_MATH_N)
+        diff = "medium (module 1 of an adaptive test: mix of easy, medium and a few hard)"
+    else:
+        hard = mod["frac"] >= 0.6
+        s["hard"]["math"] = hard
+        section, n, domains = "math", SAT_MATH_N, _sat_domains("math", SAT_MATH_N)
+        diff = "hard" if hard else "easy to medium"
+    try:
+        qs = await _sat_make_module(section, domains, diff)
+    except Exception:
+        s["mods"].pop()  # foydalanuvchi qayta yuborishi mumkin
+        s["cur"] = mod
+        return _err("generation_failed", 502)
+    new = {"section": section, "stage": nxt, "questions": qs, "answers": [], "difficulty": diff}
+    s["cur"] = new
+    return web.json_response({"done": False, "module": _sat_public(new), "prev": {"stage": stage, "pct": round(mod["frac"] * 100)}})
+
+
 @app_api
 async def api_app_leaderboard(request: web.Request, uid: int, lang: str, user: dict):
     boards = []
@@ -7180,6 +7891,8 @@ def create_app() -> web.Application:
     app.router.add_get("/api/app/speaking/tts/{sid}/{i}", api_app_speaking_tts)
     app.router.add_get("/api/app/speaking/pic/{sid}/{n}", api_app_speaking_pic)
     app.router.add_post("/api/app/speaking/answer", api_app_speaking_answer)
+    app.router.add_post("/api/app/sat/start", api_app_sat_start)
+    app.router.add_post("/api/app/sat/submit", api_app_sat_submit)
     app.router.add_get("/api/app/leaderboard", api_app_leaderboard)
     app.router.add_get("/api/dashboard/content/{type}", api_dashboard_content_list)
     app.router.add_get("/api/dashboard/content/{type}/{id}", api_dashboard_content_detail)
