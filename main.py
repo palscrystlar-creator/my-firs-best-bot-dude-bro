@@ -136,6 +136,7 @@ SPEAKING_PRICE_STARS = 3   # IELTS Speaking to'liq mock narxi (⭐ Telegram Star
 PRO_PRICE_STARS = 10   # PRO obuna narxi (⭐ Telegram Stars)
 GATE_CHAT_ENGLISH = True   # True: ingliz tiliga oid chat buyruqlari (grammar, test, reading/listening) faqat PRO uchun
 PRO_DAYS = 30
+PRO_ENABLED = False   # False: PRO butunlay o'chiq — hamma funksiya hamma uchun ochiq (kunlik adolatli limit bilan). True: PRO sotuvi qaytadan yoqiladi.
 BOT_USER_INFO_KEY = "ielts_bot:user_info"      # hash: user_id -> JSON {n, u, d}
 BOT_ACTIVE_DAY_PREFIX = "ielts_bot:active:"   # + YYYY-MM-DD (Toshkent vaqti)
 _active_seen: set = set()  # (kun, user_id) — Redis'ga kuniga bir marta yozish uchun
@@ -631,6 +632,7 @@ def _lang_keyboard() -> InlineKeyboardMarkup:
 # Kalit — kodda yozilgan o'zbekcha matn bo'lagi, qiymat — (ruscha, inglizcha).
 
 I18N_FRAGMENTS = {
+    '🎁 <i>Bepul.</i>\n\n': ('🎁 <i>Бесплатно.</i>\n\n', '🎁 <i>Free.</i>\n\n'),
     '⭐ <i>PRO — tekin.</i>\n\n': ('⭐ <i>PRO — бесплатно.</i>\n\n', '⭐ <i>PRO — included.</i>\n\n'),
     '✅ <b>Test tayyor!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview (qisqa test)\n🎙 Har bir savolga ovozli xabar bilan javob bering.': ('✅ <b>Тест готов!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview (короткий тест)\n🎙 Отвечайте на каждый вопрос голосовым сообщением.', '✅ <b>Test ready!</b>\n\n🎤 <b>PART 1</b> — Introduction & Interview (short test)\n🎙 Answer every question with a voice message.'),
     '✅ <b>Part 1 tugadi!</b>\n\n📊 Yakuniy natija tayyorlanmoqda, biroz kuting...': ('✅ <b>Part 1 завершена!</b>\n\n📊 Готовлю итоговый результат, подождите...', '✅ <b>Part 1 complete!</b>\n\n📊 Preparing your final result, please wait...'),
@@ -1738,9 +1740,8 @@ WELCOME_TEXT = (
     "🇬🇧 <b>Ingliz tili va IELTS</b>\n"
     "/english — ingliz tilida suhbat, xatolaringizni tuzatib boraman\n"
     "/grammar — grammatika: dars + mashqlar 📝\n"
-    f"/writing — 💎 IELTS Writing tahlili ({WRITING_PRICE_STARS} ⭐)\n"
-    f"/speaking — 🎙 IELTS Speaking to'liq mock ({SPEAKING_PRICE_STARS} ⭐)\n"
-    f"/pro — ⭐ PRO obuna: Writing va Speaking tekin ({PRO_PRICE_STARS} ⭐ / {PRO_DAYS} kun)\n"
+    f"/writing — 💎 IELTS Writing tahlili\n"
+    f"/speaking — 🎙 IELTS Speaking to'liq mock\n"
     "/test — IELTS Speaking mock testi (ovozli javoblar)\n"
     "/reading_test, /listening_test — IELTS uslubidagi testlar\n"
     "/dashboard — profil va o'quv materiallari\n\n"
@@ -1757,7 +1758,7 @@ MENU_SCIENCE = [
     ("📖", "story"), ("📅", "daily"), ("🎓", "certificate"), ("🏆", "leaderboard"),
 ]
 MENU_ENGLISH = [
-    ("💬", "english"), ("📝", "grammar"), ("⭐", "pro"), ("💎", "writing"), ("🎙", "speaking"), ("🎤", "test"),
+    ("💬", "english"), ("📝", "grammar"), ("💎", "writing"), ("🎙", "speaking"), ("🎤", "test"),
     ("📖", "reading_test"), ("🎧", "listening_test"), ("📚", "dashboard"),
 ]
 
@@ -1779,9 +1780,8 @@ ALL_COMMANDS = {
         "🇬🇧 <b>Английский и IELTS</b>\n"
         "/english — разговор на английском с исправлением ошибок\n"
         "/grammar — грамматика: урок + упражнения 📝\n"
-        f"/writing — 💎 разбор IELTS Writing ({WRITING_PRICE_STARS} ⭐)\n"
-        f"/speaking — 🎙 полный мок IELTS Speaking ({SPEAKING_PRICE_STARS} ⭐)\n"
-        f"/pro — ⭐ PRO-подписка: Writing и Speaking бесплатно ({PRO_PRICE_STARS} ⭐ / {PRO_DAYS} дней)\n"
+        f"/writing — 💎 разбор IELTS Writing\n"
+        f"/speaking — 🎙 полный мок IELTS Speaking\n"
         "/test — IELTS Speaking (голосовые ответы)\n"
         "/reading_test, /listening_test — тесты в стиле IELTS\n"
         "/dashboard — профиль и материалы\n\n"
@@ -1805,9 +1805,8 @@ ALL_COMMANDS = {
         "🇬🇧 <b>English & IELTS</b>\n"
         "/english — chat in English, I'll fix your mistakes\n"
         "/grammar — grammar: lesson + exercises 📝\n"
-        f"/writing — 💎 IELTS Writing review ({WRITING_PRICE_STARS} ⭐)\n"
-        f"/speaking — 🎙 IELTS Speaking full mock ({SPEAKING_PRICE_STARS} ⭐)\n"
-        f"/pro — ⭐ PRO: Writing and Speaking included ({PRO_PRICE_STARS} ⭐ / {PRO_DAYS} days)\n"
+        f"/writing — 💎 IELTS Writing review\n"
+        f"/speaking — 🎙 IELTS Speaking full mock\n"
         "/test — IELTS Speaking mock (voice answers)\n"
         "/reading_test, /listening_test — IELTS-style tests\n"
         "/dashboard — profile and study materials\n\n"
@@ -1823,14 +1822,19 @@ I18N.update({
     "btn_pro_go": {"uz": "⭐ PRO bilan davom etish · {p} ⭐", "ru": "⭐ Продолжить с PRO · {p} ⭐", "en": "⭐ Continue with PRO · {p} ⭐"},
     "btn_free": {"uz": "🆓 Bepul versiya", "ru": "🆓 Бесплатная версия", "en": "🆓 Free version"},
     "pitch": {
-        "uz": "👋 <b>Salom! Talk botiga xush kelibsiz.</b>\n\n⭐ <b>PRO bilan hammasi ochiladi</b> — atigi {p} ⭐ ga {d} kun:\n💎 IELTS Writing tahlili\n🎙 To'liq Speaking mock (mikrofon bilan)\n📝 Grammar darslari va mashqlar\n📖 Reading va 🎧 Listening testlari\n🌐 Ingliz tili viktorinalari va kutubxona\n\nHar birini alohida olsangiz ancha qimmatroq — PRO eng foydali yo'l 🚀\n\n🆓 <b>Bepul versiyada:</b> fan viktorinalari, jumboqlar, hikoyalar, o'yinlar, kunlik fakt, sertifikat testi va ingliz tilida erkin suhbat.\n\nQaysi birini tanlaysiz? 👇",
-        "ru": "👋 <b>Привет! Добро пожаловать в Talk.</b>\n\n⭐ <b>С PRO открывается всё</b> — всего {p} ⭐ на {d} дней:\n💎 Разбор IELTS Writing\n🎙 Полный Speaking мок (с микрофоном)\n📝 Уроки и упражнения по Grammar\n📖 Тесты Reading и 🎧 Listening\n🌐 Английские викторины и библиотека\n\nПо отдельности каждое стоит заметно дороже — PRO самый выгодный путь 🚀\n\n🆓 <b>В бесплатной версии:</b> викторины по наукам, головоломки, истории, игры, факт дня, тест с сертификатом и свободный разговор на английском.\n\nЧто выбираете? 👇",
-        "en": "👋 <b>Hi! Welcome to Talk.</b>\n\n⭐ <b>PRO unlocks everything</b> — just {p} ⭐ for {d} days:\n💎 IELTS Writing review\n🎙 Full Speaking mock (with your microphone)\n📝 Grammar lessons and practice\n📖 Reading and 🎧 Listening tests\n🌐 English quizzes and the library\n\nBought one by one it costs much more — PRO is the best deal 🚀\n\n🆓 <b>The free version has:</b> science quizzes, brain teasers, stories, games, the daily fact, the certificate test and free chat in English.\n\nWhich do you choose? 👇",
+        "uz": "👋 <b>Salom! Talk botiga xush kelibsiz.</b>\n\n⭐ <b>PRO bilan hammasi ochiladi</b> — atigi {p} ⭐ ga {d} kun:\n💎 IELTS Writing tahlili\n🎙 To'liq Speaking mock + Speaking Part 1 (mikrofon bilan)\n🎓 SAT: adaptiv mock va mavzu mashqlari (Reading & Writing + Math, formulalar bilan)\n📝 Grammar darslari · 📖 Reading · 🎧 Listening · 📚 Kutubxona\n🌐 Ingliz tili viktorinalari\n🏅 Ilovada: sertifikat testi, interaktiv hikoya, «Men topaman»\n⭐ Profilda PRO belgisi\n\nHar birini alohida olsangiz ancha qimmatroq — PRO eng foydali yo'l 🚀\n\n🆓 <b>Bepul versiyada:</b> fan viktorinalari, jumboqlar, «Yolg'onni top», «Nima bo'ladi?», kunlik fakt va ingliz tilida erkin suhbat.\n\nQaysi birini tanlaysiz? 👇",
+        "ru": "👋 <b>Привет! Добро пожаловать в Talk.</b>\n\n⭐ <b>С PRO открывается всё</b> — всего {p} ⭐ на {d} дней:\n💎 Разбор IELTS Writing\n🎙 Полный Speaking мок + Speaking Part 1 (с микрофоном)\n🎓 SAT: адаптивный мок и практика по темам (Reading & Writing + Math, с формулами)\n📝 Уроки Grammar · 📖 Reading · 🎧 Listening · 📚 Библиотека\n🌐 Английские викторины\n🏅 В приложении: тест с сертификатом, интерактивные истории, «Угадаю»\n⭐ Значок PRO в профиле\n\nПо отдельности каждое стоит заметно дороже — PRO самый выгодный путь 🚀\n\n🆓 <b>В бесплатной версии:</b> викторины по наукам, головоломки, «Найди ложь», «Что будет?», факт дня и свободный разговор на английском.\n\nЧто выбираете? 👇",
+        "en": "👋 <b>Hi! Welcome to Talk.</b>\n\n⭐ <b>PRO unlocks everything</b> — just {p} ⭐ for {d} days:\n💎 IELTS Writing review\n🎙 Full Speaking mock + Speaking Part 1 (with your microphone)\n🎓 SAT: adaptive mock and topic practice (Reading & Writing + Math, with formulas)\n📝 Grammar lessons · 📖 Reading · 🎧 Listening · 📚 Library\n🌐 English quizzes\n🏅 In the app: certificate test, interactive story, the guessing game\n⭐ A PRO badge on your profile\n\nBought one by one it costs much more — PRO is the best deal 🚀\n\n🆓 <b>The free version has:</b> science quizzes, brain teasers, “Spot the lie”, “What if?”, the daily fact and free chat in English.\n\nWhich do you choose? 👇",
     },
     "free_go": {
-        "uz": "🆓 <b>Bepul versiya yoqildi!</b>\n\nFan viktorinalari, o'yinlar, hikoyalar va ingliz tilida suhbat — hammasi bepul. Ingliz tiliga oid vositalar (Writing, Speaking, Grammar, Reading, Listening) PRO'da. Xohlagan payt /pro buyrug'i bilan ulanishingiz mumkin.\n\nIlovani oching yoki menyudan tanlang 👇",
-        "ru": "🆓 <b>Бесплатная версия включена!</b>\n\nВикторины, игры, истории и разговор на английском — всё бесплатно. Инструменты английского (Writing, Speaking, Grammar, Reading, Listening) — в PRO. Подключить можно в любой момент командой /pro.\n\nОткройте приложение или выберите в меню 👇",
-        "en": "🆓 <b>Free version on!</b>\n\nScience quizzes, games, stories and chatting in English are all free. The English tools (Writing, Speaking, Grammar, Reading, Listening) are in PRO — you can switch it on any time with /pro.\n\nOpen the app or pick from the menu 👇",
+        "uz": "🆓 <b>Bepul versiya yoqildi!</b>\n\nFan viktorinalari, jumboqlar va ingliz tilida suhbat — bepul. Ingliz tiliga oid vositalar (Writing, Speaking, Grammar, Reading, Listening), SAT va ilovadagi sertifikat testi PRO'da. Xohlagan payt /pro buyrug'i bilan ulanishingiz mumkin.\n\nIlovani oching yoki menyudan tanlang 👇",
+        "ru": "🆓 <b>Бесплатная версия включена!</b>\n\nВикторины, головоломки и разговор на английском — бесплатно. Инструменты английского (Writing, Speaking, Grammar, Reading, Listening), SAT и тест с сертификатом в приложении — в PRO. Подключить можно в любой момент командой /pro.\n\nОткройте приложение или выберите в меню 👇",
+        "en": "🆓 <b>Free version on!</b>\n\nScience quizzes, brain teasers and chatting in English are free. The English tools (Writing, Speaking, Grammar, Reading, Listening), SAT and the app's certificate test are in PRO — you can switch it on any time with /pro.\n\nOpen the app or pick from the menu 👇",
+    },
+    "welcome_free": {
+        "uz": "👋 <b>Xush kelibsiz!</b>\n\nIlovani oching yoki menyudan tanlang 👇",
+        "ru": "👋 <b>Добро пожаловать!</b>\n\nОткройте приложение или выберите в меню 👇",
+        "en": "👋 <b>Welcome!</b>\n\nOpen the app or pick from the menu 👇",
     },
     "welcome_back": {
         "uz": "👋 <b>Xush kelibsiz!</b> ⭐ PRO faol.\n\nIlovani oching yoki menyudan tanlang 👇",
@@ -1838,9 +1842,9 @@ I18N.update({
         "en": "👋 <b>Welcome back!</b> ⭐ PRO is active.\n\nOpen the app or pick from the menu 👇",
     },
     "gate": {
-        "uz": "🔒 <b>Bu PRO funksiya</b>\n\nIngliz tiliga oid barcha vositalar (Grammar, Reading, Listening, Speaking, Writing) PRO'da. Ingliz tilida erkin suhbat (/english) esa hamma uchun bepul.\n\n⭐ PRO — {p} ⭐ / {d} kun.",
-        "ru": "🔒 <b>Это функция PRO</b>\n\nВсе инструменты английского (Grammar, Reading, Listening, Speaking, Writing) — в PRO. Свободный разговор на английском (/english) бесплатен для всех.\n\n⭐ PRO — {p} ⭐ / {d} дней.",
-        "en": "🔒 <b>This is a PRO feature</b>\n\nAll English tools (Grammar, Reading, Listening, Speaking, Writing) are in PRO. Free chat in English (/english) stays free for everyone.\n\n⭐ PRO — {p} ⭐ / {d} days.",
+        "uz": "🔒 <b>Bu PRO funksiya</b>\n\nIngliz tiliga oid barcha vositalar (Grammar, Reading, Listening, Speaking, Writing) va SAT PRO'da. Ingliz tilida erkin suhbat (/english) esa hamma uchun bepul.\n\n⭐ PRO — {p} ⭐ / {d} kun.",
+        "ru": "🔒 <b>Это функция PRO</b>\n\nВсе инструменты английского (Grammar, Reading, Listening, Speaking, Writing) и SAT — в PRO. Свободный разговор на английском (/english) бесплатен для всех.\n\n⭐ PRO — {p} ⭐ / {d} дней.",
+        "en": "🔒 <b>This is a PRO feature</b>\n\nAll English tools (Grammar, Reading, Listening, Speaking, Writing) and SAT are in PRO. Free chat in English (/english) stays free for everyone.\n\n⭐ PRO — {p} ⭐ / {d} days.",
     },
     "paid_app": {
         "uz": "✅ <b>To'lov qabul qilindi!</b> ⭐ Ilovaga qaytib, davom eting.",
@@ -1861,12 +1865,13 @@ def _app_button(route: str = "") -> InlineKeyboardButton:
 
 def _menu_label(cmd: str) -> str:
     base = MENU_LABELS.get(cmd, {}).get(cur_lang()) or MENU_LABELS.get(cmd, {}).get("uz") or cmd
-    if cmd == "writing":
-        base += f" (⭐{WRITING_PRICE_STARS})"
-    if cmd == "speaking":
-        base += f" (⭐{SPEAKING_PRICE_STARS})"
-    if cmd == "pro":
-        base += f" (⭐{PRO_PRICE_STARS})"
+    if PRO_ENABLED:
+        if cmd == "writing":
+            base += f" (⭐{WRITING_PRICE_STARS})"
+        if cmd == "speaking":
+            base += f" (⭐{SPEAKING_PRICE_STARS})"
+        if cmd == "pro":
+            base += f" (⭐{PRO_PRICE_STARS})"
     return base
 
 
@@ -1903,7 +1908,7 @@ def _pitch_keyboard() -> InlineKeyboardMarkup:
 async def _start_screen(uid: int) -> tuple[str, InlineKeyboardMarkup]:
     """/start dan keyin ko'rsatiladigan ekran: PRO foydalanuvchiga menyu, qolganlarga PRO taklifi."""
     if await _is_premium(uid):
-        return tr("welcome_back"), _main_menu_keyboard()
+        return tr("welcome_back" if PRO_ENABLED else "welcome_free"), _main_menu_keyboard()
     return tr("pitch", p=PRO_PRICE_STARS, d=PRO_DAYS), _pitch_keyboard()
 
 
@@ -2186,9 +2191,9 @@ async def cmd_reyting(message: Message):
 _DASH_T = {
     "btn": {"uz": "🎓 Ilovani ochish", "ru": "🎓 Открыть приложение", "en": "🎓 Open the app"},
     "txt": {
-        "uz": "🎓 <b>Talk ilovasi</b>\n\nBarcha o'yinlar, testlar, Writing va Speaking, reyting va ⭐ PRO — bitta joyda:",
-        "ru": "🎓 <b>Приложение Talk</b>\n\nВсе игры, тесты, Writing и Speaking, рейтинг и ⭐ PRO — в одном месте:",
-        "en": "🎓 <b>The Talk app</b>\n\nAll games, tests, Writing and Speaking, the leaderboard and ⭐ PRO — in one place:",
+        "uz": "🎓 <b>Talk ilovasi</b>\n\nBarcha o'yinlar, testlar, Writing, Speaking va SAT, reyting — bitta joyda:",
+        "ru": "🎓 <b>Приложение Talk</b>\n\nВсе игры, тесты, Writing, Speaking и SAT, рейтинг — в одном месте:",
+        "en": "🎓 <b>The Talk app</b>\n\nAll games, tests, Writing, Speaking and SAT, the leaderboard — in one place:",
     },
 }
 
@@ -3667,7 +3672,7 @@ async def cmd_writing(message: Message, state: FSMContext):
         if not pro_ok:
             await message.answer(_pr("limit", l=PRO_DAILY_LIMIT))
     if _is_admin(uid) or pro_ok or await _has_writing_credit(uid):
-        free = "🎁 <i>Siz uchun bepul.</i>\n\n" if _is_admin(uid) else ("⭐ <i>PRO — tekin.</i>\n\n" if pro_ok else "✅ <i>To'lov qabul qilingan.</i>\n\n")
+        free = "🎁 <i>Siz uchun bepul.</i>\n\n" if _is_admin(uid) else (("⭐ <i>PRO — tekin.</i>\n\n" if PRO_ENABLED else "🎁 <i>Bepul.</i>\n\n") if pro_ok else "✅ <i>To'lov qabul qilingan.</i>\n\n")
         await _give_writing_task(message, uid, f"💎 {free}")
         return
 
@@ -4297,9 +4302,9 @@ _pro_use_mem: dict = {}      # (kind, user_id, sana) -> son
 
 _PRO = {
     "offer": {
-        "uz": "⭐ <b>PRO obuna</b>\n\nUshbu imkoniyatlar {d} kun davomida:\n💎 <b>/writing</b> — IELTS Writing tahlili tekin (kuniga {l} tagacha)\n🎙 <b>/speaking</b> — to'liq Speaking mock tekin (kuniga {l} tagacha)\n🏅 Profilda ⭐ PRO belgisi\n\nAlohida olsangiz: Writing {w} ⭐ + Speaking {s} ⭐ — PRO bilan esa hammasi bir joyda.\n\nNarxi: <b>{p} ⭐ Telegram Stars</b> ({d} kun, avtomatik yangilanmaydi)",
-        "ru": "⭐ <b>PRO-подписка</b>\n\nНа {d} дней вы получаете:\n💎 <b>/writing</b> — разбор IELTS Writing бесплатно (до {l} в день)\n🎙 <b>/speaking</b> — полный Speaking мок бесплатно (до {l} в день)\n🏅 Значок ⭐ PRO в профиле\n\nПо отдельности: Writing {w} ⭐ + Speaking {s} ⭐ — с PRO всё в одном.\n\nЦена: <b>{p} ⭐ Telegram Stars</b> ({d} дней, без автопродления)",
-        "en": "⭐ <b>PRO subscription</b>\n\nFor {d} days you get:\n💎 <b>/writing</b> — IELTS Writing review included (up to {l} per day)\n🎙 <b>/speaking</b> — full Speaking mock included (up to {l} per day)\n🏅 A ⭐ PRO badge on your profile\n\nBought separately: Writing {w} ⭐ + Speaking {s} ⭐ — with PRO it's all in one.\n\nPrice: <b>{p} ⭐ Telegram Stars</b> ({d} days, does not auto-renew)",
+        "uz": "⭐ <b>PRO obuna</b>\n\n{d} kun davomida PRO'da nimalar bor:\n💎 IELTS Writing tahlili\n🎙 To'liq Speaking mock + Speaking Part 1 (mikrofon bilan)\n🎓 SAT: adaptiv mock va mavzu mashqlari (Reading & Writing + Math, formulalar bilan)\n📝 Grammar darslari · 📖 Reading · 🎧 Listening · 📚 Kutubxona\n🌐 Ingliz tili viktorinalari\n🏅 Ilovada: sertifikat testi, interaktiv hikoya, «Men topaman»\n⭐ Profilda PRO belgisi\n\n✏️ Writing va Speaking — kuniga {l} tagacha, SAT — kuniga {l} marta boshlash. Qolganlari cheklovsiz.\n\nAlohida olsangiz: Writing {w} ⭐ + Speaking {s} ⭐ — PRO bilan esa hammasi bir joyda.\n\nNarxi: <b>{p} ⭐ Telegram Stars</b> ({d} kun, avtomatik yangilanmaydi)",
+        "ru": "⭐ <b>PRO-подписка</b>\n\nЧто входит в PRO на {d} дней:\n💎 Разбор IELTS Writing\n🎙 Полный Speaking мок + Speaking Part 1 (с микрофоном)\n🎓 SAT: адаптивный мок и практика по темам (Reading & Writing + Math, с формулами)\n📝 Уроки Grammar · 📖 Reading · 🎧 Listening · 📚 Библиотека\n🌐 Английские викторины\n🏅 В приложении: тест с сертификатом, интерактивные истории, «Угадаю»\n⭐ Значок PRO в профиле\n\n✏️ Writing и Speaking — до {l} в день, SAT — до {l} запусков в день. Остальное без ограничений.\n\nПо отдельности: Writing {w} ⭐ + Speaking {s} ⭐ — с PRO всё в одном.\n\nЦена: <b>{p} ⭐ Telegram Stars</b> ({d} дней, без автопродления)",
+        "en": "⭐ <b>PRO subscription</b>\n\nWhat PRO includes for {d} days:\n💎 IELTS Writing review\n🎙 Full Speaking mock + Speaking Part 1 (with your microphone)\n🎓 SAT: adaptive mock and topic practice (Reading & Writing + Math, with formulas)\n📝 Grammar lessons · 📖 Reading · 🎧 Listening · 📚 Library\n🌐 English quizzes\n🏅 In the app: certificate test, interactive story, the guessing game\n⭐ A PRO badge on your profile\n\n✏️ Writing and Speaking — up to {l} per day, SAT — up to {l} starts per day. Everything else is unlimited.\n\nBought separately: Writing {w} ⭐ + Speaking {s} ⭐ — with PRO it's all in one.\n\nPrice: <b>{p} ⭐ Telegram Stars</b> ({d} days, does not auto-renew)",
     },
     "active": {
         "uz": "⭐ <b>PRO faol!</b>\n\n📅 Tugash sanasi: <b>{date}</b> ({left} kun qoldi)\n💎 /writing va 🎙 /speaking — kuniga {l} tagacha tekin.\n\nMuddatni uzaytirish uchun pastdagi to'lovni amalga oshiring: +{d} kun ({p} ⭐).",
@@ -4313,20 +4318,30 @@ _PRO = {
     },
     "inv_title": {"uz": "PRO obuna", "ru": "PRO-подписка", "en": "PRO subscription"},
     "inv_desc": {
-        "uz": "{d} kun: Writing va Speaking mock tekin.",
-        "ru": "{d} дней: Writing и Speaking мок бесплатно.",
-        "en": "{d} days: Writing and Speaking mock included.",
+        "uz": "{d} kun: Writing, Speaking, SAT va barcha ingliz tili vositalari.",
+        "ru": "{d} дней: Writing, Speaking, SAT и все инструменты английского.",
+        "en": "{d} days: Writing, Speaking, SAT and all English tools.",
     },
     "inv_label": {"uz": "PRO {d} kun", "ru": "PRO {d} дней", "en": "PRO {d} days"},
     "thanks": {
-        "uz": "🎉 <b>PRO faollashtirildi, rahmat!</b> ⭐\n\n📅 Tugash sanasi: <b>{date}</b>\n💎 /writing va 🎙 /speaking endi tekin (kuniga {l} tagacha). Mashq qilishni boshlang!",
-        "ru": "🎉 <b>PRO активирована, спасибо!</b> ⭐\n\n📅 Действует до: <b>{date}</b>\n💎 /writing и 🎙 /speaking теперь бесплатны (до {l} в день). Начинайте тренироваться!",
-        "en": "🎉 <b>PRO activated, thank you!</b> ⭐\n\n📅 Valid until: <b>{date}</b>\n💎 /writing and 🎙 /speaking are now included (up to {l} per day). Start practising!",
+        "uz": "🎉 <b>PRO faollashtirildi, rahmat!</b> ⭐\n\n📅 Tugash sanasi: <b>{date}</b>\n💎 Writing, 🎙 Speaking, 🎓 SAT va boshqa ingliz tili vositalari ochildi (Writing/Speaking kuniga {l} tagacha). Ilovani oching va mashq qilishni boshlang!",
+        "ru": "🎉 <b>PRO активирована, спасибо!</b> ⭐\n\n📅 Действует до: <b>{date}</b>\n💎 Writing, 🎙 Speaking, 🎓 SAT и другие инструменты английского открыты (Writing/Speaking до {l} в день). Откройте приложение и тренируйтесь!",
+        "en": "🎉 <b>PRO activated, thank you!</b> ⭐\n\n📅 Valid until: <b>{date}</b>\n💎 Writing, 🎙 Speaking, 🎓 SAT and the other English tools are unlocked (Writing/Speaking up to {l} per day). Open the app and start practising!",
     },
     "limit": {
         "uz": "⏳ PRO'da bugungi limit ({l} ta) tugadi. Ertaga yana tekin bo'ladi, hozir esa bitta marta to'lab foydalanishingiz mumkin.",
         "ru": "⏳ Дневной лимит PRO ({l}) исчерпан. Завтра снова бесплатно, а сейчас можно оплатить разовое использование.",
         "en": "⏳ Today's PRO limit ({l}) is used up. It's free again tomorrow, or you can pay for a single use now.",
+    },
+    "limit_free": {
+        "uz": "⏳ Bugungi limit ({l} ta) tugadi. Ertaga yana bepul — kuting yoki boshqa funksiyalardan foydalaning.",
+        "ru": "⏳ Дневной лимит ({l}) исчерпан. Завтра снова бесплатно — подождите или попробуйте другие функции.",
+        "en": "⏳ Today's limit ({l}) is used up. It's free again tomorrow — meanwhile try the other features.",
+    },
+    "free_all": {
+        "uz": "🎉 Hamma funksiyalar hamma uchun bepul! Writing, Speaking va SAT'dan kuniga {l} tagacha, qolganlardan cheksiz foydalaning.",
+        "ru": "🎉 Все функции бесплатны для всех! Writing, Speaking и SAT — до {l} в день, остальное без ограничений.",
+        "en": "🎉 Every feature is free for everyone! Writing, Speaking and SAT up to {l} a day, everything else unlimited.",
     },
     "fail": {
         "uz": "❌ To'lov oynasini ochib bo'lmadi. Birozdan so'ng qayta urinib ko'ring.",
@@ -4337,6 +4352,8 @@ _PRO = {
 
 
 def _pr(key: str, **kw) -> str:
+    if key == "limit" and not PRO_ENABLED:
+        key = "limit_free"
     d = _PRO[key]
     t = d.get(cur_lang()) or d["en"]
     return t.format(**kw) if kw else t
@@ -4362,6 +4379,8 @@ async def _pro_expiry(user_id: int) -> float:
 
 
 async def _is_pro(user_id: int) -> bool:
+    if not PRO_ENABLED:
+        return True
     return await _pro_expiry(user_id) > 0
 
 
@@ -4423,6 +4442,9 @@ async def _send_pro_invoice(message: Message):
 @dp.message(Command("pro"))
 async def cmd_pro(message: Message):
     uid = message.from_user.id
+    if not PRO_ENABLED:
+        await message.answer(_pr("free_all", l=PRO_DAILY_LIMIT))
+        return
     if _is_admin(uid):
         await message.answer(_pr("admin"))
         return
@@ -5482,7 +5504,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       loading: "Yuklanmoqda…", preparing: "Tayyorlanmoqda… (5–20 soniya)", err: "Xatolik. Qayta urinib ko'ring.", expired: "Sessiya tugadi. Qaytadan boshlang.",
       noTg: "Bu ilovani Telegramdagi bot orqali oching.", hello: "Salom", back: "← Orqaga", again: "🔁 Yana", done: "Tayyor", next: "Keyingisi ➜", start: "Boshlash",
       freeTag: "Bepul", proTag: "PRO",
-      promoT: "⭐ PRO bilan hammasi ochiladi", promoD: "Writing, Speaking, Grammar, Reading, Listening va ingliz tili viktorinalari — {p} ⭐ / {d} kun.", promoBtn: "PRO ni ko'rish",
+      promoT: "⭐ PRO bilan hammasi ochiladi", promoD: "Writing, Speaking, SAT, Grammar, Reading, Listening, sertifikat, hikoya va ingliz tili viktorinalari — {p} ⭐ / {d} kun.", promoBtn: "PRO ni ko'rish",
       statQuiz: "Viktorina (eng yaxshi)", statCert: "Sertifikat (eng yaxshi)", statRead: "Reading yechilgan", statListen: "Listening yechilgan", rank: "O'rin",
       daily: "Kunlik fan va fakt", dailyD: "Bugungi fakt + 5 ta savol", quiz: "Viktorina", quizD: "Istalgan fandan {n} ta savol", cert: "Sertifikat testi", certD: "{n} savol, {p}%+ bo'lsa sertifikat",
       teaser: "Miya jumboqi", teaserD: "O'ylang, maslahat oling", guess: "Men topaman", guessD: "Siz o'ylang, men topaman", story: "Interaktiv hikoya", storyD: "Tanlovingiz yakunni o'zgartiradi",
@@ -5503,11 +5525,11 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       sFlu: "Fluency & Coherence", sLex: "Lexical Resource", sGra: "Grammatical Range & Accuracy", sPro: "Pronunciation (taxminiy)", sSummary: "Examiner xulosasi", sPlan: "O'quv rejasi", sNote: "Talaffuz bahosi taxminiy: u matnga aylantirilgan nutqqa asoslangan.",
       examiner: "Examiner", listenQ: "🔊 Savolni tinglash", rec: "Yozishni boshlash", recStop: "To'xtatish", recSend: "Yuborish", recRedo: "Qayta yozish", recProcessing: "Javob qayta ishlanmoqda…", recHint: "Mikrofon tugmasini bosing va ingliz tilida javob bering.",
       part: "Part", prep: "Tayyorlanish", picA: "Rasm A", picB: "Rasm B", picsFail: "Rasmlar yuklanmadi, tavsifi:", micDenied: "Mikrofonga ruxsat berilmadi yoki ishlamayapti.", micChat: "Chatda ovozli xabar bilan davom etish", noSpeech: "Nutq aniqlanmadi. Aniqroq gapirib qayta yozing.", tooBig: "Yozuv juda uzun.", maxTime: "Maksimal vaqt tugadi",
-      pwT: "🔒 Bu PRO funksiya", pwD: "Ingliz tiliga oid hamma vositalar (Writing, Speaking, Grammar, Reading, Listening, Kutubxona) PRO'da. Ingliz tilida erkin suhbat esa bepul.", pwGet: "⭐ PRO olish", later: "Hozir emas",
+      pwT: "🔒 Bu PRO funksiya", pwD: "Ingliz tiliga oid hamma vositalar (Writing, Speaking, Grammar, Reading, Listening, Kutubxona), SAT, sertifikat testi, hikoya va «Men topaman» PRO'da. Ingliz tilida erkin suhbat esa bepul.", pwGet: "⭐ PRO olish", later: "Hozir emas",
       payT: "Premium funksiya", payD: "PRO bilan hammasi tekin yoki bir martalik to'lang.", payOnce: "Faqat shu safar", limitT: "PRO limiti tugadi", limitD: "Bugungi limit ({n} ta) tugadi. Ertaga yana tekin yoki bir martalik to'lang.",
-      upT: "🎉 Zo'r o'ynadingiz!", upD: "PRO bilan ingliz tilidagi Writing, Speaking, Grammar, Reading va Listening ham ochiladi. {p} ⭐ / {d} kun.", upBtn: "⭐ PRO ga o'tish", upLater: "Keyinroq",
+      upT: "🎉 Zo'r o'ynadingiz!", upD: "PRO bilan Writing, Speaking, SAT, Grammar, Reading, Listening, sertifikat testi va hikoyalar ham ochiladi. {p} ⭐ / {d} kun.", upBtn: "⭐ PRO ga o'tish", upLater: "Keyinroq",
       proActive: "PRO faol", until: "Tugash sanasi", daysLeft: "kun qoldi", extend: "Muddatni uzaytirish", buy: "PRO olish", offerT: "PRO obuna", days: "kun",
-      perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "⭐ PRO belgisi", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
+      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
       owner: "Siz bot egasisiz — hammasi doim tekin.", paidOk: "To'lov qabul qilindi! ⭐", cancelled: "To'lov bekor qilindi.", checking: "Tekshirilmoqda…", asSeparate: "Alohida: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Hozircha kontent yo'q.", questions: "ta savol", readOnly: "O'qish / tinglash", noRank: "Hozircha natijalar yo'q", boardQuiz: "Viktorina", boardCert: "Sertifikat", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (xalqaro)",
@@ -5559,7 +5581,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       loading: "Загрузка…", preparing: "Готовлю… (5–20 секунд)", err: "Ошибка. Попробуйте ещё раз.", expired: "Сессия закончилась. Начните заново.",
       noTg: "Откройте приложение через бота в Telegram.", hello: "Привет", back: "← Назад", again: "🔁 Ещё раз", done: "Готово", next: "Дальше ➜", start: "Начать",
       freeTag: "Бесплатно", proTag: "PRO",
-      promoT: "⭐ С PRO открывается всё", promoD: "Writing, Speaking, Grammar, Reading, Listening и английские викторины — {p} ⭐ / {d} дней.", promoBtn: "Узнать про PRO",
+      promoT: "⭐ С PRO открывается всё", promoD: "Writing, Speaking, SAT, Grammar, Reading, Listening, сертификат, истории и английские викторины — {p} ⭐ / {d} дней.", promoBtn: "Узнать про PRO",
       statQuiz: "Викторина (лучший)", statCert: "Сертификат (лучший)", statRead: "Reading пройдено", statListen: "Listening пройдено", rank: "Место",
       daily: "Наука и факт дня", dailyD: "Факт дня + 5 вопросов", quiz: "Викторина", quizD: "{n} вопросов по любой теме", cert: "Тест с сертификатом", certD: "{n} вопросов, от {p}% — сертификат",
       teaser: "Головоломка", teaserD: "Думайте, берите подсказку", guess: "Я угадаю", guessD: "Загадайте — я угадаю", story: "Интерактивная история", storyD: "Ваш выбор меняет финал",
@@ -5580,11 +5602,11 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       sFlu: "Fluency & Coherence", sLex: "Lexical Resource", sGra: "Grammatical Range & Accuracy", sPro: "Pronunciation (оценка)", sSummary: "Вывод экзаменатора", sPlan: "План обучения", sNote: "Оценка произношения приблизительная: она основана на расшифрованной речи.",
       examiner: "Экзаменатор", listenQ: "🔊 Прослушать вопрос", rec: "Начать запись", recStop: "Остановить", recSend: "Отправить", recRedo: "Записать заново", recProcessing: "Обрабатываю ответ…", recHint: "Нажмите кнопку микрофона и отвечайте по-английски.",
       part: "Part", prep: "Подготовка", picA: "Картинка A", picB: "Картинка B", picsFail: "Картинки не загрузились, описание:", micDenied: "Нет доступа к микрофону или он не работает.", micChat: "Продолжить голосовыми в чате", noSpeech: "Речь не распознана. Говорите чётче и запишите снова.", tooBig: "Запись слишком длинная.", maxTime: "Время записи вышло",
-      pwT: "🔒 Это функция PRO", pwD: "Все инструменты английского (Writing, Speaking, Grammar, Reading, Listening, библиотека) — в PRO. Свободный разговор на английском бесплатен.", pwGet: "⭐ Получить PRO", later: "Не сейчас",
+      pwT: "🔒 Это функция PRO", pwD: "Все инструменты английского (Writing, Speaking, Grammar, Reading, Listening, библиотека), SAT, тест с сертификатом, истории и «Угадаю» — в PRO. Свободный разговор на английском бесплатен.", pwGet: "⭐ Получить PRO", later: "Не сейчас",
       payT: "Премиум-функция", payD: "С PRO всё бесплатно, либо оплатите разово.", payOnce: "Только в этот раз", limitT: "Лимит PRO исчерпан", limitD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно, либо оплатите разово.",
-      upT: "🎉 Отлично сыграли!", upD: "С PRO откроются Writing, Speaking, Grammar, Reading и Listening по английскому. {p} ⭐ / {d} дней.", upBtn: "⭐ Перейти на PRO", upLater: "Позже",
+      upT: "🎉 Отлично сыграли!", upD: "С PRO откроются Writing, Speaking, SAT, Grammar, Reading, Listening, тест с сертификатом и истории. {p} ⭐ / {d} дней.", upBtn: "⭐ Перейти на PRO", upLater: "Позже",
       proActive: "PRO активна", until: "Действует до", daysLeft: "дн. осталось", extend: "Продлить", buy: "Получить PRO", offerT: "PRO-подписка", days: "дней",
-      perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "⭐ Значок PRO", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
+      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
       owner: "Вы владелец бота — для вас всё бесплатно.", paidOk: "Оплата получена! ⭐", cancelled: "Оплата отменена.", checking: "Проверяем…", asSeparate: "По отдельности: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Пока нет материалов.", questions: "вопросов", readOnly: "Для чтения / прослушивания", noRank: "Пока нет результатов", boardQuiz: "Викторина", boardCert: "Сертификат", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (международный)",
@@ -5636,7 +5658,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       loading: "Loading…", preparing: "Preparing… (5–20 seconds)", err: "Something went wrong. Please try again.", expired: "Session expired. Please start again.",
       noTg: "Please open this app from the bot inside Telegram.", hello: "Hi", back: "← Back", again: "🔁 Again", done: "Done", next: "Next ➜", start: "Start",
       freeTag: "Free", proTag: "PRO",
-      promoT: "⭐ PRO unlocks everything", promoD: "Writing, Speaking, Grammar, Reading, Listening and English quizzes — {p} ⭐ / {d} days.", promoBtn: "See PRO",
+      promoT: "⭐ PRO unlocks everything", promoD: "Writing, Speaking, SAT, Grammar, Reading, Listening, certificate, story and English quizzes — {p} ⭐ / {d} days.", promoBtn: "See PRO",
       statQuiz: "Quiz (best)", statCert: "Certificate (best)", statRead: "Reading completed", statListen: "Listening completed", rank: "Rank",
       daily: "Daily science & fact", dailyD: "Today's fact + 5 questions", quiz: "Quiz", quizD: "{n} questions on any subject", cert: "Certificate test", certD: "{n} questions, certificate at {p}%+",
       teaser: "Brain teaser", teaserD: "Think, ask for a hint", guess: "I'll guess", guessD: "You think, I guess", story: "Interactive story", storyD: "Your choices change the ending",
@@ -5657,11 +5679,11 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       sFlu: "Fluency & Coherence", sLex: "Lexical Resource", sGra: "Grammatical Range & Accuracy", sPro: "Pronunciation (est.)", sSummary: "Examiner's summary", sPlan: "Study plan", sNote: "The pronunciation score is an estimate based on the transcribed speech.",
       examiner: "Examiner", listenQ: "🔊 Hear the question", rec: "Start recording", recStop: "Stop", recSend: "Send", recRedo: "Record again", recProcessing: "Processing your answer…", recHint: "Tap the microphone and answer in English.",
       part: "Part", prep: "Preparation", picA: "Picture A", picB: "Picture B", picsFail: "The pictures didn't load, described in words:", micDenied: "Microphone access was denied or isn't available.", micChat: "Continue with voice messages in chat", noSpeech: "No speech detected. Please speak clearly and record again.", tooBig: "The recording is too long.", maxTime: "Max recording time reached",
-      pwT: "🔒 This is a PRO feature", pwD: "All English tools (Writing, Speaking, Grammar, Reading, Listening, Library) are in PRO. Free chat in English stays free.", pwGet: "⭐ Get PRO", later: "Not now",
+      pwT: "🔒 This is a PRO feature", pwD: "All English tools (Writing, Speaking, Grammar, Reading, Listening, Library), SAT, the certificate test, stories and the guessing game are in PRO. Free chat in English stays free.", pwGet: "⭐ Get PRO", later: "Not now",
       payT: "Premium feature", payD: "Included with PRO, or pay once for just this.", payOnce: "Just this once", limitT: "PRO limit reached", limitD: "Today's limit ({n}) is used up. Free again tomorrow, or pay for a single use.",
-      upT: "🎉 Nice game!", upD: "PRO also unlocks English Writing, Speaking, Grammar, Reading and Listening. {p} ⭐ / {d} days.", upBtn: "⭐ Go PRO", upLater: "Later",
+      upT: "🎉 Nice game!", upD: "PRO also unlocks Writing, Speaking, SAT, Grammar, Reading, Listening, the certificate test and stories. {p} ⭐ / {d} days.", upBtn: "⭐ Go PRO", upLater: "Later",
       proActive: "PRO is active", until: "Valid until", daysLeft: "days left", extend: "Extend", buy: "Get PRO", offerT: "PRO subscription", days: "days",
-      perk1: "IELTS Writing review", perk2: "Full Speaking mock", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "⭐ PRO badge", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
+      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
       owner: "You're the bot owner — everything is always free for you.", paidOk: "Payment received! ⭐", cancelled: "Payment cancelled.", checking: "Checking…", asSeparate: "Bought separately: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "No content yet.", questions: "questions", readOnly: "For reading / listening", noRank: "No results yet", boardQuiz: "Quiz", boardCert: "Certificate", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (international)",
@@ -5789,9 +5811,14 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     document.body.appendChild(bg);
     return { close: close };
   }
+  function upgradeBar() {
+    if (isPremium()) return null;
+    return h("button", { class: "btn gold", style: "margin:0 0 12px;padding:10px", onclick: function () { tab = "pro"; show(); },
+      text: S("upgrade") + " · ⭐ " + me.prices.pro + " / " + me.prices.pro_days + " " + S("days") });
+  }
   function perks() {
     return h("div", { style: "margin:10px 0" },
-      [["💎", "perk1"], ["🎙", "perk2"], ["📝", "perk3"], ["🌐", "perk4"]].map(function (x) {
+      [["💎", "perk1"], ["🎙", "perk2"], ["🎓", "perkSat"], ["📝", "perk3"], ["🌐", "perk4"], ["🏅", "perk5"]].map(function (x) {
         return h("div", { class: "perk" }, h("div", { class: "ic", text: x[0] }), h("div", { text: S(x[1]) }));
       }));
   }
@@ -5808,7 +5835,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       h("button", { class: "btn ghost", onclick: function () { s.close(); show(); }, text: S("later") }));
   }
   function limitSheet() {
-    var s = sheet(h("h2", { text: S("limitT") }), h("p", { class: "muted", style: "margin-top:8px", text: S("limitD", { n: me.prices.pro_daily_limit }) }),
+    var free = !me.pro_enabled;
+    var s = sheet(h("h2", { text: S(free ? "limitFreeT" : "limitT") }), h("p", { class: "muted", style: "margin-top:8px", text: S(free ? "limitFreeD" : "limitD", { n: me.prices.pro_daily_limit }) }),
       h("button", { class: "btn ghost", onclick: function () { s.close(); show(); }, text: S("done") }));
   }
   function upsell() {
@@ -5849,12 +5877,13 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   // ---- navigatsiya ----
   function renderNav() {
     clear(nav);
-    [["home", "🏠"], ["science", "🔬"], ["english", "🇬🇧"], ["top", "🏆"], ["pro", "⭐"]].forEach(function (x) {
+    [["home", "🏠"], ["science", "🔬"], ["english", "🇬🇧"], ["top", "🏆"], ["pro", "⭐"]].filter(function (x) { return x[0] !== "pro" || (me && me.pro_enabled); }).forEach(function (x) {
       nav.appendChild(h("button", { class: tab === x[0] ? "on" : "", onclick: function () { tab = x[0]; show(); } },
         h("span", { class: "i", text: x[1] }), h("span", { text: S(x[0]) })));
     });
   }
   function show() {
+    if (me && !me.pro_enabled && tab === "pro") tab = "home";
     renderNav();
     if (!me) return;
     ({ home: viewHome, science: viewScience, english: viewEnglish, top: viewTop, pro: viewPro })[tab]();
@@ -5880,7 +5909,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   function viewHome() {
     var st = me.stats, initial = (me.name || "?").trim().charAt(0).toUpperCase() || "?";
     var nm = h("h1", { text: me.name || "" });
-    if (me.admin || me.pro.active) nm.appendChild(h("span", { class: "badge", text: me.admin ? "OWNER" : "PRO" }));
+    if (me.admin || (me.pro_enabled && me.pro.active)) nm.appendChild(h("span", { class: "badge", text: me.admin ? "OWNER" : "PRO" }));
     var parts = [h("div", { class: "top" }, h("div", { class: "avatar", text: initial }), h("div", {}, nm, h("div", { class: "sub", text: S("hello") + " 👋" })))];
     if (!isPremium()) {
       parts.push(h("div", { class: "card promo" }, h("h3", { text: S("promoT") }),
@@ -5901,7 +5930,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
   function viewScience() {
     var L = me.limits;
-    mount(title(S("science")),
+    mount(title(S("science")), upgradeBar(),
       h("div", { class: "grid2" },
         tile("📅", S("daily"), S("dailyD"), function () { startQuiz({ kind: "daily" }); }),
         tile("🧩", S("quiz"), S("quizD", { n: L.quiz_len }), quizPicker),
@@ -5915,7 +5944,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
   function viewEnglish() {
     var P = isPremium(), pr = me.prices;
-    mount(title(S("english")),
+    mount(title(S("english")), upgradeBar(),
       h("div", { class: "grid2" },
         tile("💬", S("chat"), S("chatD"), function () { openBot("run_english"); }),
         tile("🎙", S("speakFull"), S("speakFullD"), function () { speakingFlow("full"); }, { price: P ? 0 : pr.speaking }),
@@ -5956,7 +5985,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     if (p.active) parts.push(h("div", { class: "card" }, h("h3", { text: "✅ " + S("proActive") }),
       h("p", { class: "muted", style: "margin-top:6px", text: S("until") + ": " + p.until + " (" + p.left + " " + S("daysLeft") + ")" })));
     parts.push(h("div", { class: "card" },
-      [["💎", "perk1"], ["🎙", "perk2"], ["📝", "perk3"], ["🌐", "perk4"], ["🏅", "perk5"]].map(function (x) {
+      [["💎", "perk1"], ["🎙", "perk2"], ["🎓", "perkSat"], ["📝", "perk3"], ["🌐", "perk4"], ["🏅", "perk5"]].map(function (x) {
         return h("div", { class: "perk" }, h("div", { class: "ic", text: x[0] }), h("div", { text: S(x[1]) }));
       }),
       h("p", { class: "muted small", style: "margin-top:6px", text: S("perkLimit", { n: me.prices.pro_daily_limit }) }),
@@ -6239,7 +6268,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   function viewSat() {
     var P = isPremium();
     function go(body) { if (!P) { paywall(); return; } satStart(body); }
-    var parts = [backBtn(viewEnglish), title("🎓 " + S("sat"), S("satD")),
+    var parts = [backBtn(viewEnglish), title("🎓 " + S("sat"), S("satD")), upgradeBar(),
       h("button", { class: "tile wide", style: "width:100%;margin-bottom:14px", onclick: function () { go({ mode: "mock" }); } },
         h("div", { class: "e", text: "🏁" }), h("div", { class: "n", text: S("satMock") }), h("div", { class: "d", text: S("satMockD") }),
         P ? null : h("div", { class: "lk", text: "🔒" }))];
@@ -7036,6 +7065,8 @@ async def api_app_me(request: web.Request):
     now_ts = datetime.now(timezone.utc).timestamp()
     pro = {"active": bool(exp), "until": _pro_date(exp) if exp else "",
            "left": max(1, int((exp - now_ts) // 86400) + 1) if exp else 0}
+    if not PRO_ENABLED:
+        pro = {"active": True, "until": "", "left": 0}
     subjects = [{"i": i, "emoji": e, "name": _l10n(n, _SUBJECT_L10N, lang), "pro": n == "Ingliz tili"}
                 for i, (e, n, _d) in enumerate(SUBJECTS)]
     genres = [{"i": i, "emoji": e, "name": _l10n(n, _GENRE_L10N, lang)} for i, (e, n, _d) in enumerate(STORY_GENRES)]
@@ -7044,7 +7075,7 @@ async def api_app_me(request: web.Request):
         levels.append({"i": i, "emoji": e, "name": f"{_GLEVEL_L10N[i]} ({_GLEVEL_WORD[lang][i]})",
                        "topics": [t.replace(" va ", " & ") for t in GRAMMAR_TOPICS[i]]})
     return web.json_response({
-        "uid": uid, "name": name, "lang": lang, "admin": _is_admin(uid), "pro": pro,
+        "uid": uid, "name": name, "lang": lang, "admin": _is_admin(uid), "pro": pro, "pro_enabled": PRO_ENABLED,
         "credits": {"writing": await _has_writing_credit(uid), "speaking": await _has_speaking_credit(uid)},
         "stats": await _profile_stats(str(uid)),
         "bot": await _bot_username(),
@@ -7930,10 +7961,9 @@ async def setup_bot_commands():
         BotCommand(command="lie", description="Spot the lie among 3 statements"),
         BotCommand(command="whatif", description="What happens? Science puzzles"),
         BotCommand(command="daily", description="Today's science, fact and English tip"),
-        BotCommand(command="writing", description=f"IELTS Writing review ({WRITING_PRICE_STARS} Stars)"),
-        BotCommand(command="speaking", description=f"IELTS Speaking full mock ({SPEAKING_PRICE_STARS} Stars)"),
-        BotCommand(command="pro", description=f"PRO: Writing + Speaking included ({PRO_PRICE_STARS} Stars)"),
-        BotCommand(command="grammar", description="English grammar: lessons and practice"),
+        BotCommand(command="writing", description="IELTS Writing review"),
+        BotCommand(command="speaking", description="IELTS Speaking full mock"),
+                BotCommand(command="grammar", description="English grammar: lessons and practice"),
         BotCommand(command="english", description="Chat in English (corrects your mistakes)"),
         BotCommand(command="certificate", description="25-question certificate test"),
         BotCommand(command="leaderboard", description="TOP 10 leaderboards"),
