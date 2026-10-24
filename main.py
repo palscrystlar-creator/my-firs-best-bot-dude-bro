@@ -5492,6 +5492,31 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   .board .btn.ghost { color: #f5f5f5; border-color: rgba(255,255,255,.35); }
   .chip { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 99px; padding: 7px 12px; font: inherit; font-size: 13px; }
   @keyframes boardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .classroom { background: #e9e3d6; border-radius: 16px; padding: 10px 10px 4px; position: relative; overflow: hidden; }
+  .tboard { margin: 0; min-height: 250px; padding-bottom: 70px; }
+  .tboard .board-title { font-size: 18px; margin-bottom: 6px; padding-bottom: 4px; }
+  .tboard .board-pic svg { max-height: 190px; }
+  .board-in { min-height: 120px; }
+  .board-start { position: absolute; left: 50%; top: 52%; transform: translate(-50%,-50%); width: auto; padding: 14px 26px; font-size: 17px; box-shadow: 0 4px 16px rgba(0,0,0,.4); animation: pulse 1.4s ease-in-out infinite; }
+  .stage { display: flex; align-items: flex-end; gap: 6px; margin-top: -78px; position: relative; z-index: 3; pointer-events: none; min-height: 150px; }
+  .bubble { flex: 1; background: rgba(15,20,30,.88); color: #fff; border-radius: 14px 14px 14px 4px; padding: 9px 12px; font-size: 14px; line-height: 1.45; align-self: center; margin-top: 70px; min-height: 40px; display: none; }
+  .bubble:not(:empty) { display: block; }
+  .teacher { width: 108px; flex: 0 0 108px; margin-left: auto; }
+  .teacher-svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .teacher-mini { width: 70px; margin: 0 auto; }
+  .teacher-svg .mouth { transform-box: fill-box; transform-origin: center; transform: scaleY(.3); }
+  .t-talk .mouth, .t-write .mouth { animation: tmouth .26s ease-in-out infinite; }
+  .teacher-svg .eyes { transform-box: fill-box; transform-origin: center; animation: tblink 4.5s infinite; }
+  .teacher-svg .arm { transform-box: view-box; }
+  .t-talk .arm { animation: tgest 1.8s ease-in-out infinite; }
+  .t-write .arm { animation: twrite .55s ease-in-out infinite; }
+  .t-talk .torso, .t-write .torso { animation: tbob 1.2s ease-in-out infinite; }
+  @keyframes tmouth { 0%,100% { transform: scaleY(.25); } 50% { transform: scaleY(1); } }
+  @keyframes tblink { 0%,94%,100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
+  @keyframes tgest { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-14deg); } }
+  @keyframes twrite { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(-24deg); } }
+  @keyframes tbob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+  @keyframes pulse { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(-50%,-50%) scale(1.06); } }
   .progress { height: 5px; background: var(--line); border-radius: 9px; overflow: hidden; margin-bottom: 12px; }
   .progress i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
   .center { text-align: center; padding: 44px 12px; color: var(--muted); }
@@ -5570,7 +5595,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium funksiya", payD: "PRO bilan hammasi tekin yoki bir martalik to'lang.", payOnce: "Faqat shu safar", limitT: "PRO limiti tugadi", limitD: "Bugungi limit ({n} ta) tugadi. Ertaga yana tekin yoki bir martalik to'lang.",
       upT: "🎉 Zo'r o'ynadingiz!", upD: "PRO bilan Writing, Speaking, SAT, Grammar, Reading, Listening, sertifikat testi va hikoyalar ham ochiladi. {p} ⭐ / {d} kun.", upBtn: "⭐ PRO ga o'tish", upLater: "Keyinroq",
       proActive: "PRO faol", until: "Tugash sanasi", daysLeft: "kun qoldi", extend: "Muddatni uzaytirish", buy: "PRO olish", offerT: "PRO obuna", days: "kun",
-      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modul) + Math (2 modul). 2-modul qiyinligi 1-modul natijasiga bog'liq. Formulalar uchun 📐, taymerni yashirish uchun ⏱. Ball — taxminiy, savollarni AI yozadi.", tutor: "SAT Tutor", tutorD: "Savol yozing — o'qituvchi doskada rasm va formulalar bilan tushuntiradi", tutorPlace: "Masalan: funksiya nima? Yoki: comma qoidalarini tushuntir", tutorAsk: "🧑‍🏫 Tushuntir", tutorBoard: "Doska tayyorlanmoqda…", tutorNext: "Davom ➜", tutorAll: "Hammasi", tutorSimpler: "🔁 Soddaroq tushuntir", tutorExample: "➕ Yana misol", tutorPractice: "Mustahkamlash", tutorOff: "Men SAT, matematika va ingliz tili bo'yicha yordam beraman. SAT savolingizni yozing 🙂", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
+      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modul) + Math (2 modul). 2-modul qiyinligi 1-modul natijasiga bog'liq. Formulalar uchun 📐, taymerni yashirish uchun ⏱. Ball — taxminiy, savollarni AI yozadi.", tutor: "SAT Tutor", tutorD: "Savol yozing — o'qituvchi doskada rasm va formulalar bilan tushuntiradi", tutorPlace: "Masalan: funksiya nima? Yoki: comma qoidalarini tushuntir", tutorAsk: "🧑‍🏫 Tushuntir", tutorBoard: "Doska tayyorlanmoqda…", tutorNext: "Davom ➜", tutorAll: "Hammasi", tutorSimpler: "🔁 Soddaroq tushuntir", tutorExample: "➕ Yana misol", tutorPractice: "Mustahkamlash", tutorOff: "Men SAT, matematika va ingliz tili bo'yicha yordam beraman. SAT savolingizni yozing 🙂", tutorStart: "Darsni boshlash", tutorNotes: "Konspekt", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
       owner: "Siz bot egasisiz — hammasi doim tekin.", paidOk: "To'lov qabul qilindi! ⭐", cancelled: "To'lov bekor qilindi.", checking: "Tekshirilmoqda…", asSeparate: "Alohida: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Hozircha kontent yo'q.", questions: "ta savol", readOnly: "O'qish / tinglash", noRank: "Hozircha natijalar yo'q", boardQuiz: "Viktorina", boardCert: "Sertifikat", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (xalqaro)",
@@ -5647,7 +5672,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Премиум-функция", payD: "С PRO всё бесплатно, либо оплатите разово.", payOnce: "Только в этот раз", limitT: "Лимит PRO исчерпан", limitD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно, либо оплатите разово.",
       upT: "🎉 Отлично сыграли!", upD: "С PRO откроются Writing, Speaking, SAT, Grammar, Reading, Listening, тест с сертификатом и истории. {p} ⭐ / {d} дней.", upBtn: "⭐ Перейти на PRO", upLater: "Позже",
       proActive: "PRO активна", until: "Действует до", daysLeft: "дн. осталось", extend: "Продлить", buy: "Получить PRO", offerT: "PRO-подписка", days: "дней",
-      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 модуля) + Math (2 модуля). Сложность 2-го модуля зависит от результата 1-го. 📐 — формулы, ⏱ — скрыть таймер. Балл ориентировочный, вопросы пишет ИИ.", tutor: "SAT Tutor", tutorD: "Напишите вопрос — преподаватель объяснит на доске с рисунками и формулами", tutorPlace: "Например: что такое функция? Или: объясни правила запятых", tutorAsk: "🧑‍🏫 Объясни", tutorBoard: "Готовлю доску…", tutorNext: "Дальше ➜", tutorAll: "Всё сразу", tutorSimpler: "🔁 Объясни проще", tutorExample: "➕ Ещё пример", tutorPractice: "Закрепление", tutorOff: "Я помогаю с SAT, математикой и английским. Напишите вопрос по SAT 🙂", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
+      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 модуля) + Math (2 модуля). Сложность 2-го модуля зависит от результата 1-го. 📐 — формулы, ⏱ — скрыть таймер. Балл ориентировочный, вопросы пишет ИИ.", tutor: "SAT Tutor", tutorD: "Напишите вопрос — преподаватель объяснит на доске с рисунками и формулами", tutorPlace: "Например: что такое функция? Или: объясни правила запятых", tutorAsk: "🧑‍🏫 Объясни", tutorBoard: "Готовлю доску…", tutorNext: "Дальше ➜", tutorAll: "Всё сразу", tutorSimpler: "🔁 Объясни проще", tutorExample: "➕ Ещё пример", tutorPractice: "Закрепление", tutorOff: "Я помогаю с SAT, математикой и английским. Напишите вопрос по SAT 🙂", tutorStart: "Начать урок", tutorNotes: "Конспект", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
       owner: "Вы владелец бота — для вас всё бесплатно.", paidOk: "Оплата получена! ⭐", cancelled: "Оплата отменена.", checking: "Проверяем…", asSeparate: "По отдельности: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Пока нет материалов.", questions: "вопросов", readOnly: "Для чтения / прослушивания", noRank: "Пока нет результатов", boardQuiz: "Викторина", boardCert: "Сертификат", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (международный)",
@@ -5724,7 +5749,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium feature", payD: "Included with PRO, or pay once for just this.", payOnce: "Just this once", limitT: "PRO limit reached", limitD: "Today's limit ({n}) is used up. Free again tomorrow, or pay for a single use.",
       upT: "🎉 Nice game!", upD: "PRO also unlocks Writing, Speaking, SAT, Grammar, Reading, Listening, the certificate test and stories. {p} ⭐ / {d} days.", upBtn: "⭐ Go PRO", upLater: "Later",
       proActive: "PRO is active", until: "Valid until", daysLeft: "days left", extend: "Extend", buy: "Get PRO", offerT: "PRO subscription", days: "days",
-      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modules) + Math (2 modules). Module 2 difficulty depends on module 1. 📐 for formulas, ⏱ to hide the timer. The score is an estimate; questions are AI-written.", tutor: "SAT Tutor", tutorD: "Type a question — the teacher explains on a whiteboard with pictures and formulas", tutorPlace: "E.g. what is a function? Or: explain comma rules", tutorAsk: "🧑‍🏫 Explain", tutorBoard: "Preparing the board…", tutorNext: "Next ➜", tutorAll: "Show all", tutorSimpler: "🔁 Simpler please", tutorExample: "➕ One more example", tutorPractice: "Quick practice", tutorOff: "I help with SAT, math and English. Ask me an SAT question 🙂", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
+      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modules) + Math (2 modules). Module 2 difficulty depends on module 1. 📐 for formulas, ⏱ to hide the timer. The score is an estimate; questions are AI-written.", tutor: "SAT Tutor", tutorD: "Type a question — the teacher explains on a whiteboard with pictures and formulas", tutorPlace: "E.g. what is a function? Or: explain comma rules", tutorAsk: "🧑‍🏫 Explain", tutorBoard: "Preparing the board…", tutorNext: "Next ➜", tutorAll: "Show all", tutorSimpler: "🔁 Simpler please", tutorExample: "➕ One more example", tutorPractice: "Quick practice", tutorOff: "I help with SAT, math and English. Ask me an SAT question 🙂", tutorStart: "Start the lesson", tutorNotes: "Notes", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
       owner: "You're the bot owner — everything is always free for you.", paidOk: "Payment received! ⭐", cancelled: "Payment cancelled.", checking: "Checking…", asSeparate: "Bought separately: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "No content yet.", questions: "questions", readOnly: "For reading / listening", noRank: "No results yet", boardQuiz: "Quiz", boardCert: "Certificate", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (international)",
@@ -6581,58 +6606,219 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     return wrap;
   }
 
-  function viewTutor(sidIn, lessonsIn) {
-    var sid = sidIn || null, area = h("div", {}), input, busy = false;
+  var TEACHER_SVG = '<svg class="teacher-svg" viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">' +
+    '<ellipse cx="60" cy="193" rx="38" ry="5" fill="rgba(0,0,0,.25)"/>' +
+    '<rect x="42" y="132" width="15" height="58" rx="5" fill="#2b3a55"/><rect x="63" y="132" width="15" height="58" rx="5" fill="#2b3a55"/>' +
+    '<rect x="38" y="184" width="22" height="9" rx="4" fill="#1b1b1b"/><rect x="60" y="184" width="22" height="9" rx="4" fill="#1b1b1b"/>' +
+    '<g class="torso"><rect x="34" y="72" width="52" height="68" rx="14" fill="#4f7cff"/>' +
+    '<path d="M54 74 L60 92 L66 74 Z" fill="#fff"/><path d="M58 90 L62 90 L64 118 L60 124 L56 118 Z" fill="#ffd166"/>' +
+    '<g class="arm2"><rect x="80" y="78" width="12" height="46" rx="6" fill="#4f7cff" transform="rotate(-6 86 80)"/><circle cx="88" cy="126" r="7" fill="#f2c6a0"/></g></g>' +
+    '<g class="arm" style="transform-origin:38px 82px"><rect x="22" y="76" width="13" height="40" rx="6.5" fill="#4f7cff" transform="rotate(32 28 80)"/>' +
+    '<circle cx="14" cy="112" r="7" fill="#f2c6a0"/><rect x="-26" y="110" width="52" height="3.5" rx="1.7" fill="#c9a26b" transform="rotate(-18 14 112)"/></g>' +
+    '<rect x="53" y="62" width="14" height="14" rx="5" fill="#e8b88f"/>' +
+    '<circle cx="60" cy="46" r="27" fill="#f2c6a0"/>' +
+    '<path d="M33 44 C33 18 87 18 87 44 C82 31 72 28 60 28 C48 28 38 31 33 44 Z" fill="#6b4a2e"/>' +
+    '<g class="eyes"><circle cx="50" cy="47" r="3" fill="#222"/><circle cx="70" cy="47" r="3" fill="#222"/></g>' +
+    '<g fill="none" stroke="#333" stroke-width="2"><circle cx="50" cy="47" r="8"/><circle cx="70" cy="47" r="8"/><path d="M58 47 L62 47"/></g>' +
+    '<path d="M44 37 Q50 33 56 37 M64 37 Q70 33 76 37" stroke="#6b4a2e" stroke-width="2.4" fill="none" stroke-linecap="round"/>' +
+    '<ellipse class="mouth" cx="60" cy="62" rx="7" ry="4.5" fill="#8a3b3b"/>' +
+    '</svg>';
+
+  function chalkWipe(el) { el.style.clipPath = "inset(0 100% 0 0)"; el.style.webkitClipPath = "inset(0 100% 0 0)"; }
+  function setWipe(el, p) { var v = "inset(0 " + (100 * (1 - p)).toFixed(1) + "% 0 0)"; el.style.clipPath = v; el.style.webkitClipPath = v; }
+
+  // Diagramma elementlarini "chizilish" animatsiyasiga tayyorlaydi: [{el, w, kind}]
+  function prepDraw(wrap) {
+    var svg = wrap.querySelector("svg"), out = [];
+    if (!svg) return out;
+    svg.querySelectorAll("line,path,polygon,polyline,circle,ellipse,rect,text").forEach(function (el) {
+      var tag = el.tagName.toLowerCase(), stroke = el.getAttribute("stroke") || "", fill = el.getAttribute("fill");
+      var grid = /rgba\(255,255,255,\.12\)/.test(stroke);
+      var item = { el: el, w: 1, kind: "fade", grid: grid };
+      if (tag !== "text" && stroke && (fill === "none" || tag === "line" || tag === "path" || tag === "polyline") && typeof el.getTotalLength === "function") {
+        var len = 0; try { len = el.getTotalLength(); } catch (e) {}
+        if (len > 0) { item.kind = "draw"; item.len = len; item.w = Math.max(1, Math.min(8, len / 70)); el.style.strokeDasharray = len; }
+      }
+      if (tag === "text") item.w = 0.4;
+      if (grid) item.w = 0.05;
+      setDraw(item, 0); out.push(item);
+    });
+    return out;
+  }
+  function setDraw(it, p) {
+    if (it.kind === "draw") { it.el.style.strokeDashoffset = it.len * (1 - p); it.el.style.opacity = p > 0 ? 1 : 0; }
+    else it.el.style.opacity = p;
+  }
+
+  function viewTutor() {
+    var sid = null, area = h("div", {}), input, busy = false, player = null, askCard = null;
+    function stopPlayer() { if (player) { player.stop(); player = null; } }
+    cleanupFn = null;
+
     function ask(msg) {
       msg = (msg || "").trim();
       if (msg.length < 2 || busy) return;
-      busy = true;
-      var wait = spinner(S("tutorBoard")); area.appendChild(wait);
-      wait.scrollIntoView({ behavior: "smooth", block: "center" });
+      busy = true; stopPlayer(); clear(area); askCard.style.display = "";
+      var wait = h("div", { class: "card" }, h("div", { class: "teacher-mini", html: "" }), spinner(S("tutorBoard")));
+      wait.firstChild.innerHTML = TEACHER_SVG; wait.firstChild.classList.add("t-talk");
+      area.appendChild(wait);
       post("/api/app/sat/tutor", { sid: sid, message: msg }).then(function (r) {
-        busy = false; area.removeChild(wait); sid = r.sid;
+        busy = false; clear(area); sid = r.sid;
         if (r.off_topic) { area.appendChild(h("div", { class: "card", text: "🧑‍🏫 " + (r.reply || S("tutorOff")) })); return; }
         input.value = "";
-        lesson(r, msg);
+        scene(r, msg);
       }).catch(function (e) {
-        busy = false; if (wait.parentNode) area.removeChild(wait);
+        busy = false; clear(area);
         if (e.status === 502) toast(S("satGenFail")); else fail(e);
       });
     }
-    function lesson(r, q) {
-      var board = h("div", { class: "board" });
-      board.appendChild(h("div", { class: "board-q", text: "❓ " + q }));
-      board.appendChild(mj(h("div", { class: "board-title", text: r.title })));
-      var stepsBox = h("div", {}), shown = 0, ctl = h("div", { style: "margin-top:12px" });
-      board.appendChild(stepsBox); board.appendChild(ctl); area.appendChild(board);
-      function showStep() {
-        var st = r.steps[shown++];
-        var el = h("div", { class: "board-step" },
-          h("div", { class: "board-h", text: shown + ". " + st.heading }),
-          mj(h("div", { class: "board-t", text: st.text })),
-          st.board.map(function (b) { return mj(h("div", { class: "chalk", text: b })); }),
-          diagramEl(st.diagram));
-        stepsBox.appendChild(el); haptic("light");
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-        paint();
+
+    function scene(r, q) {
+      var N = r.steps.length;
+      var boardIn = h("div", { class: "board-in" });
+      var board = h("div", { class: "board tboard" }, h("div", { class: "board-q", text: "❓ " + q }),
+        mj(h("div", { class: "board-title", text: r.title })), boardIn);
+      var teacher = h("div", { class: "teacher" }); teacher.innerHTML = TEACHER_SVG;
+      var bubble = h("div", { class: "bubble", text: "" });
+      var stage = h("div", { class: "stage" }, bubble, teacher);
+      var startBtn = h("button", { class: "btn gold board-start", text: "▶ " + S("tutorStart") });
+      board.appendChild(startBtn);
+      var ctl = h("div", { class: "row", style: "margin:10px 0" });
+      var after = h("div", {});
+      askCard.style.display = "none";
+      var room = h("div", { class: "classroom" }, board, stage);
+      area.appendChild(room); area.appendChild(ctl); area.appendChild(after);
+      setTimeout(function () { try { room.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 60);
+      var tsvg = teacher.firstChild;
+
+      var audio = new Audio(), st = { i: -1, playing: false, muted: false, t: 0, dur: 0, items: [], raf: 0, last: 0, usingAudio: false, say: [], active: -1, dead: false, ended: false, gen: 0 };
+      function setMode(m) { tsvg.classList.toggle("t-talk", m === "talk"); tsvg.classList.toggle("t-write", m === "write"); }
+
+      function sentences(txt) { return (txt.match(/[^.!?…]+[.!?…]*/g) || [txt]).map(function (x) { return x.trim(); }).filter(Boolean); }
+
+      function buildStep(i) {
+        var s0 = r.steps[i];
+        clear(boardIn);
+        var items = [], total = 0, parts = [];
+        var hd = mj(h("div", { class: "board-h", text: (i + 1) + ". " + s0.heading })); parts.push({ el: hd, w: 1.2, kind: "wipe" });
+        s0.board.forEach(function (b) { parts.push({ el: mj(h("div", { class: "chalk", text: b })), w: 1.4, kind: "wipe" }); });
+        var dg = s0.diagram ? diagramEl(s0.diagram) : null;
+        parts.forEach(function (p) { boardIn.appendChild(p.el); chalkWipe(p.el); });
+        if (dg) { boardIn.appendChild(dg); var dr = prepDraw(dg), tw = dr.reduce(function (a, x) { return a + x.w; }, 0) || 1; parts.push({ el: dg, w: 3.2, kind: "diagram", draw: dr, tw: tw }); dg.style.opacity = 1; }
+        parts.forEach(function (p) { total += p.w; });
+        return { parts: parts, total: total };
       }
-      function paint() {
-        clear(ctl);
-        if (shown < r.steps.length) {
-          ctl.appendChild(h("div", { class: "row" },
-            h("button", { class: "btn", onclick: showStep, text: S("tutorNext") + " (" + shown + "/" + r.steps.length + ")" }),
-            h("button", { class: "btn ghost", onclick: function () { while (shown < r.steps.length) showStep(); }, text: S("tutorAll") })));
-        } else finish();
+
+      function layout(step, W) {          // W — yozish uchun ajratilgan soniyalar
+        var t0 = 0.3, k = (W - 0.3) / step.total;
+        step.parts.forEach(function (p) { p.start = t0; p.dur = Math.max(0.5, p.w * k); t0 += p.dur; });
+        step.end = t0;
       }
+
+      function apply(step, t) {
+        var writing = false;
+        step.parts.forEach(function (p) {
+          var pr = Math.max(0, Math.min(1, (t - p.start) / p.dur));
+          if (p.kind === "wipe") setWipe(p.el, pr);
+          else {
+            var acc = 0, tw = p.tw;
+            p.draw.forEach(function (it) {
+              var a = acc / tw, b = (acc + it.w) / tw; acc += it.w;
+              setDraw(it, Math.max(0, Math.min(1, (pr - a) / Math.max(1e-6, b - a))));
+            });
+          }
+          if (pr > 0 && pr < 1) writing = true;
+        });
+        return writing;
+      }
+
+      function showSub(step, t, dur) {
+        var sents = st.say[st.i]; if (!sents.length) return;
+        var idx = Math.min(sents.length - 1, Math.floor(Math.min(0.999, t / Math.max(0.5, dur)) * sents.length));
+        if (idx !== st.active) { st.active = idx; bubble.textContent = sents[idx]; }
+      }
+
+      function playStep(i, fromGesture) {
+        st.gen++; var gen = st.gen;
+        st.i = i; st.t = 0; st.active = -1; st.ended = false; st.usingAudio = false; st.dur = 0;
+        var step = buildStep(i); st.step = step;
+        st.say[i] = st.say[i] || sentences(r.steps[i].say || r.steps[i].text);
+        var fallbackDur = Math.max(4, (r.steps[i].say || "").length / 13);
+        layout(step, fallbackDur * 0.85);
+        st.dur = fallbackDur; st.hasDur = false;
+        // ovoz
+        audio.onloadedmetadata = function () {
+          if (gen !== st.gen) return;
+          if (isFinite(audio.duration) && audio.duration > 0.5) { st.dur = audio.duration; st.hasDur = true; layout(step, Math.max(2.5, audio.duration * 0.85)); }
+        };
+        audio.onerror = function () { if (gen === st.gen) st.usingAudio = false; };
+        audio.onended = function () { if (gen === st.gen) st.ended = true; };
+        audio.src = "/api/app/sat/tutor/tts/" + sid + "/" + r.n + "/" + i;
+        audio.muted = st.muted;
+        var pp = audio.play();
+        if (pp && pp.then) pp.then(function () { if (gen === st.gen) st.usingAudio = true; }).catch(function () { if (gen === st.gen) st.usingAudio = false; });
+        st.playing = true; st.last = performance.now(); updateCtl();
+        cancelAnimationFrame(st.raf); st.raf = requestAnimationFrame(loop);
+      }
+
+      function loop(now) {
+        if (st.dead) return;
+        var dt = (now - st.last) / 1000; st.last = now;
+        if (st.playing) {
+          if (st.usingAudio && !audio.paused && !audio.ended && audio.currentTime > 0) st.t = audio.currentTime;
+          else st.t += dt;
+          var writing = apply(st.step, st.t);
+          showSub(st.step, st.t, st.dur);
+          setMode(writing ? "write" : "talk");
+          var done = st.usingAudio ? (st.ended && st.t >= st.step.end) : (st.t >= Math.max(st.dur, st.step.end));
+          if (st.usingAudio && !st.hasDur && st.t > st.dur + 6) done = true;
+          if (done) {
+            apply(st.step, 999); setMode("idle");
+            if (st.i + 1 < N) { st.playing = false; var g = st.gen; setTimeout(function () { if (!st.dead && g === st.gen) playStep(st.i + 1); }, 700); }
+            else { st.playing = false; finish(); }
+            updateCtl(); return;
+          }
+        }
+        st.raf = requestAnimationFrame(loop);
+      }
+
+      var bPause = h("button", { class: "btn ghost", onclick: function () {
+        if (st.i < 0) return;
+        st.playing = !st.playing;
+        if (st.playing) { try { audio.play(); } catch (e) {} st.last = performance.now(); cancelAnimationFrame(st.raf); st.raf = requestAnimationFrame(loop); }
+        else { try { audio.pause(); } catch (e) {} setMode("idle"); }
+        updateCtl();
+      } });
+      var bNext = h("button", { class: "btn ghost", text: "⏭", onclick: function () { if (st.i + 1 < N) { try { audio.pause(); } catch (e) {} playStep(st.i + 1); } } });
+      var bMute = h("button", { class: "btn ghost", onclick: function () { st.muted = !st.muted; audio.muted = st.muted; updateCtl(); } });
+      var bAgain = h("button", { class: "btn ghost", text: "🔁", onclick: function () { clear(after); try { audio.pause(); } catch (e) {} playStep(0); } });
+      var bNew = h("button", { class: "btn ghost", text: "✏️", onclick: function () { stopPlayer(); clear(area); askCard.style.display = ""; window.scrollTo(0, 0); } });
+      ctl.appendChild(bPause); ctl.appendChild(bNext); ctl.appendChild(bMute); ctl.appendChild(bAgain); ctl.appendChild(bNew);
+      function updateCtl() { bPause.textContent = st.playing ? "⏸" : "▶"; bMute.textContent = st.muted ? "🔇" : "🔊"; }
+      updateCtl();
+
       function finish() {
-        if (r.summary) ctl.appendChild(mj(h("div", { class: "board-sum", text: "✅ " + r.summary })));
-        if (r.practice) ctl.appendChild(practice(r.practice));
-        ctl.appendChild(h("div", { class: "row", style: "margin-top:10px" },
+        setMode("idle"); bubble.textContent = r.summary ? "" : bubble.textContent;
+        clear(after);
+        if (r.summary) after.appendChild(mj(h("div", { class: "board-sum", style: "background:var(--card);margin:0 0 12px", text: "✅ " + r.summary })));
+        var notes = h("div", { class: "card" }, h("h3", { text: "📒 " + S("tutorNotes") }));
+        r.steps.forEach(function (s0, k) {
+          notes.appendChild(mj(h("p", { style: "margin-top:10px", text: (k + 1) + ". " + s0.heading + " — " + s0.text })));
+          s0.board.forEach(function (b) { notes.appendChild(mj(h("div", { class: "chalk", style: "color:var(--text)", text: b }))); });
+        });
+        after.appendChild(notes);
+        if (r.practice) after.appendChild(practice(r.practice));
+        after.appendChild(h("div", { class: "row", style: "margin-top:10px" },
           h("button", { class: "btn ghost", onclick: function () { ask("Explain the same thing more simply, with a different example"); }, text: S("tutorSimpler") }),
           h("button", { class: "btn ghost", onclick: function () { ask("Give me one more worked example of this topic, a bit harder"); }, text: S("tutorExample") })));
       }
-      showStep();
+
+      startBtn.addEventListener("click", function () { board.removeChild(startBtn); playStep(0, true); });
+      player = { stop: function () { st.dead = true; cancelAnimationFrame(st.raf); try { audio.pause(); audio.removeAttribute("src"); audio.load(); } catch (e) {} } };
+      cleanupFn = stopPlayer;
+      setMode("idle");
     }
+
     function practice(p) {
       var box = h("div", { class: "card", style: "margin-top:12px" }, h("h3", { text: "🎯 " + S("tutorPractice") }), mj(h("div", { class: "sat-q", text: p.question })));
       var done = false;
@@ -6652,8 +6838,10 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     input = h("textarea", { placeholder: S("tutorPlace"), maxlength: "500", style: "min-height:70px" });
     var chips = h("div", { style: "display:flex;flex-wrap:wrap;gap:8px;margin:10px 0" });
     TUTOR_TOPICS.forEach(function (t) { chips.appendChild(h("button", { class: "chip", onclick: function () { ask(t); }, text: t })); });
-    mount(backBtn(viewSat), title("🧑‍🏫 " + S("tutor"), S("tutorD")), h("div", { class: "card" }, input,
-      h("button", { class: "btn", style: "margin-top:8px", onclick: function () { ask(input.value); }, text: S("tutorAsk") }), chips), area);
+    askCard = h("div", { class: "card" }, input,
+      h("button", { class: "btn", style: "margin-top:8px", onclick: function () { ask(input.value); }, text: S("tutorAsk") }), chips);
+    mount(backBtn(viewSat), title("🧑‍🏫 " + S("tutor"), S("tutorD")), askCard, area);
+    cleanupFn = stopPlayer;
   }
 
 
@@ -8172,7 +8360,8 @@ def _generate_tutor_lesson_sync(question: str, history: list) -> dict:
         "Write all explanations in UZBEK (Latin script); English terms, SAT vocabulary and example sentences stay in English. "
         "Put ALL math in LaTeX between single dollar signs, e.g. $y=mx+b$, $\\\\frac{a}{b}$ (double every backslash inside JSON). "
         "Reply ONLY as JSON:\n"
-        '{"title": "short title", "steps": [ 4 to 6 items: {"heading": "short", "text": "2-4 short sentences", '
+        '{"title": "short title", "steps": [ 4 to 6 items: {"heading": "short", "text": "2-4 short sentences (written notes)", '
+        '"say": "what you SAY ALOUD to the student in UZBEK: 2-4 short natural friendly sentences like a real teacher talking; NO symbols, NO LaTeX - read math in words, e.g. y teng ikki x qo shuv bir", '
         '"board": ["1-3 short lines written on the board, e.g. key formula or example (LaTeX allowed)"], '
         '"diagram": null OR a picture } ], "summary": "2 sentences", '
         '"practice": {"question": "...", "options": ["...","...","...","..."], "correct_index": 0, "explanation": "..."}}\n'
@@ -8192,7 +8381,8 @@ def _generate_tutor_lesson_sync(question: str, history: list) -> dict:
             continue
         st = _sat_fix_tex_obj(st)
         board = [str(b).strip()[:140] for b in (st.get("board") or []) if str(b).strip()][:3]
-        steps.append({"heading": str(st.get("heading") or "").strip()[:80], "text": str(st["text"]).strip()[:700],
+        say = re.sub(r"[$\\^_{}]", " ", str(st.get("say") or st["text"])).strip()[:600]
+        steps.append({"heading": str(st.get("heading") or "").strip()[:80], "text": str(st["text"]).strip()[:700], "say": say,
                       "board": board, "diagram": _clean_diagram(st.get("diagram"))})
     if len(steps) < 2:
         raise ValueError("Tutor darsi to'liq emas")
@@ -8232,10 +8422,47 @@ async def api_app_sat_tutor(request: web.Request, uid: int, lang: str, user: dic
             logger.warning("Tutor darsi generatsiyasi: %s", e)
     if not lesson:
         return _err("generation_failed", 502)
+    n = None
     if not lesson.get("off_topic"):
         s["history"].append({"q": msg[:200], "title": lesson["title"]})
         s["history"] = s["history"][-6:]
-    return web.json_response({"sid": sid, **lesson})
+        s.setdefault("lessons", []).append({"says": [st["say"] for st in lesson["steps"]], "tts": {}})
+        s["lessons"] = s["lessons"][-6:]
+        s["lang"] = lang
+        n = s["lesson_count"] = s.get("lesson_count", 0) + 1
+        s.setdefault("lesson_keys", []).append(n)
+        s["lesson_keys"] = s["lesson_keys"][-6:]
+    return web.json_response({"sid": sid, "n": n, **lesson})
+
+
+_TTS_LANG = {"uz": "uz", "ru": "ru", "en": "en"}
+
+
+def _tts_lang_mp3_sync(text: str, lang: str) -> bytes:
+    import io
+    buf = io.BytesIO()
+    gTTS(text=text, lang=_TTS_LANG.get(lang, "en")).write_to_fp(buf)
+    return buf.getvalue()
+
+
+async def api_app_sat_tutor_tts(request: web.Request):
+    """O'qituvchi ovozi: sessiya id'si maxfiy, shuning uchun sarlavhasiz GET."""
+    s = _app_session(request.match_info.get("sid", ""), None, ("tutor",))
+    try:
+        n = int(request.match_info.get("n", ""))
+        i = int(request.match_info.get("i", ""))
+        idx = s["lesson_keys"].index(n)
+        lesson = s["lessons"][idx]
+        text = lesson["says"][i]
+    except (TypeError, ValueError, IndexError, KeyError, AttributeError):
+        return web.Response(status=404)
+    if i not in lesson["tts"]:
+        try:
+            lesson["tts"][i] = await asyncio.to_thread(_tts_lang_mp3_sync, text, s.get("lang", "en"))
+        except Exception as e:
+            logger.exception("Tutor TTS xatosi: %s", e)
+            return web.Response(status=500)
+    return web.Response(body=lesson["tts"][i], content_type="audio/mpeg", headers={"Cache-Control": "private, max-age=3600"})
 
 
 @app_api
@@ -8318,6 +8545,7 @@ def create_app() -> web.Application:
     app.router.add_post("/api/app/sat/start", api_app_sat_start)
     app.router.add_post("/api/app/sat/submit", api_app_sat_submit)
     app.router.add_post("/api/app/sat/tutor", api_app_sat_tutor)
+    app.router.add_get("/api/app/sat/tutor/tts/{sid}/{n}/{i}", api_app_sat_tutor_tts)
     app.router.add_get("/api/app/leaderboard", api_app_leaderboard)
     app.router.add_get("/api/dashboard/content/{type}", api_dashboard_content_list)
     app.router.add_get("/api/dashboard/content/{type}/{id}", api_dashboard_content_detail)
