@@ -560,10 +560,11 @@ I18N = {
     "btn_eng": {"uz": "🇬🇧 Ingliz tili", "ru": "🇬🇧 Английский язык", "en": "🇬🇧 English learning"},
     "btn_sat": {"uz": "🎓 SAT", "ru": "🎓 SAT", "en": "🎓 SAT"},
     "sat_title": {
-        "uz": "🎓 <b>SAT — xalqaro imtihon</b>\n\nDigital SAT formatida mashq qiling: <b>Reading & Writing</b> va <b>Math</b>. Formulalar bilan, taymer va xatolar tahlili bilan. Test ilovada ochiladi 👇\n\n🏁 <b>To'liq mock</b> — 4 modul, 2-modul qiyinligi natijangizga qarab tanlanadi, oxirida taxminiy ball (400–1600).\n📖➗ <b>Mavzu bo'yicha mashq</b> — 10 savol, tushuntirishlar bilan.\n\nℹ️ Savollarni AI yozadi, ball rasmiy emas — taxminiy.",
-        "ru": "🎓 <b>SAT — международный экзамен</b>\n\nТренируйтесь в формате Digital SAT: <b>Reading & Writing</b> и <b>Math</b>. С формулами, таймером и разбором ошибок. Тест открывается в приложении 👇\n\n🏁 <b>Полный мок</b> — 4 модуля, сложность 2-го модуля зависит от результата, в конце ориентировочный балл (400–1600).\n📖➗ <b>Практика по темам</b> — 10 вопросов с объяснениями.\n\nℹ️ Вопросы пишет ИИ, балл неофициальный — ориентировочный.",
-        "en": "🎓 <b>SAT — the international exam</b>\n\nPractise in the Digital SAT format: <b>Reading & Writing</b> and <b>Math</b>, with formulas, a timer and mistake review. The test opens in the app 👇\n\n🏁 <b>Full mock</b> — 4 modules, module 2 difficulty adapts to your result, estimated score (400–1600) at the end.\n📖➗ <b>Topic practice</b> — 10 questions with explanations.\n\nℹ️ Questions are AI-written and the score is an estimate, not official.",
+        "uz": "🎓 <b>SAT — xalqaro imtihon</b>\n\nDigital SAT formatida mashq qiling: <b>Reading & Writing</b> va <b>Math</b>. Formulalar bilan, taymer va xatolar tahlili bilan. Test ilovada ochiladi 👇\n\n🧑‍🏫 <b>SAT Tutor</b> — savol yozing, o'qituvchi doskada rasm va formulalar bilan tushuntiradi.\n🏁 <b>To'liq mock</b> — 4 modul, 2-modul qiyinligi natijangizga qarab tanlanadi, oxirida taxminiy ball (400–1600).\n📖➗ <b>Mavzu bo'yicha mashq</b> — 10 savol, tushuntirishlar bilan.\n\nℹ️ Savollarni AI yozadi, ball rasmiy emas — taxminiy.",
+        "ru": "🎓 <b>SAT — международный экзамен</b>\n\nТренируйтесь в формате Digital SAT: <b>Reading & Writing</b> и <b>Math</b>. С формулами, таймером и разбором ошибок. Тест открывается в приложении 👇\n\n🧑‍🏫 <b>SAT Tutor</b> — напишите вопрос, преподаватель объяснит на доске с рисунками и формулами.\n🏁 <b>Полный мок</b> — 4 модуля, сложность 2-го модуля зависит от результата, в конце ориентировочный балл (400–1600).\n📖➗ <b>Практика по темам</b> — 10 вопросов с объяснениями.\n\nℹ️ Вопросы пишет ИИ, балл неофициальный — ориентировочный.",
+        "en": "🎓 <b>SAT — the international exam</b>\n\nPractise in the Digital SAT format: <b>Reading & Writing</b> and <b>Math</b>, with formulas, a timer and mistake review. The test opens in the app 👇\n\n🧑‍🏫 <b>SAT Tutor</b> — type a question and the teacher explains it on a whiteboard with pictures and formulas.\n🏁 <b>Full mock</b> — 4 modules, module 2 difficulty adapts to your result, estimated score (400–1600) at the end.\n📖➗ <b>Topic practice</b> — 10 questions with explanations.\n\nℹ️ Questions are AI-written and the score is an estimate, not official.",
     },
+    "sat_b_tutor": {"uz": "🧑‍🏫 SAT Tutor (doskada tushuntiradi)", "ru": "🧑‍🏫 SAT Tutor (объяснит на доске)", "en": "🧑‍🏫 SAT Tutor (explains on a whiteboard)"},
     "sat_b_mock": {"uz": "🏁 To'liq mock (adaptiv)", "ru": "🏁 Полный мок (адаптивный)", "en": "🏁 Full mock (adaptive)"},
     "sat_b_rw": {"uz": "📖 Reading & Writing mashq", "ru": "📖 Практика Reading & Writing", "en": "📖 Reading & Writing practice"},
     "sat_b_math": {"uz": "➗ Math mashq", "ru": "➗ Практика Math", "en": "➗ Math practice"},
@@ -1899,7 +1900,7 @@ def _sat_keyboard() -> InlineKeyboardMarkup:
     def wb(key, route):
         return [InlineKeyboardButton(text=tr(key), web_app=WebAppInfo(url=_app_url(route)))]
     return InlineKeyboardMarkup(inline_keyboard=[
-        wb("sat_b_mock", "sat_mock"), wb("sat_b_rw", "sat_rw"), wb("sat_b_math", "sat_math"),
+        wb("sat_b_tutor", "sat_tutor"), wb("sat_b_mock", "sat_mock"), wb("sat_b_rw", "sat_rw"), wb("sat_b_math", "sat_math"),
         [InlineKeyboardButton(text=tr("btn_back"), callback_data="mn:home")],
     ])
 
@@ -4424,7 +4425,7 @@ async def _grant_pro(user_id: int) -> float:
     return exp
 
 
-async def _pro_use(user_id: int, kind: str, consume: bool = True) -> bool:
+async def _pro_use(user_id: int, kind: str, consume: bool = True, limit: int | None = None) -> bool:
     """PRO foydalanuvchi bugungi limitdan oshmagan bo'lsa True (consume=True bo'lsa hisoblaydi)."""
     day = datetime.now(UZ_TZ).strftime("%Y-%m-%d")
     mk = (kind, user_id, day)
@@ -4437,7 +4438,7 @@ async def _pro_use(user_id: int, kind: str, consume: bool = True) -> bool:
                 count = max(count, int(raw.decode() if isinstance(raw, bytes) else raw))
         except Exception as e:
             logger.warning("PRO limitini o'qishda xatolik: %s", e)
-    if count >= PRO_DAILY_LIMIT:
+    if count >= (limit or PRO_DAILY_LIMIT):
         return False
     if consume:
         _pro_use_mem[mk] = count + 1
@@ -5478,6 +5479,19 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   .sat-opt { font-size: 16px; line-height: 1.45; padding: 13px 14px; }
   .katex { font-size: 1.08em; }
   @media (min-width: 760px) { .sat-split { grid-template-columns: 1fr 1fr; align-items: start; } }
+  .board { background: #1d3a2f; background-image: radial-gradient(circle at 30% 20%, rgba(255,255,255,.05), transparent 60%); border: 6px solid #8b6b4a; border-radius: 14px; padding: 14px; margin: 12px 0; color: #f5f5f5; box-shadow: 0 6px 18px rgba(0,0,0,.35); font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Chalkboard SE", cursive, system-ui; }
+  .board-q { color: #b2f7a3; font-size: 14px; margin-bottom: 6px; }
+  .board-title { font-size: 21px; font-weight: 700; color: #ffd166; margin-bottom: 8px; border-bottom: 2px dashed rgba(255,255,255,.25); padding-bottom: 6px; }
+  .board-step { margin: 14px 0; animation: boardIn .5s ease; }
+  .board-h { color: #7bdff2; font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+  .board-t { font-size: 15.5px; line-height: 1.6; }
+  .chalk { background: rgba(255,255,255,.08); border-left: 3px solid #ffd166; border-radius: 6px; padding: 7px 10px; margin: 8px 0; font-size: 17px; color: #fff; }
+  .board-pic { background: rgba(0,0,0,.22); border-radius: 10px; padding: 8px; margin: 10px 0; }
+  .board-pic svg { width: 100%; height: auto; display: block; }
+  .board-sum { background: rgba(178,247,163,.12); border-radius: 8px; padding: 10px; margin-top: 10px; font-size: 15px; }
+  .board .btn.ghost { color: #f5f5f5; border-color: rgba(255,255,255,.35); }
+  .chip { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 99px; padding: 7px 12px; font: inherit; font-size: 13px; }
+  @keyframes boardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   .progress { height: 5px; background: var(--line); border-radius: 9px; overflow: hidden; margin-bottom: 12px; }
   .progress i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
   .center { text-align: center; padding: 44px 12px; color: var(--muted); }
@@ -5556,7 +5570,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium funksiya", payD: "PRO bilan hammasi tekin yoki bir martalik to'lang.", payOnce: "Faqat shu safar", limitT: "PRO limiti tugadi", limitD: "Bugungi limit ({n} ta) tugadi. Ertaga yana tekin yoki bir martalik to'lang.",
       upT: "🎉 Zo'r o'ynadingiz!", upD: "PRO bilan Writing, Speaking, SAT, Grammar, Reading, Listening, sertifikat testi va hikoyalar ham ochiladi. {p} ⭐ / {d} kun.", upBtn: "⭐ PRO ga o'tish", upLater: "Keyinroq",
       proActive: "PRO faol", until: "Tugash sanasi", daysLeft: "kun qoldi", extend: "Muddatni uzaytirish", buy: "PRO olish", offerT: "PRO obuna", days: "kun",
-      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modul) + Math (2 modul). 2-modul qiyinligi 1-modul natijasiga bog'liq. Formulalar uchun 📐, taymerni yashirish uchun ⏱. Ball — taxminiy, savollarni AI yozadi.", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
+      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modul) + Math (2 modul). 2-modul qiyinligi 1-modul natijasiga bog'liq. Formulalar uchun 📐, taymerni yashirish uchun ⏱. Ball — taxminiy, savollarni AI yozadi.", tutor: "SAT Tutor", tutorD: "Savol yozing — o'qituvchi doskada rasm va formulalar bilan tushuntiradi", tutorPlace: "Masalan: funksiya nima? Yoki: comma qoidalarini tushuntir", tutorAsk: "🧑‍🏫 Tushuntir", tutorBoard: "Doska tayyorlanmoqda…", tutorNext: "Davom ➜", tutorAll: "Hammasi", tutorSimpler: "🔁 Soddaroq tushuntir", tutorExample: "➕ Yana misol", tutorPractice: "Mustahkamlash", tutorOff: "Men SAT, matematika va ingliz tili bo'yicha yordam beraman. SAT savolingizni yozing 🙂", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
       owner: "Siz bot egasisiz — hammasi doim tekin.", paidOk: "To'lov qabul qilindi! ⭐", cancelled: "To'lov bekor qilindi.", checking: "Tekshirilmoqda…", asSeparate: "Alohida: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Hozircha kontent yo'q.", questions: "ta savol", readOnly: "O'qish / tinglash", noRank: "Hozircha natijalar yo'q", boardQuiz: "Viktorina", boardCert: "Sertifikat", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (xalqaro)",
@@ -5633,7 +5647,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Премиум-функция", payD: "С PRO всё бесплатно, либо оплатите разово.", payOnce: "Только в этот раз", limitT: "Лимит PRO исчерпан", limitD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно, либо оплатите разово.",
       upT: "🎉 Отлично сыграли!", upD: "С PRO откроются Writing, Speaking, SAT, Grammar, Reading, Listening, тест с сертификатом и истории. {p} ⭐ / {d} дней.", upBtn: "⭐ Перейти на PRO", upLater: "Позже",
       proActive: "PRO активна", until: "Действует до", daysLeft: "дн. осталось", extend: "Продлить", buy: "Получить PRO", offerT: "PRO-подписка", days: "дней",
-      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 модуля) + Math (2 модуля). Сложность 2-го модуля зависит от результата 1-го. 📐 — формулы, ⏱ — скрыть таймер. Балл ориентировочный, вопросы пишет ИИ.", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
+      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 модуля) + Math (2 модуля). Сложность 2-го модуля зависит от результата 1-го. 📐 — формулы, ⏱ — скрыть таймер. Балл ориентировочный, вопросы пишет ИИ.", tutor: "SAT Tutor", tutorD: "Напишите вопрос — преподаватель объяснит на доске с рисунками и формулами", tutorPlace: "Например: что такое функция? Или: объясни правила запятых", tutorAsk: "🧑‍🏫 Объясни", tutorBoard: "Готовлю доску…", tutorNext: "Дальше ➜", tutorAll: "Всё сразу", tutorSimpler: "🔁 Объясни проще", tutorExample: "➕ Ещё пример", tutorPractice: "Закрепление", tutorOff: "Я помогаю с SAT, математикой и английским. Напишите вопрос по SAT 🙂", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
       owner: "Вы владелец бота — для вас всё бесплатно.", paidOk: "Оплата получена! ⭐", cancelled: "Оплата отменена.", checking: "Проверяем…", asSeparate: "По отдельности: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Пока нет материалов.", questions: "вопросов", readOnly: "Для чтения / прослушивания", noRank: "Пока нет результатов", boardQuiz: "Викторина", boardCert: "Сертификат", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (международный)",
@@ -5710,7 +5724,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium feature", payD: "Included with PRO, or pay once for just this.", payOnce: "Just this once", limitT: "PRO limit reached", limitD: "Today's limit ({n}) is used up. Free again tomorrow, or pay for a single use.",
       upT: "🎉 Nice game!", upD: "PRO also unlocks Writing, Speaking, SAT, Grammar, Reading, Listening, the certificate test and stories. {p} ⭐ / {d} days.", upBtn: "⭐ Go PRO", upLater: "Later",
       proActive: "PRO is active", until: "Valid until", daysLeft: "days left", extend: "Extend", buy: "Get PRO", offerT: "PRO subscription", days: "days",
-      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modules) + Math (2 modules). Module 2 difficulty depends on module 1. 📐 for formulas, ⏱ to hide the timer. The score is an estimate; questions are AI-written.", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
+      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modules) + Math (2 modules). Module 2 difficulty depends on module 1. 📐 for formulas, ⏱ to hide the timer. The score is an estimate; questions are AI-written.", tutor: "SAT Tutor", tutorD: "Type a question — the teacher explains on a whiteboard with pictures and formulas", tutorPlace: "E.g. what is a function? Or: explain comma rules", tutorAsk: "🧑‍🏫 Explain", tutorBoard: "Preparing the board…", tutorNext: "Next ➜", tutorAll: "Show all", tutorSimpler: "🔁 Simpler please", tutorExample: "➕ One more example", tutorPractice: "Quick practice", tutorOff: "I help with SAT, math and English. Ask me an SAT question 🙂", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
       owner: "You're the bot owner — everything is always free for you.", paidOk: "Payment received! ⭐", cancelled: "Payment cancelled.", checking: "Checking…", asSeparate: "Bought separately: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "No content yet.", questions: "questions", readOnly: "For reading / listening", noRank: "No results yet", boardQuiz: "Quiz", boardCert: "Certificate", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (international)",
@@ -6296,6 +6310,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     var P = isPremium();
     function go(body) { if (!P) { paywall(); return; } satStart(body); }
     var parts = [title("🎓 " + S("sat"), S("satD")), upgradeBar(),
+      h("button", { class: "tile", style: "width:100%;margin-bottom:12px;background:linear-gradient(135deg,#1d3a2f,#274e3f);color:#fff", onclick: function () { viewTutor(); } },
+        h("div", { class: "e", text: "🧑‍🏫" }), h("div", { class: "n", text: S("tutor") }), h("div", { class: "d", style: "color:#cfe8dc", text: S("tutorD") })),
       h("div", { class: "card" }, h("p", { class: "small muted", text: S("satInfo") })),
       h("button", { class: "tile wide", style: "width:100%;margin-bottom:14px", onclick: function () { go({ mode: "mock" }); } },
         h("div", { class: "e", text: "🏁" }), h("div", { class: "n", text: S("satMock") }), h("div", { class: "d", text: S("satMockD") }),
@@ -6465,6 +6481,179 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     });
     if (!list.length) parts.push(h("div", { class: "center", text: "🎉" }));
     mount.apply(null, parts);
+  }
+
+
+  // ================= SAT TUTOR (doska) =================
+  var TUTOR_TOPICS = ["Linear functions", "Quadratic equations", "Percent problems", "Circles", "Systems of equations", "Words in context", "Comma rules", "Transitions"];
+
+  function plotEval(src) {
+    var t = String(src).replace(/\*\*/g, "^").replace(/\s+/g, "").toLowerCase(), pos = 0;
+    var FN = { sqrt: Math.sqrt, abs: Math.abs, sin: Math.sin, cos: Math.cos, tan: Math.tan, ln: Math.log, log: Math.log10, exp: Math.exp };
+    function peek() { return t.charAt(pos); }
+    function num() { var m = /^\d*\.?\d+(e[+-]?\d+)?/.exec(t.slice(pos)); if (!m) return null; pos += m[0].length; return parseFloat(m[0]); }
+    function ident() { var m = /^[a-z]+/.exec(t.slice(pos)); if (!m) return null; pos += m[0].length; return m[0]; }
+    function primary() {
+      var c = peek(), n;
+      if (c === "(") { pos++; var v = expr(); if (peek() === ")") pos++; return v; }
+      if ((c >= "0" && c <= "9") || c === ".") { n = num(); return function () { return n; }; }
+      var id = ident();
+      if (id === "x") return function (x) { return x; };
+      if (id === "pi") return function () { return Math.PI; };
+      if (id === "e") return function () { return Math.E; };
+      if (id && FN[id]) { if (peek() === "(") { pos++; var a = expr(); if (peek() === ")") pos++; return function (x) { return FN[id](a(x)); }; } }
+      throw new Error("bad expr");
+    }
+    function power() { var b = unary(true); if (peek() === "^") { pos++; var e = unary(false); return function (x) { return Math.pow(b(x), e(x)); }; } return b; }
+    function unary(inBase) {
+      if (peek() === "-") { pos++; var u = inBase ? power() : unary(false); return function (x) { return -u(x); }; }
+      if (peek() === "+") { pos++; return unary(inBase); }
+      return primary();
+    }
+    function term() {
+      var l = power();
+      while (pos < t.length) {
+        var c = peek();
+        if (c === "*" || c === "/") { pos++; var r = power(); (function (l0, r0, op) { l = function (x) { return op === "*" ? l0(x) * r0(x) : l0(x) / r0(x); }; })(l, r, c); }
+        else if (c === "(" || (c >= "a" && c <= "z") || (c >= "0" && c <= "9") || c === ".") { var r2 = power(); (function (l0, r0) { l = function (x) { return l0(x) * r0(x); }; })(l, r2); }
+        else break;
+      }
+      return l;
+    }
+    function expr() {
+      var l = term();
+      while (peek() === "+" || peek() === "-") { var op = t.charAt(pos++), r = term(); (function (l0, r0, o) { l = function (x) { return o === "+" ? l0(x) + r0(x) : l0(x) - r0(x); }; })(l, r, op); }
+      return l;
+    }
+    var f = expr();
+    if (pos < t.length) throw new Error("bad expr");
+    return f;
+  }
+
+  function svgEl(tag, attrs, text) {
+    var el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.keys(attrs || {}).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+    if (text != null) el.textContent = text;
+    return el;
+  }
+  function niceStep(span) { var raw = span / 8, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; }
+
+  function plotSvg(d) {
+    var W = 400, H = 280, pad = 26, svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, preserveAspectRatio: "xMidYMid meet" });
+    var sx = function (x) { return pad + (x - d.xmin) / (d.xmax - d.xmin) * (W - 2 * pad); };
+    var sy = function (y) { return H - pad - (y - d.ymin) / (d.ymax - d.ymin) * (H - 2 * pad); };
+    var gx = niceStep(d.xmax - d.xmin), gy = niceStep(d.ymax - d.ymin), v;
+    for (v = Math.ceil(d.xmin / gx) * gx; v <= d.xmax + 1e-9; v += gx) {
+      svg.appendChild(svgEl("line", { x1: sx(v), y1: pad, x2: sx(v), y2: H - pad, stroke: "rgba(255,255,255,.12)", "stroke-width": 1 }));
+      if (Math.abs(v) > 1e-9) svg.appendChild(svgEl("text", { x: sx(v), y: Math.min(H - 8, Math.max(pad + 10, sy(0) + 14)), fill: "#cfd8dc", "font-size": 11, "text-anchor": "middle" }, String(+v.toFixed(2))));
+    }
+    for (v = Math.ceil(d.ymin / gy) * gy; v <= d.ymax + 1e-9; v += gy) {
+      svg.appendChild(svgEl("line", { x1: pad, y1: sy(v), x2: W - pad, y2: sy(v), stroke: "rgba(255,255,255,.12)", "stroke-width": 1 }));
+      if (Math.abs(v) > 1e-9) svg.appendChild(svgEl("text", { x: Math.min(W - 6, Math.max(pad - 4, sx(0) - 5)), y: sy(v) + 4, fill: "#cfd8dc", "font-size": 11, "text-anchor": "end" }, String(+v.toFixed(2))));
+    }
+    if (d.xmin <= 0 && d.xmax >= 0) svg.appendChild(svgEl("line", { x1: sx(0), y1: pad - 6, x2: sx(0), y2: H - pad + 6, stroke: "#f5f5f5", "stroke-width": 2 }));
+    if (d.ymin <= 0 && d.ymax >= 0) svg.appendChild(svgEl("line", { x1: pad - 6, y1: sy(0), x2: W - pad + 6, y2: sy(0), stroke: "#f5f5f5", "stroke-width": 2 }));
+    var colors = ["#ffd166", "#7bdff2", "#b2f7a3", "#ff9aa2"];
+    d.fns.forEach(function (f, k) {
+      var fn; try { fn = plotEval(f.expr); } catch (e) { return; }
+      var path = "", pen = false, prev = null, N = 400, yr = d.ymax - d.ymin;
+      for (var i = 0; i <= N; i++) {
+        var x = d.xmin + (d.xmax - d.xmin) * i / N, y = fn(x);
+        if (!isFinite(y) || Math.abs(y) > 1e6 || (prev !== null && Math.abs(y - prev) > yr * 3)) { pen = false; prev = isFinite(y) ? y : null; continue; }
+        path += (pen ? "L" : "M") + sx(x).toFixed(1) + " " + sy(y).toFixed(1) + " "; pen = true; prev = y;
+      }
+      if (path) svg.appendChild(svgEl("path", { d: path, fill: "none", stroke: colors[k % 4], "stroke-width": 2.6, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+      if (f.label) svg.appendChild(svgEl("text", { x: W - pad - 4, y: pad + 12 + k * 16, fill: colors[k % 4], "font-size": 13, "text-anchor": "end" }, f.label));
+    });
+    d.points.forEach(function (p) {
+      svg.appendChild(svgEl("circle", { cx: sx(p.x), cy: sy(p.y), r: 4.5, fill: "#ff9aa2", stroke: "#fff", "stroke-width": 1.5 }));
+      if (p.label) svg.appendChild(svgEl("text", { x: sx(p.x) + 7, y: sy(p.y) - 7, fill: "#fff", "font-size": 12 }, p.label));
+    });
+    return svg;
+  }
+
+  function diagramEl(d) {
+    if (!d) return null;
+    var wrap = h("div", { class: "board-pic" });
+    if (d.type === "plot") wrap.appendChild(plotSvg(d));
+    else if (d.type === "svg") wrap.innerHTML = d.svg;   // server tomonida tozalangan (whitelist) SVG
+    if (d.caption) wrap.appendChild(h("div", { class: "muted small", style: "text-align:center;margin-top:4px", text: d.caption }));
+    return wrap;
+  }
+
+  function viewTutor(sidIn, lessonsIn) {
+    var sid = sidIn || null, area = h("div", {}), input, busy = false;
+    function ask(msg) {
+      msg = (msg || "").trim();
+      if (msg.length < 2 || busy) return;
+      busy = true;
+      var wait = spinner(S("tutorBoard")); area.appendChild(wait);
+      wait.scrollIntoView({ behavior: "smooth", block: "center" });
+      post("/api/app/sat/tutor", { sid: sid, message: msg }).then(function (r) {
+        busy = false; area.removeChild(wait); sid = r.sid;
+        if (r.off_topic) { area.appendChild(h("div", { class: "card", text: "🧑‍🏫 " + (r.reply || S("tutorOff")) })); return; }
+        input.value = "";
+        lesson(r, msg);
+      }).catch(function (e) {
+        busy = false; if (wait.parentNode) area.removeChild(wait);
+        if (e.status === 502) toast(S("satGenFail")); else fail(e);
+      });
+    }
+    function lesson(r, q) {
+      var board = h("div", { class: "board" });
+      board.appendChild(h("div", { class: "board-q", text: "❓ " + q }));
+      board.appendChild(mj(h("div", { class: "board-title", text: r.title })));
+      var stepsBox = h("div", {}), shown = 0, ctl = h("div", { style: "margin-top:12px" });
+      board.appendChild(stepsBox); board.appendChild(ctl); area.appendChild(board);
+      function showStep() {
+        var st = r.steps[shown++];
+        var el = h("div", { class: "board-step" },
+          h("div", { class: "board-h", text: shown + ". " + st.heading }),
+          mj(h("div", { class: "board-t", text: st.text })),
+          st.board.map(function (b) { return mj(h("div", { class: "chalk", text: b })); }),
+          diagramEl(st.diagram));
+        stepsBox.appendChild(el); haptic("light");
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        paint();
+      }
+      function paint() {
+        clear(ctl);
+        if (shown < r.steps.length) {
+          ctl.appendChild(h("div", { class: "row" },
+            h("button", { class: "btn", onclick: showStep, text: S("tutorNext") + " (" + shown + "/" + r.steps.length + ")" }),
+            h("button", { class: "btn ghost", onclick: function () { while (shown < r.steps.length) showStep(); }, text: S("tutorAll") })));
+        } else finish();
+      }
+      function finish() {
+        if (r.summary) ctl.appendChild(mj(h("div", { class: "board-sum", text: "✅ " + r.summary })));
+        if (r.practice) ctl.appendChild(practice(r.practice));
+        ctl.appendChild(h("div", { class: "row", style: "margin-top:10px" },
+          h("button", { class: "btn ghost", onclick: function () { ask("Explain the same thing more simply, with a different example"); }, text: S("tutorSimpler") }),
+          h("button", { class: "btn ghost", onclick: function () { ask("Give me one more worked example of this topic, a bit harder"); }, text: S("tutorExample") })));
+      }
+      showStep();
+    }
+    function practice(p) {
+      var box = h("div", { class: "card", style: "margin-top:12px" }, h("h3", { text: "🎯 " + S("tutorPractice") }), mj(h("div", { class: "sat-q", text: p.question })));
+      var done = false;
+      p.options.forEach(function (o, k) {
+        var b = h("button", { class: "opt sat-opt", text: "ABCD".charAt(k) + ")  " + o });
+        b.addEventListener("click", function () {
+          if (done) return; done = true;
+          var right = k === p.correct_index; haptic(right ? "success" : "warning");
+          b.classList.add(right ? "correct" : "wrong");
+          if (!right) box.querySelectorAll(".opt")[p.correct_index].classList.add("correct");
+          if (p.explanation) box.appendChild(mj(h("p", { class: "small", style: "margin-top:8px", text: "💡 " + p.explanation })));
+        });
+        box.appendChild(mj(b));
+      });
+      return box;
+    }
+    input = h("textarea", { placeholder: S("tutorPlace"), maxlength: "500", style: "min-height:70px" });
+    var chips = h("div", { style: "display:flex;flex-wrap:wrap;gap:8px;margin:10px 0" });
+    TUTOR_TOPICS.forEach(function (t) { chips.appendChild(h("button", { class: "chip", onclick: function () { ask(t); }, text: t })); });
+    mount(backBtn(viewSat), title("🧑‍🏫 " + S("tutor"), S("tutorD")), h("div", { class: "card" }, input,
+      h("button", { class: "btn", style: "margin-top:8px", onclick: function () { ask(input.value); }, text: S("tutorAsk") }), chips), area);
   }
 
 
@@ -6715,6 +6904,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     if (r && ["home", "science", "english", "sat", "top", "pro"].indexOf(r) >= 0) tab = r;
     show();
     if (sub === "sat_mock") satStart({ mode: "mock" });
+    else if (sub === "sat_tutor") viewTutor();
     else if (sub === "sat_rw") satStart({ mode: "practice", section: "rw" });
     else if (sub === "sat_math") satStart({ mode: "practice", section: "math" });
   }).catch(function () { mount(h("div", { class: "center", text: S("err") })); });
@@ -7014,7 +7204,7 @@ _APP_ACTIVITY = {
     "api_app_teaser_new": "📱 App: brain teaser", "api_app_guess_start": "📱 App: taxmin o'yini",
     "api_app_story_start": "📱 App: hikoya", "api_app_writing_task": "📱 App: Writing",
     "api_app_writing_submit": "📱 App: Writing yubordi", "api_app_speaking_start": "📱 App: Speaking",
-    "api_app_invoice": "📱 App: to'lov oynasi", "api_app_sat_start": "📱 App: SAT", "api_app_sat_submit": "📱 App: SAT modulini topshirdi",
+    "api_app_invoice": "📱 App: to'lov oynasi", "api_app_sat_start": "📱 App: SAT", "api_app_sat_submit": "📱 App: SAT modulini topshirdi", "api_app_sat_tutor": "📱 App: SAT tutor",
 }
 
 
@@ -7879,6 +8069,175 @@ async def api_app_sat_submit(request: web.Request, uid: int, lang: str, user: di
     return web.json_response({"done": False, "module": _sat_public(new), "prev": {"stage": stage, "pct": round(mod["frac"] * 100)}})
 
 
+# ---- SAT Tutor: doskada tushuntiradigan AI o'qituvchi ---------------------------
+TUTOR_DAILY_LIMIT = 15
+_SVG_TAGS = {"svg", "g", "line", "circle", "ellipse", "rect", "path", "polygon", "polyline", "text", "tspan"}
+_SVG_ATTRS = {"x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "r", "rx", "ry", "width", "height", "d", "points", "fill", "stroke",
+              "stroke-width", "stroke-dasharray", "font-size", "text-anchor", "transform", "viewbox", "opacity", "font-weight",
+              "stroke-linecap", "stroke-linejoin", "dominant-baseline", "fill-opacity", "stroke-opacity", "dx", "dy"}
+
+
+def _sanitize_svg(raw: str) -> str | None:
+    """LLM yozgan SVG'dan faqat xavfsiz teg va atributlarni qoldiradi (script, havola, hodisa — yo'q)."""
+    import xml.etree.ElementTree as ET
+    if not isinstance(raw, str) or len(raw) > 7000 or "<" not in raw:
+        return None
+    raw = raw.strip()
+    if "<!" in raw or "<?" in raw or "javascript" in raw.lower():
+        return None
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError:
+        return None
+    count = [0]
+
+    def local(tag: str) -> str:
+        return tag.rsplit("}", 1)[-1].lower()
+
+    def clean(el):
+        count[0] += 1
+        if count[0] > 160 or local(el.tag) not in _SVG_TAGS:
+            return None
+        parts = []
+        for k, v in el.attrib.items():
+            k = k.rsplit("}", 1)[-1].lower()
+            v = str(v)
+            if k not in _SVG_ATTRS or len(v) > 600 or "url(" in v.lower() or "javascript" in v.lower() or "<" in v:
+                continue
+            parts.append(f'{"viewBox" if k == "viewbox" else k}="{html.escape(v, quote=True)}"')
+        inner = ""
+        if el.text and local(el.tag) in ("text", "tspan"):
+            inner += html.escape(el.text.strip()[:60])
+        for ch in el:
+            c = clean(ch)
+            if c:
+                inner += c
+            if ch.tail and local(el.tag) in ("text", "tspan"):
+                inner += html.escape(ch.tail.strip()[:60])
+        name = local(el.tag)
+        return f"<{name}{(' ' + ' '.join(parts)) if parts else ''}>{inner}</{name}>"
+
+    if local(root.tag) != "svg":
+        return None
+    out = clean(root)
+    if not out:
+        return None
+    if "viewBox" not in out.split(">", 1)[0]:
+        out = out.replace("<svg", '<svg viewBox="0 0 400 260"', 1)
+    return out.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"', 1)
+
+
+_EXPR_OK = __import__("re").compile(r"^[0-9a-zA-Z_+\-*/^(). ]{1,70}$")
+
+
+def _clean_diagram(d) -> dict | None:
+    if not isinstance(d, dict):
+        return None
+    t = d.get("type")
+    if t == "svg":
+        svg = _sanitize_svg(d.get("svg"))
+        return {"type": "svg", "svg": svg, "caption": str(d.get("caption") or "")[:120]} if svg else None
+    if t == "plot":
+        fns = []
+        for f in (d.get("fns") or [])[:4]:
+            if isinstance(f, dict) and _EXPR_OK.match(str(f.get("expr") or "")):
+                fns.append({"expr": str(f["expr"]).strip(), "label": str(f.get("label") or "")[:30]})
+        pts = []
+        for p in (d.get("points") or [])[:8]:
+            try:
+                pts.append({"x": float(p["x"]), "y": float(p["y"]), "label": str(p.get("label") or "")[:20]})
+            except (KeyError, TypeError, ValueError):
+                pass
+        try:
+            xmin, xmax, ymin, ymax = (float(d[k]) for k in ("xmin", "xmax", "ymin", "ymax"))
+        except (KeyError, TypeError, ValueError):
+            xmin, xmax, ymin, ymax = -6.0, 6.0, -6.0, 6.0
+        if not (xmin < xmax and ymin < ymax) or max(abs(xmin), abs(xmax), abs(ymin), abs(ymax)) > 1000:
+            xmin, xmax, ymin, ymax = -6.0, 6.0, -6.0, 6.0
+        if not fns and not pts:
+            return None
+        return {"type": "plot", "fns": fns, "points": pts, "xmin": xmin, "xmax": xmax, "ymin": ymin, "ymax": ymax,
+                "caption": str(d.get("caption") or "")[:120]}
+    return None
+
+
+def _generate_tutor_lesson_sync(question: str, history: list) -> dict:
+    hist = "\n".join(f"- student asked: {h['q']} (you taught: {h['title']})" for h in history[-4:]) or "(none)"
+    data = _llm_json_sync(
+        "You are a warm, brilliant SAT tutor teaching at a WHITEBOARD. The student wrote:\n"
+        f"\"{question}\"\n\nEarlier in this session:\n{hist}\n\n"
+        "If the message is NOT about SAT prep, math, English grammar, reading or writing, reply ONLY with "
+        '{"off_topic": true, "reply": "one friendly sentence in UZBEK inviting an SAT question"}.\n'
+        "Otherwise teach it like a real teacher: simple language, a concrete worked example, common traps, and a quick SAT tip. "
+        "Write all explanations in UZBEK (Latin script); English terms, SAT vocabulary and example sentences stay in English. "
+        "Put ALL math in LaTeX between single dollar signs, e.g. $y=mx+b$, $\\\\frac{a}{b}$ (double every backslash inside JSON). "
+        "Reply ONLY as JSON:\n"
+        '{"title": "short title", "steps": [ 4 to 6 items: {"heading": "short", "text": "2-4 short sentences", '
+        '"board": ["1-3 short lines written on the board, e.g. key formula or example (LaTeX allowed)"], '
+        '"diagram": null OR a picture } ], "summary": "2 sentences", '
+        '"practice": {"question": "...", "options": ["...","...","...","..."], "correct_index": 0, "explanation": "..."}}\n'
+        "DIAGRAM kinds (use a diagram in at least 2 steps when the topic is visual — functions, graphs, geometry, data, angles, circles):\n"
+        '1) function graph: {"type":"plot","fns":[{"expr":"2*x+1","label":"y=2x+1"}],"xmin":-5,"xmax":5,"ymin":-5,"ymax":8,'
+        '"points":[{"x":0,"y":1,"label":"(0,1)"}],"caption":"..."} — expr uses x, + - * / ^ ( ), sqrt abs sin cos tan ln exp pi, always explicit * .\n'
+        '2) drawing: {"type":"svg","svg":"<svg viewBox=\\"0 0 400 260\\">...</svg>","caption":"..."} — only line, circle, ellipse, rect, path, polygon, polyline, text, g; '
+        "the board is dark, so use LIGHT colors (#f5f5f5, #ffd166, #7bdff2, #b2f7a3, #ff9aa2), stroke-width 2-3, text font-size 14-16, plain-text labels (no LaTeX), "
+        "shapes must be geometrically accurate (e.g. right angle really 90°, labels not overlapping).\n"
+        "Make sure every number and computation is correct. practice must have exactly one correct option.",
+        temperature=0.5)
+    if data.get("off_topic"):
+        return {"off_topic": True, "reply": str(data.get("reply") or "")[:300]}
+    steps = []
+    for st in data.get("steps") or []:
+        if not isinstance(st, dict) or not str(st.get("text") or "").strip():
+            continue
+        st = _sat_fix_tex_obj(st)
+        board = [str(b).strip()[:140] for b in (st.get("board") or []) if str(b).strip()][:3]
+        steps.append({"heading": str(st.get("heading") or "").strip()[:80], "text": str(st["text"]).strip()[:700],
+                      "board": board, "diagram": _clean_diagram(st.get("diagram"))})
+    if len(steps) < 2:
+        raise ValueError("Tutor darsi to'liq emas")
+    practice = None
+    pr = _sat_fix_tex_obj(data.get("practice") or {})
+    try:
+        opts = [str(o).strip() for o in pr["options"]][:4]
+        ci = int(pr["correct_index"])
+        if len(opts) == 4 and len(set(opts)) == 4 and 0 <= ci < 4 and str(pr.get("question") or "").strip():
+            practice = {"question": str(pr["question"]).strip(), "options": opts, "correct_index": ci,
+                        "explanation": str(pr.get("explanation") or "").strip()}
+    except (KeyError, TypeError, ValueError):
+        pass
+    return {"off_topic": False, "title": str(data.get("title") or question)[:100], "steps": steps[:7],
+            "summary": str(data.get("summary") or "").strip()[:500], "practice": practice}
+
+
+@app_api
+async def api_app_sat_tutor(request: web.Request, uid: int, lang: str, user: dict):
+    b = await _body(request)
+    msg = str(b.get("message") or "").strip()[:600]
+    if len(msg) < 2:
+        return _err("empty")
+    if not _is_admin(uid) and not await _pro_use(uid, "tutor", limit=TUTOR_DAILY_LIMIT):
+        return _err("limit", 429, limit=TUTOR_DAILY_LIMIT)
+    s = _app_session(b.get("sid"), uid, ("tutor",))
+    if not s:
+        sid, s = _app_new_session(uid, "tutor", history=[])
+    else:
+        sid = b["sid"]
+    lesson = None
+    for _ in range(2):
+        try:
+            lesson = await asyncio.to_thread(_generate_tutor_lesson_sync, msg, s["history"])
+            break
+        except Exception as e:
+            logger.warning("Tutor darsi generatsiyasi: %s", e)
+    if not lesson:
+        return _err("generation_failed", 502)
+    if not lesson.get("off_topic"):
+        s["history"].append({"q": msg[:200], "title": lesson["title"]})
+        s["history"] = s["history"][-6:]
+    return web.json_response({"sid": sid, **lesson})
+
+
 @app_api
 async def api_app_leaderboard(request: web.Request, uid: int, lang: str, user: dict):
     boards = []
@@ -7958,6 +8317,7 @@ def create_app() -> web.Application:
     app.router.add_post("/api/app/speaking/answer", api_app_speaking_answer)
     app.router.add_post("/api/app/sat/start", api_app_sat_start)
     app.router.add_post("/api/app/sat/submit", api_app_sat_submit)
+    app.router.add_post("/api/app/sat/tutor", api_app_sat_tutor)
     app.router.add_get("/api/app/leaderboard", api_app_leaderboard)
     app.router.add_get("/api/dashboard/content/{type}", api_dashboard_content_list)
     app.router.add_get("/api/dashboard/content/{type}/{id}", api_dashboard_content_detail)
