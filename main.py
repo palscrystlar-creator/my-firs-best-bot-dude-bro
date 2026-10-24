@@ -558,6 +558,15 @@ I18N = {
     "main_menu": {"uz": "📋 <b>Asosiy menyu</b> 👇", "ru": "📋 <b>Главное меню</b> 👇", "en": "📋 <b>Main menu</b> 👇"},
     "btn_sci": {"uz": "🔬 Ilm yo'nalishi", "ru": "🔬 Наука и игры", "en": "🔬 Science & games"},
     "btn_eng": {"uz": "🇬🇧 Ingliz tili", "ru": "🇬🇧 Английский язык", "en": "🇬🇧 English learning"},
+    "btn_sat": {"uz": "🎓 SAT", "ru": "🎓 SAT", "en": "🎓 SAT"},
+    "sat_title": {
+        "uz": "🎓 <b>SAT — xalqaro imtihon</b>\n\nDigital SAT formatida mashq qiling: <b>Reading & Writing</b> va <b>Math</b>. Formulalar bilan, taymer va xatolar tahlili bilan. Test ilovada ochiladi 👇\n\n🏁 <b>To'liq mock</b> — 4 modul, 2-modul qiyinligi natijangizga qarab tanlanadi, oxirida taxminiy ball (400–1600).\n📖➗ <b>Mavzu bo'yicha mashq</b> — 10 savol, tushuntirishlar bilan.\n\nℹ️ Savollarni AI yozadi, ball rasmiy emas — taxminiy.",
+        "ru": "🎓 <b>SAT — международный экзамен</b>\n\nТренируйтесь в формате Digital SAT: <b>Reading & Writing</b> и <b>Math</b>. С формулами, таймером и разбором ошибок. Тест открывается в приложении 👇\n\n🏁 <b>Полный мок</b> — 4 модуля, сложность 2-го модуля зависит от результата, в конце ориентировочный балл (400–1600).\n📖➗ <b>Практика по темам</b> — 10 вопросов с объяснениями.\n\nℹ️ Вопросы пишет ИИ, балл неофициальный — ориентировочный.",
+        "en": "🎓 <b>SAT — the international exam</b>\n\nPractise in the Digital SAT format: <b>Reading & Writing</b> and <b>Math</b>, with formulas, a timer and mistake review. The test opens in the app 👇\n\n🏁 <b>Full mock</b> — 4 modules, module 2 difficulty adapts to your result, estimated score (400–1600) at the end.\n📖➗ <b>Topic practice</b> — 10 questions with explanations.\n\nℹ️ Questions are AI-written and the score is an estimate, not official.",
+    },
+    "sat_b_mock": {"uz": "🏁 To'liq mock (adaptiv)", "ru": "🏁 Полный мок (адаптивный)", "en": "🏁 Full mock (adaptive)"},
+    "sat_b_rw": {"uz": "📖 Reading & Writing mashq", "ru": "📖 Практика Reading & Writing", "en": "📖 Reading & Writing practice"},
+    "sat_b_math": {"uz": "➗ Math mashq", "ru": "➗ Практика Math", "en": "➗ Math practice"},
     "btn_all": {"uz": "ℹ️ Barcha buyruqlar", "ru": "ℹ️ Все команды", "en": "ℹ️ All commands"},
     "btn_lang": {"uz": "🌐 Til", "ru": "🌐 Язык", "en": "🌐 Language"},
     "btn_back": {"uz": "⬅️ Orqaga", "ru": "⬅️ Назад", "en": "⬅️ Back"},
@@ -1879,10 +1888,25 @@ def _main_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [_app_button()],
         [InlineKeyboardButton(text=tr("btn_sci"), callback_data="mn:sci")],
-        [InlineKeyboardButton(text=tr("btn_eng"), callback_data="mn:eng")],
+        [InlineKeyboardButton(text=tr("btn_eng"), callback_data="mn:eng"),
+         InlineKeyboardButton(text=tr("btn_sat"), callback_data="mn:sat")],
         [InlineKeyboardButton(text=tr("btn_all"), callback_data="mn:all"),
          InlineKeyboardButton(text=tr("btn_lang"), callback_data="mn:lang")],
     ])
+
+
+def _sat_keyboard() -> InlineKeyboardMarkup:
+    def wb(key, route):
+        return [InlineKeyboardButton(text=tr(key), web_app=WebAppInfo(url=_app_url(route)))]
+    return InlineKeyboardMarkup(inline_keyboard=[
+        wb("sat_b_mock", "sat_mock"), wb("sat_b_rw", "sat_rw"), wb("sat_b_math", "sat_math"),
+        [InlineKeyboardButton(text=tr("btn_back"), callback_data="mn:home")],
+    ])
+
+
+@dp.message(Command("sat"))
+async def cmd_sat(message: Message, state: FSMContext):
+    await message.answer(tr("sat_title"), reply_markup=_sat_keyboard())
 
 
 def _submenu_keyboard(items: list) -> InlineKeyboardMarkup:
@@ -1922,7 +1946,7 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject)
     payload = (command.args or "").strip()
     if payload.startswith("run_"):
         cmd = payload[4:]
-        if cmd in {c for _e, c in MENU_SCIENCE + MENU_ENGLISH}:
+        if cmd in {c for _e, c in MENU_SCIENCE + MENU_ENGLISH} | {"sat"}:
             fake = message.model_copy(update={"text": f"/{cmd}", "entities": None})
             await dp.feed_update(bot, Update(update_id=0, message=fake))
             return
@@ -1993,6 +2017,9 @@ async def handle_menu(callback: CallbackQuery):
     elif action == "eng":
         await callback.answer()
         await show(tr("eng_title"), _submenu_keyboard(MENU_ENGLISH))
+    elif action == "sat":
+        await callback.answer()
+        await show(tr("sat_title"), _sat_keyboard())
     elif action == "lang":
         await callback.answer()
         await show(tr("pick"), _lang_keyboard())
@@ -5529,7 +5556,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium funksiya", payD: "PRO bilan hammasi tekin yoki bir martalik to'lang.", payOnce: "Faqat shu safar", limitT: "PRO limiti tugadi", limitD: "Bugungi limit ({n} ta) tugadi. Ertaga yana tekin yoki bir martalik to'lang.",
       upT: "🎉 Zo'r o'ynadingiz!", upD: "PRO bilan Writing, Speaking, SAT, Grammar, Reading, Listening, sertifikat testi va hikoyalar ham ochiladi. {p} ⭐ / {d} kun.", upBtn: "⭐ PRO ga o'tish", upLater: "Keyinroq",
       proActive: "PRO faol", until: "Tugash sanasi", daysLeft: "kun qoldi", extend: "Muddatni uzaytirish", buy: "PRO olish", offerT: "PRO obuna", days: "kun",
-      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
+      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modul) + Math (2 modul). 2-modul qiyinligi 1-modul natijasiga bog'liq. Formulalar uchun 📐, taymerni yashirish uchun ⏱. Ball — taxminiy, savollarni AI yozadi.", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
       owner: "Siz bot egasisiz — hammasi doim tekin.", paidOk: "To'lov qabul qilindi! ⭐", cancelled: "To'lov bekor qilindi.", checking: "Tekshirilmoqda…", asSeparate: "Alohida: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Hozircha kontent yo'q.", questions: "ta savol", readOnly: "O'qish / tinglash", noRank: "Hozircha natijalar yo'q", boardQuiz: "Viktorina", boardCert: "Sertifikat", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (xalqaro)",
@@ -5606,7 +5633,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Премиум-функция", payD: "С PRO всё бесплатно, либо оплатите разово.", payOnce: "Только в этот раз", limitT: "Лимит PRO исчерпан", limitD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно, либо оплатите разово.",
       upT: "🎉 Отлично сыграли!", upD: "С PRO откроются Writing, Speaking, SAT, Grammar, Reading, Listening, тест с сертификатом и истории. {p} ⭐ / {d} дней.", upBtn: "⭐ Перейти на PRO", upLater: "Позже",
       proActive: "PRO активна", until: "Действует до", daysLeft: "дн. осталось", extend: "Продлить", buy: "Получить PRO", offerT: "PRO-подписка", days: "дней",
-      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
+      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 модуля) + Math (2 модуля). Сложность 2-го модуля зависит от результата 1-го. 📐 — формулы, ⏱ — скрыть таймер. Балл ориентировочный, вопросы пишет ИИ.", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
       owner: "Вы владелец бота — для вас всё бесплатно.", paidOk: "Оплата получена! ⭐", cancelled: "Оплата отменена.", checking: "Проверяем…", asSeparate: "По отдельности: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Пока нет материалов.", questions: "вопросов", readOnly: "Для чтения / прослушивания", noRank: "Пока нет результатов", boardQuiz: "Викторина", boardCert: "Сертификат", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (международный)",
@@ -5683,7 +5710,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium feature", payD: "Included with PRO, or pay once for just this.", payOnce: "Just this once", limitT: "PRO limit reached", limitD: "Today's limit ({n}) is used up. Free again tomorrow, or pay for a single use.",
       upT: "🎉 Nice game!", upD: "PRO also unlocks Writing, Speaking, SAT, Grammar, Reading, Listening, the certificate test and stories. {p} ⭐ / {d} days.", upBtn: "⭐ Go PRO", upLater: "Later",
       proActive: "PRO is active", until: "Valid until", daysLeft: "days left", extend: "Extend", buy: "Get PRO", offerT: "PRO subscription", days: "days",
-      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
+      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modules) + Math (2 modules). Module 2 difficulty depends on module 1. 📐 for formulas, ⏱ to hide the timer. The score is an estimate; questions are AI-written.", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
       owner: "You're the bot owner — everything is always free for you.", paidOk: "Payment received! ⭐", cancelled: "Payment cancelled.", checking: "Checking…", asSeparate: "Bought separately: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "No content yet.", questions: "questions", readOnly: "For reading / listening", noRank: "No results yet", boardQuiz: "Quiz", boardCert: "Certificate", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (international)",
@@ -5877,16 +5904,16 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   // ---- navigatsiya ----
   function renderNav() {
     clear(nav);
-    [["home", "🏠"], ["science", "🔬"], ["english", "🇬🇧"], ["top", "🏆"], ["pro", "⭐"]].filter(function (x) { return x[0] !== "pro" || (me && me.pro_enabled); }).forEach(function (x) {
+    [["home", "🏠"], ["science", "🔬"], ["english", "🇬🇧"], ["sat", "🎓"], ["top", "🏆"], ["pro", "⭐"]].filter(function (x) { return x[0] !== "pro" || (me && me.pro_enabled); }).forEach(function (x) {
       nav.appendChild(h("button", { class: tab === x[0] ? "on" : "", onclick: function () { tab = x[0]; show(); } },
-        h("span", { class: "i", text: x[1] }), h("span", { text: S(x[0]) })));
+        h("span", { class: "i", text: x[1] }), h("span", { text: S(x[0] === "sat" ? "satTab" : x[0]) })));
     });
   }
   function show() {
     if (me && !me.pro_enabled && tab === "pro") tab = "home";
     renderNav();
     if (!me) return;
-    ({ home: viewHome, science: viewScience, english: viewEnglish, top: viewTop, pro: viewPro })[tab]();
+    ({ home: viewHome, science: viewScience, english: viewEnglish, sat: viewSat, top: viewTop, pro: viewPro })[tab]();
   }
   function backBtn(fn) { return h("button", { class: "back", onclick: fn || show, text: S("back") }); }
   function title(txt, sub) {
@@ -5953,8 +5980,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         tile("📝", S("grammar"), S("grammarD"), function () { P ? grammarPicker() : paywall(); }, { lock: !P }),
         tile("📖", S("reading"), S("readingD"), function () { P ? startQuiz({ kind: "reading" }) : paywall(); }, { lock: !P }),
         tile("🎧", S("listening"), S("listeningD"), function () { P ? startQuiz({ kind: "listening" }) : paywall(); }, { lock: !P }),
-        tile("📚", S("library"), S("libraryD"), function () { P ? viewLibrary("reading") : paywall(); }, { lock: !P }),
-        tile("🎓", S("sat"), S("satD"), viewSat, { lock: !P })));
+        tile("📚", S("library"), S("libraryD"), function () { P ? viewLibrary("reading") : paywall(); }, { lock: !P })));
   }
 
   // ================= REYTING =================
@@ -6266,9 +6292,11 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     math: ["Algebra", "Advanced Math", "Problem-Solving and Data Analysis", "Geometry and Trigonometry"] };
 
   function viewSat() {
+    tab = "sat";
     var P = isPremium();
     function go(body) { if (!P) { paywall(); return; } satStart(body); }
-    var parts = [backBtn(viewEnglish), title("🎓 " + S("sat"), S("satD")), upgradeBar(),
+    var parts = [title("🎓 " + S("sat"), S("satD")), upgradeBar(),
+      h("div", { class: "card" }, h("p", { class: "small muted", text: S("satInfo") })),
       h("button", { class: "tile wide", style: "width:100%;margin-bottom:14px", onclick: function () { go({ mode: "mock" }); } },
         h("div", { class: "e", text: "🏁" }), h("div", { class: "n", text: S("satMock") }), h("div", { class: "d", text: S("satMockD") }),
         P ? null : h("div", { class: "lk", text: "🔒" }))];
@@ -6682,8 +6710,13 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   refreshMe().then(function () {
     if (T[me.lang]) lang = me.lang;
     var r = new URLSearchParams(window.location.search).get("r");
-    if (r && ["home", "science", "english", "top", "pro"].indexOf(r) >= 0) tab = r;
+    var sub = null;
+    if (r && r.indexOf("sat_") === 0) { sub = r; r = "sat"; }
+    if (r && ["home", "science", "english", "sat", "top", "pro"].indexOf(r) >= 0) tab = r;
     show();
+    if (sub === "sat_mock") satStart({ mode: "mock" });
+    else if (sub === "sat_rw") satStart({ mode: "practice", section: "rw" });
+    else if (sub === "sat_math") satStart({ mode: "practice", section: "math" });
   }).catch(function () { mount(h("div", { class: "center", text: S("err") })); });
 
 })();
@@ -7963,7 +7996,8 @@ async def setup_bot_commands():
         BotCommand(command="daily", description="Today's science, fact and English tip"),
         BotCommand(command="writing", description="IELTS Writing review"),
         BotCommand(command="speaking", description="IELTS Speaking full mock"),
-                BotCommand(command="grammar", description="English grammar: lessons and practice"),
+                BotCommand(command="sat", description="SAT: adaptive mock and practice"),
+        BotCommand(command="grammar", description="English grammar: lessons and practice"),
         BotCommand(command="english", description="Chat in English (corrects your mistakes)"),
         BotCommand(command="certificate", description="25-question certificate test"),
         BotCommand(command="leaderboard", description="TOP 10 leaderboards"),
