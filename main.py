@@ -5497,6 +5497,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   .tboard .board-title { font-size: 18px; margin-bottom: 6px; padding-bottom: 4px; }
   .tboard .board-pic svg { max-height: 190px; }
   .board-in { min-height: 120px; }
+  .chatboard { min-height: 150px; }
+  .chatboard .board-in { min-height: 40px; }
   .board-start { position: absolute; left: 50%; top: 52%; transform: translate(-50%,-50%); width: auto; padding: 14px 26px; font-size: 17px; box-shadow: 0 4px 16px rgba(0,0,0,.4); animation: pulse 1.4s ease-in-out infinite; }
   .stage { display: flex; align-items: flex-end; gap: 6px; margin-top: -78px; position: relative; z-index: 3; pointer-events: none; min-height: 150px; }
   .bubble { flex: 1; background: rgba(15,20,30,.88); color: #fff; border-radius: 14px 14px 14px 4px; padding: 9px 12px; font-size: 14px; line-height: 1.45; align-self: center; margin-top: 70px; min-height: 40px; display: none; }
@@ -5595,7 +5597,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium funksiya", payD: "PRO bilan hammasi tekin yoki bir martalik to'lang.", payOnce: "Faqat shu safar", limitT: "PRO limiti tugadi", limitD: "Bugungi limit ({n} ta) tugadi. Ertaga yana tekin yoki bir martalik to'lang.",
       upT: "🎉 Zo'r o'ynadingiz!", upD: "PRO bilan Writing, Speaking, SAT, Grammar, Reading, Listening, sertifikat testi va hikoyalar ham ochiladi. {p} ⭐ / {d} kun.", upBtn: "⭐ PRO ga o'tish", upLater: "Keyinroq",
       proActive: "PRO faol", until: "Tugash sanasi", daysLeft: "kun qoldi", extend: "Muddatni uzaytirish", buy: "PRO olish", offerT: "PRO obuna", days: "kun",
-      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modul) + Math (2 modul). 2-modul qiyinligi 1-modul natijasiga bog'liq. Formulalar uchun 📐, taymerni yashirish uchun ⏱. Ball — taxminiy, savollarni AI yozadi.", tutor: "SAT Tutor", tutorD: "Savol yozing — o'qituvchi doskada rasm va formulalar bilan tushuntiradi", tutorPlace: "Masalan: funksiya nima? Yoki: comma qoidalarini tushuntir", tutorAsk: "🧑‍🏫 Tushuntir", tutorBoard: "Doska tayyorlanmoqda…", tutorNext: "Davom ➜", tutorAll: "Hammasi", tutorSimpler: "🔁 Soddaroq tushuntir", tutorExample: "➕ Yana misol", tutorPractice: "Mustahkamlash", tutorOff: "Men SAT, matematika va ingliz tili bo'yicha yordam beraman. SAT savolingizni yozing 🙂", tutorStart: "Darsni boshlash", tutorNotes: "Konspekt", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
+      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modul) + Math (2 modul). 2-modul qiyinligi 1-modul natijasiga bog'liq. Formulalar uchun 📐, taymerni yashirish uchun ⏱. Ball — taxminiy, savollarni AI yozadi.", tutor: "SAT Tutor", tutorD: "Savol yozing yoki shunchaki gaplashing — o'qituvchi doskada tushuntiradi va javob beradi", tutorPlace: "Masalan: salom, qalaysan? Yoki: funksiya nima?", tutorAsk: "🧑‍🏫 Tushuntir", tutorBoard: "Doska tayyorlanmoqda…", tutorNext: "Davom ➜", tutorAll: "Hammasi", tutorSimpler: "🔁 Soddaroq tushuntir", tutorExample: "➕ Yana misol", tutorPractice: "Mustahkamlash", tutorOff: "Men SAT, matematika va ingliz tili bo'yicha yordam beraman. SAT savolingizni yozing 🙂", tutorStart: "Darsni boshlash", tutorNotes: "Konspekt", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
       owner: "Siz bot egasisiz — hammasi doim tekin.", paidOk: "To'lov qabul qilindi! ⭐", cancelled: "To'lov bekor qilindi.", checking: "Tekshirilmoqda…", asSeparate: "Alohida: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Hozircha kontent yo'q.", questions: "ta savol", readOnly: "O'qish / tinglash", noRank: "Hozircha natijalar yo'q", boardQuiz: "Viktorina", boardCert: "Sertifikat", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (xalqaro)",
@@ -5672,7 +5674,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Премиум-функция", payD: "С PRO всё бесплатно, либо оплатите разово.", payOnce: "Только в этот раз", limitT: "Лимит PRO исчерпан", limitD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно, либо оплатите разово.",
       upT: "🎉 Отлично сыграли!", upD: "С PRO откроются Writing, Speaking, SAT, Grammar, Reading, Listening, тест с сертификатом и истории. {p} ⭐ / {d} дней.", upBtn: "⭐ Перейти на PRO", upLater: "Позже",
       proActive: "PRO активна", until: "Действует до", daysLeft: "дн. осталось", extend: "Продлить", buy: "Получить PRO", offerT: "PRO-подписка", days: "дней",
-      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 модуля) + Math (2 модуля). Сложность 2-го модуля зависит от результата 1-го. 📐 — формулы, ⏱ — скрыть таймер. Балл ориентировочный, вопросы пишет ИИ.", tutor: "SAT Tutor", tutorD: "Напишите вопрос — преподаватель объяснит на доске с рисунками и формулами", tutorPlace: "Например: что такое функция? Или: объясни правила запятых", tutorAsk: "🧑‍🏫 Объясни", tutorBoard: "Готовлю доску…", tutorNext: "Дальше ➜", tutorAll: "Всё сразу", tutorSimpler: "🔁 Объясни проще", tutorExample: "➕ Ещё пример", tutorPractice: "Закрепление", tutorOff: "Я помогаю с SAT, математикой и английским. Напишите вопрос по SAT 🙂", tutorStart: "Начать урок", tutorNotes: "Конспект", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
+      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 модуля) + Math (2 модуля). Сложность 2-го модуля зависит от результата 1-го. 📐 — формулы, ⏱ — скрыть таймер. Балл ориентировочный, вопросы пишет ИИ.", tutor: "SAT Tutor", tutorD: "Напишите вопрос или просто поболтайте — преподаватель объяснит на доске и ответит", tutorPlace: "Например: привет, как дела? Или: что такое функция?", tutorAsk: "🧑‍🏫 Объясни", tutorBoard: "Готовлю доску…", tutorNext: "Дальше ➜", tutorAll: "Всё сразу", tutorSimpler: "🔁 Объясни проще", tutorExample: "➕ Ещё пример", tutorPractice: "Закрепление", tutorOff: "Я помогаю с SAT, математикой и английским. Напишите вопрос по SAT 🙂", tutorStart: "Начать урок", tutorNotes: "Конспект", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
       owner: "Вы владелец бота — для вас всё бесплатно.", paidOk: "Оплата получена! ⭐", cancelled: "Оплата отменена.", checking: "Проверяем…", asSeparate: "По отдельности: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Пока нет материалов.", questions: "вопросов", readOnly: "Для чтения / прослушивания", noRank: "Пока нет результатов", boardQuiz: "Викторина", boardCert: "Сертификат", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (международный)",
@@ -5749,7 +5751,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium feature", payD: "Included with PRO, or pay once for just this.", payOnce: "Just this once", limitT: "PRO limit reached", limitD: "Today's limit ({n}) is used up. Free again tomorrow, or pay for a single use.",
       upT: "🎉 Nice game!", upD: "PRO also unlocks Writing, Speaking, SAT, Grammar, Reading, Listening, the certificate test and stories. {p} ⭐ / {d} days.", upBtn: "⭐ Go PRO", upLater: "Later",
       proActive: "PRO is active", until: "Valid until", daysLeft: "days left", extend: "Extend", buy: "Get PRO", offerT: "PRO subscription", days: "days",
-      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modules) + Math (2 modules). Module 2 difficulty depends on module 1. 📐 for formulas, ⏱ to hide the timer. The score is an estimate; questions are AI-written.", tutor: "SAT Tutor", tutorD: "Type a question — the teacher explains on a whiteboard with pictures and formulas", tutorPlace: "E.g. what is a function? Or: explain comma rules", tutorAsk: "🧑‍🏫 Explain", tutorBoard: "Preparing the board…", tutorNext: "Next ➜", tutorAll: "Show all", tutorSimpler: "🔁 Simpler please", tutorExample: "➕ One more example", tutorPractice: "Quick practice", tutorOff: "I help with SAT, math and English. Ask me an SAT question 🙂", tutorStart: "Start the lesson", tutorNotes: "Notes", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
+      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modules) + Math (2 modules). Module 2 difficulty depends on module 1. 📐 for formulas, ⏱ to hide the timer. The score is an estimate; questions are AI-written.", tutor: "SAT Tutor", tutorD: "Ask a question or just chat — the teacher explains on the whiteboard and talks back", tutorPlace: "E.g. hi, how are you? Or: what is a function?", tutorAsk: "🧑‍🏫 Explain", tutorBoard: "Preparing the board…", tutorNext: "Next ➜", tutorAll: "Show all", tutorSimpler: "🔁 Simpler please", tutorExample: "➕ One more example", tutorPractice: "Quick practice", tutorOff: "I help with SAT, math and English. Ask me an SAT question 🙂", tutorStart: "Start the lesson", tutorNotes: "Notes", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
       owner: "You're the bot owner — everything is always free for you.", paidOk: "Payment received! ⭐", cancelled: "Payment cancelled.", checking: "Checking…", asSeparate: "Bought separately: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "No content yet.", questions: "questions", readOnly: "For reading / listening", noRank: "No results yet", boardQuiz: "Quiz", boardCert: "Certificate", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (international)",
@@ -6650,8 +6652,10 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     else it.el.style.opacity = p;
   }
 
+  var SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
+
   function viewTutor() {
-    var sid = null, area = h("div", {}), input, busy = false, player = null, askCard = null;
+    var sid = null, area = h("div", {}), input, busy = false, player = null, askCard = null, tutorAudio = null, unlocked = Promise.resolve(false);
     function stopPlayer() { if (player) { player.stop(); player = null; } }
     cleanupFn = null;
 
@@ -6659,39 +6663,47 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       msg = (msg || "").trim();
       if (msg.length < 2 || busy) return;
       busy = true; stopPlayer(); clear(area); askCard.style.display = "";
+      // Foydalanuvchi tugmani bosgan paytda audio'ni "ochib" qo'yamiz — keyin dars o'zi ovoz bilan boshlanadi
+      if (!tutorAudio) tutorAudio = new Audio();
+      try {
+        tutorAudio.src = SILENT_WAV; tutorAudio.muted = false;
+        var up = tutorAudio.play();
+        unlocked = up && up.then ? up.then(function () { return true; }).catch(function () { return false; }) : Promise.resolve(false);
+      } catch (e) { unlocked = Promise.resolve(false); }
       var wait = h("div", { class: "card" }, h("div", { class: "teacher-mini", html: "" }), spinner(S("tutorBoard")));
       wait.firstChild.innerHTML = TEACHER_SVG; wait.firstChild.classList.add("t-talk");
       area.appendChild(wait);
       post("/api/app/sat/tutor", { sid: sid, message: msg }).then(function (r) {
         busy = false; clear(area); sid = r.sid;
-        if (r.off_topic) { area.appendChild(h("div", { class: "card", text: "🧑‍🏫 " + (r.reply || S("tutorOff")) })); return; }
         input.value = "";
-        scene(r, msg);
+        var rr = r;
+        if (r.mode === "chat") rr = { n: r.n, title: "", steps: [{ heading: "", text: r.say, say: r.say, board: r.board ? [r.board] : [], diagram: null }], summary: "", practice: null, chat: true };
+        unlocked.then(function (ok) { scene(rr, msg, ok); });
       }).catch(function (e) {
         busy = false; clear(area);
         if (e.status === 502) toast(S("satGenFail")); else fail(e);
       });
     }
 
-    function scene(r, q) {
+    function scene(r, q, canAuto) {
       var N = r.steps.length;
       var boardIn = h("div", { class: "board-in" });
-      var board = h("div", { class: "board tboard" }, h("div", { class: "board-q", text: "❓ " + q }),
-        mj(h("div", { class: "board-title", text: r.title })), boardIn);
+      var board = h("div", { class: "board tboard" + (r.chat ? " chatboard" : "") }, r.chat ? null : h("div", { class: "board-q", text: "❓ " + q }),
+        r.chat ? null : mj(h("div", { class: "board-title", text: r.title })), boardIn);
       var teacher = h("div", { class: "teacher" }); teacher.innerHTML = TEACHER_SVG;
       var bubble = h("div", { class: "bubble", text: "" });
       var stage = h("div", { class: "stage" }, bubble, teacher);
       var startBtn = h("button", { class: "btn gold board-start", text: "▶ " + S("tutorStart") });
-      board.appendChild(startBtn);
+      if (!canAuto) board.appendChild(startBtn);
       var ctl = h("div", { class: "row", style: "margin:10px 0" });
       var after = h("div", {});
-      askCard.style.display = "none";
+      if (!r.chat) askCard.style.display = "none";
       var room = h("div", { class: "classroom" }, board, stage);
       area.appendChild(room); area.appendChild(ctl); area.appendChild(after);
       setTimeout(function () { try { room.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 60);
       var tsvg = teacher.firstChild;
 
-      var audio = new Audio(), st = { i: -1, playing: false, muted: false, t: 0, dur: 0, items: [], raf: 0, last: 0, usingAudio: false, say: [], active: -1, dead: false, ended: false, gen: 0 };
+      var audio = tutorAudio || (tutorAudio = new Audio()), st = { i: -1, playing: false, muted: false, t: 0, dur: 0, items: [], raf: 0, last: 0, usingAudio: false, say: [], active: -1, dead: false, ended: false, gen: 0 };
       function setMode(m) { tsvg.classList.toggle("t-talk", m === "talk"); tsvg.classList.toggle("t-write", m === "write"); }
 
       function sentences(txt) { return (txt.match(/[^.!?…]+[.!?…]*/g) || [txt]).map(function (x) { return x.trim(); }).filter(Boolean); }
@@ -6700,7 +6712,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         var s0 = r.steps[i];
         clear(boardIn);
         var items = [], total = 0, parts = [];
-        var hd = mj(h("div", { class: "board-h", text: (i + 1) + ". " + s0.heading })); parts.push({ el: hd, w: 1.2, kind: "wipe" });
+        if (s0.heading) parts.push({ el: mj(h("div", { class: "board-h", text: (i + 1) + ". " + s0.heading })), w: 1.2, kind: "wipe" });
         s0.board.forEach(function (b) { parts.push({ el: mj(h("div", { class: "chalk", text: b })), w: 1.4, kind: "wipe" }); });
         var dg = s0.diagram ? diagramEl(s0.diagram) : null;
         parts.forEach(function (p) { boardIn.appendChild(p.el); chalkWipe(p.el); });
@@ -6742,6 +6754,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         st.gen++; var gen = st.gen;
         st.i = i; st.t = 0; st.active = -1; st.ended = false; st.usingAudio = false; st.dur = 0;
         var step = buildStep(i); st.step = step;
+        if (!step.parts.length) { step.parts.push({ el: h("div", {}), w: 1, kind: "wipe" }); step.total = 1; }
         st.say[i] = st.say[i] || sentences(r.steps[i].say || r.steps[i].text);
         var fallbackDur = Math.max(4, (r.steps[i].say || "").length / 13);
         layout(step, fallbackDur * 0.85);
@@ -6793,12 +6806,13 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       var bMute = h("button", { class: "btn ghost", onclick: function () { st.muted = !st.muted; audio.muted = st.muted; updateCtl(); } });
       var bAgain = h("button", { class: "btn ghost", text: "🔁", onclick: function () { clear(after); try { audio.pause(); } catch (e) {} playStep(0); } });
       var bNew = h("button", { class: "btn ghost", text: "✏️", onclick: function () { stopPlayer(); clear(area); askCard.style.display = ""; window.scrollTo(0, 0); } });
-      ctl.appendChild(bPause); ctl.appendChild(bNext); ctl.appendChild(bMute); ctl.appendChild(bAgain); ctl.appendChild(bNew);
+      ctl.appendChild(bPause); if (!r.chat) ctl.appendChild(bNext); ctl.appendChild(bMute); ctl.appendChild(bAgain); if (!r.chat) ctl.appendChild(bNew);
       function updateCtl() { bPause.textContent = st.playing ? "⏸" : "▶"; bMute.textContent = st.muted ? "🔇" : "🔊"; }
       updateCtl();
 
       function finish() {
-        setMode("idle"); bubble.textContent = r.summary ? "" : bubble.textContent;
+        setMode("idle");
+        if (r.chat) { try { input.focus({ preventScroll: true }); } catch (e) {} return; } bubble.textContent = r.summary ? "" : bubble.textContent;
         clear(after);
         if (r.summary) after.appendChild(mj(h("div", { class: "board-sum", style: "background:var(--card);margin:0 0 12px", text: "✅ " + r.summary })));
         var notes = h("div", { class: "card" }, h("h3", { text: "📒 " + S("tutorNotes") }));
@@ -6813,10 +6827,11 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
           h("button", { class: "btn ghost", onclick: function () { ask("Give me one more worked example of this topic, a bit harder"); }, text: S("tutorExample") })));
       }
 
-      startBtn.addEventListener("click", function () { board.removeChild(startBtn); playStep(0, true); });
+      startBtn.addEventListener("click", function () { if (startBtn.parentNode) board.removeChild(startBtn); playStep(0, true); });
       player = { stop: function () { st.dead = true; cancelAnimationFrame(st.raf); try { audio.pause(); audio.removeAttribute("src"); audio.load(); } catch (e) {} } };
       cleanupFn = stopPlayer;
       setMode("idle");
+      if (canAuto) setTimeout(function () { if (!st.dead && st.i < 0) playStep(0, false); }, 250);
     }
 
     function practice(p) {
@@ -8354,9 +8369,13 @@ def _generate_tutor_lesson_sync(question: str, history: list) -> dict:
     data = _llm_json_sync(
         "You are a warm, brilliant SAT tutor teaching at a WHITEBOARD. The student wrote:\n"
         f"\"{question}\"\n\nEarlier in this session:\n{hist}\n\n"
-        "If the message is NOT about SAT prep, math, English grammar, reading or writing, reply ONLY with "
-        '{"off_topic": true, "reply": "one friendly sentence in UZBEK inviting an SAT question"}.\n'
-        "Otherwise teach it like a real teacher: simple language, a concrete worked example, common traps, and a quick SAT tip. "
+        "You are also a friendly, witty person to talk to. If the message is a greeting, small talk, a personal question, thanks, a joke, "
+        "or any general conversation that is NOT a study question, just TALK like a real teacher chatting face to face: reply ONLY with "
+        '{"mode": "chat", "say": "1-3 short, natural, warm sentences in UZBEK (answer what they said, e.g. greet back, say you are doing great, ask them a question back; '
+        'if it is a general knowledge question, answer it briefly and kindly; gently mention you can also explain any SAT topic on the board)", '
+        '"board": "OPTIONAL very short text to write on the board, e.g. Salom! (or empty string)"}.\n'
+        "If it is a study question (SAT, math, English grammar, reading, writing, or any subject to explain), TEACH it:\n"
+        "Teach it like a real teacher: simple language, a concrete worked example, common traps, and a quick SAT tip. "
         "Write all explanations in UZBEK (Latin script); English terms, SAT vocabulary and example sentences stay in English. "
         "Put ALL math in LaTeX between single dollar signs, e.g. $y=mx+b$, $\\\\frac{a}{b}$ (double every backslash inside JSON). "
         "Reply ONLY as JSON:\n"
@@ -8373,8 +8392,11 @@ def _generate_tutor_lesson_sync(question: str, history: list) -> dict:
         "shapes must be geometrically accurate (e.g. right angle really 90°, labels not overlapping).\n"
         "Make sure every number and computation is correct. practice must have exactly one correct option.",
         temperature=0.5)
-    if data.get("off_topic"):
-        return {"off_topic": True, "reply": str(data.get("reply") or "")[:300]}
+    if data.get("mode") == "chat" or data.get("off_topic"):
+        say = re.sub(r"[$\\^_{}]", " ", str(data.get("say") or data.get("reply") or "")).strip()[:500]
+        if not say:
+            raise ValueError("Tutor suhbat javobi bo'sh")
+        return {"mode": "chat", "off_topic": False, "say": say, "board": str(data.get("board") or "").strip()[:60]}
     steps = []
     for st in data.get("steps") or []:
         if not isinstance(st, dict) or not str(st.get("text") or "").strip():
@@ -8396,7 +8418,7 @@ def _generate_tutor_lesson_sync(question: str, history: list) -> dict:
                         "explanation": str(pr.get("explanation") or "").strip()}
     except (KeyError, TypeError, ValueError):
         pass
-    return {"off_topic": False, "title": str(data.get("title") or question)[:100], "steps": steps[:7],
+    return {"mode": "lesson", "off_topic": False, "title": str(data.get("title") or question)[:100], "steps": steps[:7],
             "summary": str(data.get("summary") or "").strip()[:500], "practice": practice}
 
 
@@ -8423,10 +8445,11 @@ async def api_app_sat_tutor(request: web.Request, uid: int, lang: str, user: dic
     if not lesson:
         return _err("generation_failed", 502)
     n = None
-    if not lesson.get("off_topic"):
-        s["history"].append({"q": msg[:200], "title": lesson["title"]})
+    if True:
+        is_chat = lesson.get("mode") == "chat"
+        s["history"].append({"q": msg[:200], "title": ("(chatted) " + lesson["say"][:60]) if is_chat else lesson["title"]})
         s["history"] = s["history"][-6:]
-        s.setdefault("lessons", []).append({"says": [st["say"] for st in lesson["steps"]], "tts": {}})
+        s.setdefault("lessons", []).append({"says": [lesson["say"]] if is_chat else [st["say"] for st in lesson["steps"]], "tts": {}})
         s["lessons"] = s["lessons"][-6:]
         s["lang"] = lang
         n = s["lesson_count"] = s.get("lesson_count", 0) + 1
@@ -8445,6 +8468,30 @@ def _tts_lang_mp3_sync(text: str, lang: str) -> bytes:
     return buf.getvalue()
 
 
+_EDGE_VOICES = {"uz": "uz-UZ-SardorNeural", "ru": "ru-RU-DmitryNeural", "en": "en-US-AndrewNeural"}
+
+
+async def _tutor_tts(text: str, lang: str) -> bytes:
+    """Tabiiy (neyron) ovoz: Microsoft Edge TTS. Ishlamasa — gTTS'ga o'tadi."""
+    try:
+        import edge_tts
+        comm = edge_tts.Communicate(text, _EDGE_VOICES.get(lang, _EDGE_VOICES["en"]), rate="-4%", pitch="+0Hz")
+        chunks = []
+
+        async def _collect():
+            async for ch in comm.stream():
+                if ch.get("type") == "audio":
+                    chunks.append(ch["data"])
+        await asyncio.wait_for(_collect(), timeout=25)
+        data = b"".join(chunks)
+        if len(data) > 1000:
+            return data
+        raise ValueError("bo'sh audio")
+    except Exception as e:
+        logger.warning("Edge TTS ishlamadi (%s), gTTS'ga o'tildi: %s", type(e).__name__, e)
+        return await asyncio.to_thread(_tts_lang_mp3_sync, text, lang)
+
+
 async def api_app_sat_tutor_tts(request: web.Request):
     """O'qituvchi ovozi: sessiya id'si maxfiy, shuning uchun sarlavhasiz GET."""
     s = _app_session(request.match_info.get("sid", ""), None, ("tutor",))
@@ -8458,7 +8505,7 @@ async def api_app_sat_tutor_tts(request: web.Request):
         return web.Response(status=404)
     if i not in lesson["tts"]:
         try:
-            lesson["tts"][i] = await asyncio.to_thread(_tts_lang_mp3_sync, text, s.get("lang", "en"))
+            lesson["tts"][i] = await _tutor_tts(text, s.get("lang", "en"))
         except Exception as e:
             logger.exception("Tutor TTS xatosi: %s", e)
             return web.Response(status=500)
