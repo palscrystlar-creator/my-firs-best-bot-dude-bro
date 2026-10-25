@@ -5519,6 +5519,27 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   @keyframes twrite { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(-24deg); } }
   @keyframes tbob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
   @keyframes pulse { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(-50%,-50%) scale(1.06); } }
+  @media (min-width: 900px) {
+    body { max-width: 1100px; margin: 0 auto; padding-left: 28px; padding-right: 28px; font-size: 16px; }
+    nav { padding-left: calc((100vw - 1100px) / 2); padding-right: calc((100vw - 1100px) / 2); }
+    .grid2 { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .tile { padding: 18px 16px; }
+    .classroom { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 16px; padding: 16px; align-items: stretch; }
+    .tboard { min-height: 400px; padding: 20px 26px 24px; }
+    .tboard .board-title { font-size: 26px; margin-bottom: 10px; }
+    .tboard .board-q { font-size: 15px; }
+    .board-h { font-size: 21px; }
+    .board-t { font-size: 18px; }
+    .chalk { font-size: 22px; padding: 9px 14px; }
+    .tboard .board-pic svg { max-height: 250px; }
+    .board-pic { max-width: 640px; }
+    .chatboard { min-height: 260px; }
+    .stage { margin-top: 0; flex-direction: column; justify-content: flex-end; align-items: stretch; min-height: 0; gap: 10px; }
+    .stage .bubble { margin-top: 0; border-radius: 14px 14px 4px 14px; font-size: 15.5px; order: 1; flex: 0 0 auto; min-height: 0; }
+    .stage .teacher { width: 190px; flex: none; margin: 0 auto; order: 2; }
+    .sat-q { font-size: 19px; } .sat-passage { font-size: 18px; } .sat-opt { font-size: 17px; }
+    .board-start { font-size: 19px; }
+  }
   .progress { height: 5px; background: var(--line); border-radius: 9px; overflow: hidden; margin-bottom: 12px; }
   .progress i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
   .center { text-align: center; padding: 44px 12px; color: var(--muted); }
@@ -8369,18 +8390,22 @@ def _generate_tutor_lesson_sync(question: str, history: list) -> dict:
     data = _llm_json_sync(
         "You are a warm, brilliant SAT tutor teaching at a WHITEBOARD. The student wrote:\n"
         f"\"{question}\"\n\nEarlier in this session:\n{hist}\n\n"
-        "You are also a friendly, witty person to talk to. If the message is a greeting, small talk, a personal question, thanks, a joke, "
-        "or any general conversation that is NOT a study question, just TALK like a real teacher chatting face to face: reply ONLY with "
-        '{"mode": "chat", "say": "1-3 short, natural, warm sentences in UZBEK (answer what they said, e.g. greet back, say you are doing great, ask them a question back; '
-        'if it is a general knowledge question, answer it briefly and kindly; gently mention you can also explain any SAT topic on the board)", '
+        "You are a SAT-ONLY tutor. You talk only about SAT preparation: SAT Math, SAT Reading & Writing (including grammar conventions, vocabulary in context, "
+        "transitions, rhetorical synthesis), test strategy, timing, scoring, study plans and motivation for the test. "
+        "If the message is a greeting, thanks, a joke or friendly small talk, answer warmly like a real teacher face to face: reply ONLY with "
+        '{"mode": "chat", "say": "1-3 short, natural, warm sentences in UZBEK (greet back, say you are doing well, ask how their SAT prep is going, '
+        'suggest 2-3 concrete SAT topics you can explain on the board)", '
         '"board": "OPTIONAL very short text to write on the board, e.g. Salom! (or empty string)"}.\n'
-        "If it is a study question (SAT, math, English grammar, reading, writing, or any subject to explain), TEACH it:\n"
+        "If the message asks about ANYTHING that is not about the SAT (other school subjects, general knowledge, coding, news, politics, relationships, "
+        "medical or legal advice, writing someone\'s homework, etc.), do NOT answer it: politely say in 1-2 sentences that you only help with the SAT, "
+        "and offer 2-3 SAT topics instead - using the same chat format above. Never teach non-SAT content.\n"
+        "If it is an SAT study question, TEACH it:\n"
         "Teach it like a real teacher: simple language, a concrete worked example, common traps, and a quick SAT tip. "
         "Write all explanations in UZBEK (Latin script); English terms, SAT vocabulary and example sentences stay in English. "
         "Put ALL math in LaTeX between single dollar signs, e.g. $y=mx+b$, $\\\\frac{a}{b}$ (double every backslash inside JSON). "
         "Reply ONLY as JSON:\n"
         '{"title": "short title", "steps": [ 4 to 6 items: {"heading": "short", "text": "2-4 short sentences (written notes)", '
-        '"say": "what you SAY ALOUD to the student in UZBEK: 2-4 short natural friendly sentences like a real teacher talking; NO symbols, NO LaTeX - read math in words, e.g. y teng ikki x qo shuv bir", '
+        '"say": "what you SAY ALOUD to the student in UZBEK: 2-4 short natural friendly sentences like a real teacher talking; NO symbols, NO LaTeX - read math in words and spell variables as letters, e.g. 0x is nol iks, y=2x+1 is igrek teng ikki iks plyus bir, x^2 is iks kvadrat", '
         '"board": ["1-3 short lines written on the board, e.g. key formula or example (LaTeX allowed)"], '
         '"diagram": null OR a picture } ], "summary": "2 sentences", '
         '"practice": {"question": "...", "options": ["...","...","...","..."], "correct_index": 0, "explanation": "..."}}\n'
@@ -8468,6 +8493,101 @@ def _tts_lang_mp3_sync(text: str, lang: str) -> bytes:
     return buf.getvalue()
 
 
+# ---- Nutq uchun matnni tayyorlash: raqam, formula va harflarni so'z qilib o'qitish ------------
+_UZ_U = ["nol", "bir", "ikki", "uch", "to'rt", "besh", "olti", "yetti", "sakkiz", "to'qqiz"]
+_UZ_T = ["", "o'n", "yigirma", "o'ttiz", "qirq", "ellik", "oltmish", "yetmish", "sakson", "to'qson"]
+
+
+def _uz_num(n: int) -> str:
+    if n < 10:
+        return _UZ_U[n]
+    if n < 100:
+        return (_UZ_T[n // 10] + (" " + _UZ_U[n % 10] if n % 10 else "")).strip()
+    if n < 1000:
+        h, r = divmod(n, 100)
+        return ((_UZ_U[h] + " ") if h > 1 else "") + "yuz" + (" " + _uz_num(r) if r else "")
+    for base, name in ((10**9, "milliard"), (10**6, "million"), (1000, "ming")):
+        if n >= base:
+            q, r = divmod(n, base)
+            return (_uz_num(q) + " " if (q > 1 or base > 1000) else "") + name + (" " + _uz_num(r) if r else "")
+    return str(n)
+
+
+_SP_WORDS = {
+    "uz": {"plus": "plyus", "minus": "minus", "eq": "teng", "mul": "ko'paytirish", "div": "bo'lish", "pct": "foiz", "lt": "kichik", "gt": "katta",
+           "le": "kichik yoki teng", "ge": "katta yoki teng", "sq": "kvadrat", "cube": "kub", "pow": "daraja", "root": "ildiz", "pi": "pi",
+           "deg": "gradus", "point": "butun", "ne": "teng emas"},
+    "ru": {"plus": "плюс", "minus": "минус", "eq": "равно", "mul": "умножить на", "div": "разделить на", "pct": "процентов", "lt": "меньше", "gt": "больше",
+           "le": "меньше или равно", "ge": "больше или равно", "sq": "в квадрате", "cube": "в кубе", "pow": "в степени", "root": "корень из", "pi": "пи",
+           "deg": "градусов", "point": "целых", "ne": "не равно"},
+    "en": {"plus": "plus", "minus": "minus", "eq": "equals", "mul": "times", "div": "divided by", "pct": "percent", "lt": "is less than", "gt": "is greater than",
+           "le": "is less than or equal to", "ge": "is greater than or equal to", "sq": "squared", "cube": "cubed", "pow": "to the power of", "root": "square root of",
+           "pi": "pi", "deg": "degrees", "point": "point", "ne": "is not equal to"},
+}
+_SP_LETTERS = {
+    "uz": dict(a="a", b="be", c="se", d="de", e="e", f="ef", g="ge", h="ha", i="i", j="je", k="ka", l="el", m="em", n="en", o="o", p="pe", q="qu",
+               r="er", s="es", t="te", u="u", v="ve", w="dubl ve", x="iks", y="igrek", z="zet"),
+    "ru": dict(a="а", b="бэ", c="цэ", d="дэ", e="е", f="эф", g="гэ", h="аш", i="и", j="жи", k="ка", l="эль", m="эм", n="эн", o="о", p="пэ", q="ку",
+               r="эр", s="эс", t="тэ", u="у", v="вэ", w="дубль вэ", x="икс", y="игрек", z="зет"),
+}
+
+
+def _speech_normalize(text: str, lang: str) -> str:
+    """TTS'ga yuborishdan oldin: 0x -> 'nol iks', 2x+3=7 -> 'ikki iks plyus uch teng yetti', x^2 -> 'iks kvadrat' va h.k."""
+    lang = lang if lang in _SP_WORDS else "en"
+    W = _SP_WORDS[lang]
+    t = str(text or "")
+    t = t.replace("−", "-").replace("–", "-").replace("×", "*").replace("·", "*").replace("÷", "/")
+    t = t.replace("≤", f" {W['le']} ").replace("≥", f" {W['ge']} ").replace("≠", f" {W['ne']} ")
+    t = t.replace("π", f" {W['pi']} ").replace("√", f" {W['root']} ").replace("°", f" {W['deg']} ").replace("%", f" {W['pct']} ")
+    # LaTeX qoldiqlari
+    t = re.sub(r"\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}", r" \1 / \2 ", t)
+    t = re.sub(r"\\sqrt\s*\{([^{}]*)\}", lambda m: f" {W['root']} {m.group(1)} ", t)
+    t = t.replace("\\pi", f" {W['pi']} ").replace("\\times", " * ").replace("\\cdot", " * ").replace("\\le", f" {W['le']} ").replace("\\ge", f" {W['ge']} ")
+    t = re.sub(r"[\\${}\[\]]", " ", t)
+    # darajalar
+    t = re.sub(r"\^\s*2\b", f" {W['sq']} ", t)
+    t = re.sub(r"\^\s*3\b", f" {W['cube']} ", t)
+    t = re.sub(r"\^\s*(\w+)", lambda m: f" {W['pow']} {m.group(1)} ", t)
+    t = t.replace("(", " ").replace(")", " ")
+    # minus / tire
+    t = re.sub(r"(?:(?<=^)|(?<=[\s=+*/<>^:,]))-(?=[\d.A-Za-z])", f" {W['minus']} ", t)          # manfiy: -5, -x
+    t = re.sub(r"(?<=[A-Za-z0-9])-(?=\d)", f" {W['minus']} ", t)                                  # x-3, 5-2
+    t = re.sub(r"\s-\s+(?=\d|[A-Za-z](?![A-Za-z]))", f" {W['minus']} ", t)                        # x - 3, 5 - x
+    t = re.sub(r"(?<=[A-Za-zА-Яа-я0-9])-(?=[A-Za-zА-Яа-я])", " ", t)                               # 10-sinf, so-called
+    t = t.replace("<=", f" {W['le']} ").replace(">=", f" {W['ge']} ").replace("!=", f" {W['ne']} ")
+    for sym, key in (("=", "eq"), ("+", "plus"), ("*", "mul"), ("<", "lt"), (">", "gt")):
+        t = t.replace(sym, f" {W[key]} ")
+    t = re.sub(r"(?<=[\w\s])/(?=[\w\s])", f" {W['div']} ", t)
+    # raqamlar -> so'z
+    def num_words(m):
+        ip, fp = m.group(1), m.group(2)
+        try:
+            if lang == "uz":
+                s = _uz_num(int(ip))
+                if fp:
+                    s += f" {W['point']} " + " ".join(_UZ_U[int(d)] for d in fp)
+                return f" {s} "
+            from num2words import num2words
+            if fp:
+                return f" {num2words(int(ip), lang=lang)} {W['point']} {' '.join(num2words(int(d), lang=lang) for d in fp)} "
+            return f" {num2words(int(ip), lang=lang)} "
+        except Exception:
+            return f" {m.group(0)} "
+    t = re.sub(r"(\d{1,12})(?:\.(\d{1,6}))?", num_words, t)
+    t = re.sub(r"\bsqrt\b", W["root"], t)
+    if lang == "ru":
+        t = re.sub(r"\bpi\b", W["pi"], t)
+    # yakka lotin harflari (x, y, f ...) -> harf nomi
+    if lang in _SP_LETTERS:
+        names = _SP_LETTERS[lang]
+        # unlisiz 2-3 harfli o'zgaruvchi yozuvlari (mx, xy, abc) -> harf-harf
+        t = re.sub(r"(?<![A-Za-zА-Яа-яЁё'’])([b-df-hj-np-tv-z]{2,3})(?![A-Za-zА-Яа-яЁё'’])",
+                   lambda m: " " + " ".join(names[c] for c in m.group(1)) + " ", t)
+        t = re.sub(r"(?<![A-Za-zА-Яа-яЁё'’])([A-Za-z])(?![A-Za-zА-Яа-яЁё'’])", lambda m: f" {names[m.group(1).lower()]} ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
 _EDGE_VOICES = {"uz": "uz-UZ-SardorNeural", "ru": "ru-RU-DmitryNeural", "en": "en-US-AndrewNeural"}
 
 
@@ -8475,6 +8595,7 @@ async def _tutor_tts(text: str, lang: str) -> bytes:
     """Tabiiy (neyron) ovoz: Microsoft Edge TTS. Ishlamasa — gTTS'ga o'tadi."""
     try:
         import edge_tts
+        text = _speech_normalize(text, lang)
         comm = edge_tts.Communicate(text, _EDGE_VOICES.get(lang, _EDGE_VOICES["en"]), rate="-4%", pitch="+0Hz")
         chunks = []
 
@@ -8489,7 +8610,7 @@ async def _tutor_tts(text: str, lang: str) -> bytes:
         raise ValueError("bo'sh audio")
     except Exception as e:
         logger.warning("Edge TTS ishlamadi (%s), gTTS'ga o'tildi: %s", type(e).__name__, e)
-        return await asyncio.to_thread(_tts_lang_mp3_sync, text, lang)
+        return await asyncio.to_thread(_tts_lang_mp3_sync, _speech_normalize(text, lang), lang)
 
 
 async def api_app_sat_tutor_tts(request: web.Request):
