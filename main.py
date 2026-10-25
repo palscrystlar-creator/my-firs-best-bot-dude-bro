@@ -2147,6 +2147,19 @@ async def cmd_activity(message: Message):
     await message.answer("\n".join(lines)[:4000])
 
 
+@dp.message(Command("ovoz"))
+async def cmd_ovoz(message: Message):
+    """Faqat bot egasi: ustoz ovozi (neyron) ishlayaptimi — jonli sinov."""
+    if not _is_admin(message.from_user.id):
+        return
+    try:
+        await _edge_once("Salom, bu sinov.", _EDGE_VOICES["uz"])
+        res = "✅ Neyron ovoz (Edge TTS) ishlayapti."
+    except Exception as e:
+        res = f"❌ Edge TTS ishlamayapti: {type(e).__name__}: {html.escape(str(e))[:200]}\nUstoz robot (gTTS) ovozida gapiradi."
+    await message.answer(f"{res}\nHisob: edge={_TTS_STATS['edge']}, gTTS={_TTS_STATS['fallback']}")
+
+
 @dp.message(Command("users"))
 async def cmd_users(message: Message):
     """Faqat bot egasi uchun: oxirgi faol foydalanuvchilar ro'yxati (ism, username, ID)."""
@@ -8669,28 +8682,40 @@ def _speech_normalize(text: str, lang: str) -> str:
 
 
 _EDGE_VOICES = {"uz": "uz-UZ-SardorNeural", "ru": "ru-RU-DmitryNeural", "en": "en-US-AndrewNeural"}
+_EDGE_ALT = {"uz": "uz-UZ-MadinaNeural", "ru": "ru-RU-SvetlanaNeural", "en": "en-US-GuyNeural"}
+_TTS_STATS = {"edge": 0, "fallback": 0, "last_error": ""}
+
+
+async def _edge_once(text: str, voice: str) -> bytes:
+    import edge_tts
+    comm = edge_tts.Communicate(text, voice, rate="-3%", pitch="+0Hz")
+    chunks = []
+
+    async def _collect():
+        async for ch in comm.stream():
+            if ch.get("type") == "audio":
+                chunks.append(ch["data"])
+    await asyncio.wait_for(_collect(), timeout=20)
+    data = b"".join(chunks)
+    if len(data) < 1000:
+        raise ValueError("bo'sh audio")
+    return data
 
 
 async def _tutor_tts(text: str, lang: str) -> bytes:
-    """Tabiiy (neyron) ovoz: Microsoft Edge TTS. Ishlamasa — gTTS'ga o'tadi."""
-    try:
-        import edge_tts
-        text = _speech_normalize(text, lang)
-        comm = edge_tts.Communicate(text, _EDGE_VOICES.get(lang, _EDGE_VOICES["en"]), rate="-4%", pitch="+0Hz")
-        chunks = []
-
-        async def _collect():
-            async for ch in comm.stream():
-                if ch.get("type") == "audio":
-                    chunks.append(ch["data"])
-        await asyncio.wait_for(_collect(), timeout=25)
-        data = b"".join(chunks)
-        if len(data) > 1000:
+    """Tabiiy (neyron) ovoz: Microsoft Edge TTS (2 ovoz, qayta urinish). Ishlamasa — gTTS."""
+    norm = _speech_normalize(text, lang)
+    for voice in (_EDGE_VOICES.get(lang, _EDGE_VOICES["en"]), _EDGE_ALT.get(lang, _EDGE_ALT["en"])):
+        try:
+            data = await _edge_once(norm, voice)
+            _TTS_STATS["edge"] += 1
             return data
-        raise ValueError("bo'sh audio")
-    except Exception as e:
-        logger.warning("Edge TTS ishlamadi (%s), gTTS'ga o'tildi: %s", type(e).__name__, e)
-        return await asyncio.to_thread(_tts_lang_mp3_sync, _speech_normalize(text, lang), lang)
+        except Exception as e:
+            _TTS_STATS["last_error"] = f"{type(e).__name__}: {e}"[:200]
+            logger.warning("Edge TTS (%s) ishlamadi: %s", voice, _TTS_STATS["last_error"])
+    _TTS_STATS["fallback"] += 1
+    logger.warning("gTTS'ga o'tildi (robot ovoz). edge=%s fallback=%s", _TTS_STATS["edge"], _TTS_STATS["fallback"])
+    return await asyncio.to_thread(_tts_lang_mp3_sync, norm, lang)
 
 
 async def api_app_sat_tutor_tts(request: web.Request):
