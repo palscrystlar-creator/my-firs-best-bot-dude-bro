@@ -5493,17 +5493,24 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   .chip { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 99px; padding: 7px 12px; font: inherit; font-size: 13px; }
   @keyframes boardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   .classroom { background: #e9e3d6; border-radius: 16px; padding: 10px 10px 4px; position: relative; overflow: hidden; }
-  .tboard { margin: 0; min-height: 250px; padding-bottom: 70px; }
+  .tboard { margin: 0; min-height: 250px; padding-bottom: 84px; }
   .tboard .board-title { font-size: 18px; margin-bottom: 6px; padding-bottom: 4px; }
   .tboard .board-pic svg { max-height: 190px; }
   .board-in { min-height: 120px; }
   .chatboard { min-height: 150px; }
   .chatboard .board-in { min-height: 40px; }
   .board-start { position: absolute; left: 50%; top: 52%; transform: translate(-50%,-50%); width: auto; padding: 14px 26px; font-size: 17px; box-shadow: 0 4px 16px rgba(0,0,0,.4); animation: pulse 1.4s ease-in-out infinite; }
-  .stage { display: flex; align-items: flex-end; gap: 6px; margin-top: -78px; position: relative; z-index: 3; pointer-events: none; min-height: 150px; }
-  .bubble { flex: 1; background: rgba(15,20,30,.88); color: #fff; border-radius: 14px 14px 14px 4px; padding: 9px 12px; font-size: 14px; line-height: 1.45; align-self: center; margin-top: 70px; min-height: 40px; display: none; }
+  .walkway { position: relative; height: 150px; margin-top: -96px; z-index: 3; pointer-events: none; }
+  .teacher { position: absolute; bottom: 0; left: 0; width: 108px; transition: left 1.5s ease-in-out; }
+  .bubble { background: rgba(15,20,30,.9); color: #fff; border-radius: 12px; padding: 9px 12px; margin: 8px 0 4px; font-size: 14.5px; line-height: 1.45; display: none; }
   .bubble:not(:empty) { display: block; }
-  .teacher { width: 108px; flex: 0 0 108px; margin-left: auto; }
+  .lesson-title { font-size: 16px; font-weight: 700; margin: 12px 2px 4px; }
+  .walking .legL { animation: legL .42s ease-in-out infinite; }
+  .walking .legR { animation: legR .42s ease-in-out infinite; }
+  .walking .torso { animation: tbob .42s ease-in-out infinite; }
+  .walking .arm { animation: tgest .84s ease-in-out infinite; }
+  @keyframes legL { 0%,100% { transform: rotate(18deg); } 50% { transform: rotate(-18deg); } }
+  @keyframes legR { 0%,100% { transform: rotate(-18deg); } 50% { transform: rotate(18deg); } }
   .teacher-svg { width: 100%; height: auto; display: block; overflow: visible; }
   .teacher-mini { width: 70px; margin: 0 auto; }
   .teacher-svg .mouth { transform-box: fill-box; transform-origin: center; transform: scaleY(.3); }
@@ -5524,19 +5531,19 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     nav { padding-left: calc((100vw - 1100px) / 2); padding-right: calc((100vw - 1100px) / 2); }
     .grid2 { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
     .tile { padding: 18px 16px; }
-    .classroom { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 16px; padding: 16px; align-items: stretch; }
-    .tboard { min-height: 400px; padding: 20px 26px 24px; }
+    .classroom { padding: 16px; }
+    .tboard { min-height: 330px; padding: 20px 26px 120px; }
     .tboard .board-title { font-size: 26px; margin-bottom: 10px; }
     .tboard .board-q { font-size: 15px; }
     .board-h { font-size: 21px; }
     .board-t { font-size: 18px; }
     .chalk { font-size: 22px; padding: 9px 14px; }
     .tboard .board-pic svg { max-height: 250px; }
-    .board-pic { max-width: 640px; }
+    .tboard .board-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 18px; align-items: start; }
+    .tboard .board-in .chalk { grid-column: 1; margin: 5px 0; }
+    .tboard .board-in .board-pic { grid-column: 2; grid-row: 1 / span 8; margin: 0; max-width: none; }
     .chatboard { min-height: 260px; }
-    .stage { margin-top: 0; flex-direction: column; justify-content: flex-end; align-items: stretch; min-height: 0; gap: 10px; }
-    .stage .bubble { margin-top: 0; border-radius: 14px 14px 4px 14px; font-size: 15.5px; order: 1; flex: 0 0 auto; min-height: 0; }
-    .stage .teacher { width: 190px; flex: none; margin: 0 auto; order: 2; }
+      .bubble { font-size: 16px; }
     .sat-q { font-size: 19px; } .sat-passage { font-size: 18px; } .sat-opt { font-size: 17px; }
     .board-start { font-size: 19px; }
   }
@@ -6631,8 +6638,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
   var TEACHER_SVG = '<svg class="teacher-svg" viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">' +
     '<ellipse cx="60" cy="193" rx="38" ry="5" fill="rgba(0,0,0,.25)"/>' +
-    '<rect x="42" y="132" width="15" height="58" rx="5" fill="#2b3a55"/><rect x="63" y="132" width="15" height="58" rx="5" fill="#2b3a55"/>' +
-    '<rect x="38" y="184" width="22" height="9" rx="4" fill="#1b1b1b"/><rect x="60" y="184" width="22" height="9" rx="4" fill="#1b1b1b"/>' +
+    '<g class="legL" style="transform-box:view-box;transform-origin:49px 134px"><rect x="42" y="132" width="15" height="58" rx="5" fill="#2b3a55"/><rect x="38" y="184" width="22" height="9" rx="4" fill="#1b1b1b"/></g>' +
+    '<g class="legR" style="transform-box:view-box;transform-origin:71px 134px"><rect x="63" y="132" width="15" height="58" rx="5" fill="#2b3a55"/><rect x="60" y="184" width="22" height="9" rx="4" fill="#1b1b1b"/></g>' +
     '<g class="torso"><rect x="34" y="72" width="52" height="68" rx="14" fill="#4f7cff"/>' +
     '<path d="M54 74 L60 92 L66 74 Z" fill="#fff"/><path d="M58 90 L62 90 L64 118 L60 124 L56 118 Z" fill="#ffd166"/>' +
     '<g class="arm2"><rect x="80" y="78" width="12" height="46" rx="6" fill="#4f7cff" transform="rotate(-6 86 80)"/><circle cx="88" cy="126" r="7" fill="#f2c6a0"/></g></g>' +
@@ -6709,22 +6716,30 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     function scene(r, q, canAuto) {
       var N = r.steps.length;
       var boardIn = h("div", { class: "board-in" });
-      var board = h("div", { class: "board tboard" + (r.chat ? " chatboard" : "") }, r.chat ? null : h("div", { class: "board-q", text: "❓ " + q }),
-        r.chat ? null : mj(h("div", { class: "board-title", text: r.title })), boardIn);
+      var board = h("div", { class: "board tboard" + (r.chat ? " chatboard" : "") }, boardIn);
       var teacher = h("div", { class: "teacher" }); teacher.innerHTML = TEACHER_SVG;
+      var walkway = h("div", { class: "walkway" }, teacher);
       var bubble = h("div", { class: "bubble", text: "" });
-      var stage = h("div", { class: "stage" }, bubble, teacher);
       var startBtn = h("button", { class: "btn gold board-start", text: "▶ " + S("tutorStart") });
       if (!canAuto) board.appendChild(startBtn);
       var ctl = h("div", { class: "row", style: "margin:10px 0" });
       var after = h("div", {});
       if (!r.chat) askCard.style.display = "none";
-      var room = h("div", { class: "classroom" }, board, stage);
+      var room = h("div", { class: "classroom" }, board, walkway, bubble);
+      if (!r.chat) area.appendChild(mj(h("div", { class: "lesson-title", text: "🧑‍🏫 " + r.title })));
       area.appendChild(room); area.appendChild(ctl); area.appendChild(after);
       setTimeout(function () { try { room.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 60);
       var tsvg = teacher.firstChild;
 
       var audio = tutorAudio || (tutorAudio = new Audio()), st = { i: -1, playing: false, muted: false, t: 0, dur: 0, items: [], raf: 0, last: 0, usingAudio: false, say: [], active: -1, dead: false, ended: false, gen: 0 };
+      var WALK = [0.06, 0.55, 0.92, 0.28, 0.75];
+      function walkTo(frac) {
+        if (st.dead) return;
+        var max = Math.max(0, walkway.clientWidth - teacher.clientWidth);
+        teacher.style.left = Math.round(max * frac) + "px";
+        tsvg.classList.add("walking");
+        clearTimeout(st.wt); st.wt = setTimeout(function () { tsvg.classList.remove("walking"); }, 1550);
+      }
       function setMode(m) { tsvg.classList.toggle("t-talk", m === "talk"); tsvg.classList.toggle("t-write", m === "write"); }
 
       function sentences(txt) { return (txt.match(/[^.!?…]+[.!?…]*/g) || [txt]).map(function (x) { return x.trim(); }).filter(Boolean); }
@@ -6733,7 +6748,6 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         var s0 = r.steps[i];
         clear(boardIn);
         var items = [], total = 0, parts = [];
-        if (s0.heading) parts.push({ el: mj(h("div", { class: "board-h", text: (i + 1) + ". " + s0.heading })), w: 1.2, kind: "wipe" });
         s0.board.forEach(function (b) { parts.push({ el: mj(h("div", { class: "chalk", text: b })), w: 1.4, kind: "wipe" }); });
         var dg = s0.diagram ? diagramEl(s0.diagram) : null;
         parts.forEach(function (p) { boardIn.appendChild(p.el); chalkWipe(p.el); });
@@ -6778,19 +6792,23 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         if (!step.parts.length) { step.parts.push({ el: h("div", {}), w: 1, kind: "wipe" }); step.total = 1; }
         st.say[i] = st.say[i] || sentences(r.steps[i].say || r.steps[i].text);
         var fallbackDur = Math.max(4, (r.steps[i].say || "").length / 13);
-        layout(step, fallbackDur * 0.85);
+        layout(step, Math.min(10, Math.max(2.5, fallbackDur * 0.7)));
         st.dur = fallbackDur; st.hasDur = false;
         // ovoz
         audio.onloadedmetadata = function () {
           if (gen !== st.gen) return;
-          if (isFinite(audio.duration) && audio.duration > 0.5) { st.dur = audio.duration; st.hasDur = true; layout(step, Math.max(2.5, audio.duration * 0.85)); }
+          if (isFinite(audio.duration) && audio.duration > 0.5) { st.dur = audio.duration; st.hasDur = true; layout(step, Math.min(10, Math.max(2.5, audio.duration * 0.7))); }
         };
         audio.onerror = function () { if (gen === st.gen) st.usingAudio = false; };
         audio.onended = function () { if (gen === st.gen) st.ended = true; };
         audio.src = "/api/app/sat/tutor/tts/" + sid + "/" + r.n + "/" + i;
         audio.muted = st.muted;
+        st.loading = true;
+        var ldTimer = setTimeout(function () { if (gen === st.gen) st.loading = false; }, 12000);
         var pp = audio.play();
-        if (pp && pp.then) pp.then(function () { if (gen === st.gen) st.usingAudio = true; }).catch(function () { if (gen === st.gen) st.usingAudio = false; });
+        if (pp && pp.then) pp.then(function () { if (gen === st.gen) { st.usingAudio = true; st.loading = false; } }).catch(function () { if (gen === st.gen) { st.usingAudio = false; st.loading = false; } });
+        else st.loading = false;
+        if (!r.chat) walkTo(WALK[i % WALK.length]);
         st.playing = true; st.last = performance.now(); updateCtl();
         cancelAnimationFrame(st.raf); st.raf = requestAnimationFrame(loop);
       }
@@ -6799,12 +6817,12 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         if (st.dead) return;
         var dt = (now - st.last) / 1000; st.last = now;
         if (st.playing) {
-          if (st.usingAudio && !audio.paused && !audio.ended && audio.currentTime > 0) st.t = audio.currentTime;
-          else st.t += dt;
+          st.t += dt;
+          if (st.usingAudio && !audio.paused && !audio.ended && audio.currentTime > 0) st.t = Math.max(st.t, audio.currentTime);
           var writing = apply(st.step, st.t);
           showSub(st.step, st.t, st.dur);
           setMode(writing ? "write" : "talk");
-          var done = st.usingAudio ? (st.ended && st.t >= st.step.end) : (st.t >= Math.max(st.dur, st.step.end));
+          var done = st.loading ? false : (st.usingAudio ? (st.ended && st.t >= st.step.end) : (st.t >= Math.max(st.dur, st.step.end)));
           if (st.usingAudio && !st.hasDur && st.t > st.dur + 6) done = true;
           if (done) {
             apply(st.step, 999); setMode("idle");
@@ -6849,9 +6867,11 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       }
 
       startBtn.addEventListener("click", function () { if (startBtn.parentNode) board.removeChild(startBtn); playStep(0, true); });
-      player = { stop: function () { st.dead = true; cancelAnimationFrame(st.raf); try { audio.pause(); audio.removeAttribute("src"); audio.load(); } catch (e) {} } };
+      player = { stop: function () { st.dead = true; clearTimeout(st.wt); cancelAnimationFrame(st.raf); try { audio.pause(); audio.removeAttribute("src"); audio.load(); } catch (e) {} } };
       cleanupFn = stopPlayer;
       setMode("idle");
+      setTimeout(function () { walkTo(r.chat ? 0.8 : 0.9); }, 120);
+      (function warm(k) { if (k >= N || st.dead) return; fetch("/api/app/sat/tutor/tts/" + sid + "/" + r.n + "/" + k).then(function (x) { return x.blob(); }).catch(function () {}).then(function () { warm(k + 1); }); })(1);
       if (canAuto) setTimeout(function () { if (!st.dead && st.i < 0) playStep(0, false); }, 250);
     }
 
@@ -8406,7 +8426,7 @@ def _generate_tutor_lesson_sync(question: str, history: list) -> dict:
         "Reply ONLY as JSON:\n"
         '{"title": "short title", "steps": [ 4 to 6 items: {"heading": "short", "text": "2-4 short sentences (written notes)", '
         '"say": "what you SAY ALOUD to the student in UZBEK: 2-4 short natural friendly sentences like a real teacher talking; NO symbols, NO LaTeX - read math in words and spell variables as letters, e.g. 0x is nol iks, y=2x+1 is igrek teng ikki iks plyus bir, x^2 is iks kvadrat", '
-        '"board": ["1-3 short lines written on the board, e.g. key formula or example (LaTeX allowed)"], '
+        '"board": ["2-5 short lines written on the board: ONLY concrete worked EXAMPLES, step by step, e.g. $2x+3=7$ then $2x=4$ then $x=2$, or a correct vs incorrect example sentence (LaTeX allowed). NO definitions, NO explanations, NO long sentences on the board - the explanation goes in the spoken part"], '
         '"diagram": null OR a picture } ], "summary": "2 sentences", '
         '"practice": {"question": "...", "options": ["...","...","...","..."], "correct_index": 0, "explanation": "..."}}\n'
         "DIAGRAM kinds (use a diagram in at least 2 steps when the topic is visual — functions, graphs, geometry, data, angles, circles):\n"
@@ -8427,7 +8447,7 @@ def _generate_tutor_lesson_sync(question: str, history: list) -> dict:
         if not isinstance(st, dict) or not str(st.get("text") or "").strip():
             continue
         st = _sat_fix_tex_obj(st)
-        board = [str(b).strip()[:140] for b in (st.get("board") or []) if str(b).strip()][:3]
+        board = [str(b).strip()[:120] for b in (st.get("board") or []) if str(b).strip()][:5]
         say = re.sub(r"[$\\^_{}]", " ", str(st.get("say") or st["text"])).strip()[:600]
         steps.append({"heading": str(st.get("heading") or "").strip()[:80], "text": str(st["text"]).strip()[:700], "say": say,
                       "board": board, "diagram": _clean_diagram(st.get("diagram"))})
@@ -8514,7 +8534,7 @@ def _uz_num(n: int) -> str:
 
 
 _SP_WORDS = {
-    "uz": {"plus": "plyus", "minus": "minus", "eq": "teng", "mul": "ko'paytirish", "div": "bo'lish", "pct": "foiz", "lt": "kichik", "gt": "katta",
+    "uz": {"plus": "plyus", "minus": "minus", "eq": "teng", "mul": "ko'paytirish", "div": "taqsim", "pct": "foiz", "lt": "kichik", "gt": "katta",
            "le": "kichik yoki teng", "ge": "katta yoki teng", "sq": "kvadrat", "cube": "kub", "pow": "daraja", "root": "ildiz", "pi": "pi",
            "deg": "gradus", "point": "butun", "ne": "teng emas"},
     "ru": {"plus": "плюс", "minus": "минус", "eq": "равно", "mul": "умножить на", "div": "разделить на", "pct": "процентов", "lt": "меньше", "gt": "больше",
