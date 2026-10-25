@@ -5546,7 +5546,20 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       .bubble { font-size: 16px; }
     .sat-q { font-size: 19px; } .sat-passage { font-size: 18px; } .sat-opt { font-size: 17px; }
     .board-start { font-size: 19px; }
+    .flow-e { font-size: 56px; } .flow-l { font-size: 15px; } .flow-arrow { font-size: 34px; } .ctable { font-size: 24px; }
   }
+  .flow { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .flow-card { flex: 1 1 0; min-width: 0; background: rgba(255,255,255,.09); border: 2px solid rgba(255,255,255,.25); border-radius: 14px; padding: 10px 4px 8px; text-align: center; }
+  .flow-card.mid { border-color: #ffd166; background: rgba(255,209,102,.12); }
+  .flow-card.mid .flow-e { animation: wobble 1.4s ease-in-out infinite; display: inline-block; }
+  .flow-e { font-size: 40px; line-height: 1.15; }
+  .flow-l { font-size: 12.5px; line-height: 1.3; color: #f5f5f5; margin-top: 4px; font-family: system-ui, sans-serif; }
+  .flow-arrow { flex: 0 0 auto; color: #ffd166; font-size: 24px; }
+  .ctable { border-collapse: collapse; margin: 4px auto; font-size: 20px; color: #fff; }
+  .ctable th { color: #ffd166; border-bottom: 2px solid rgba(255,255,255,.5); padding: 6px 18px; }
+  .ctable td { text-align: center; padding: 6px 18px; border-bottom: 1px dashed rgba(255,255,255,.2); }
+  .ctable td + td, .ctable th + th { border-left: 2px solid rgba(255,255,255,.3); }
+  @keyframes wobble { 0%,100% { transform: rotate(-8deg) scale(1); } 50% { transform: rotate(8deg) scale(1.12); } }
   .progress { height: 5px; background: var(--line); border-radius: 9px; overflow: hidden; margin-bottom: 12px; }
   .progress i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
   .center { text-align: center; padding: 44px 12px; color: var(--muted); }
@@ -6631,6 +6644,22 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     if (!d) return null;
     var wrap = h("div", { class: "board-pic" });
     if (d.type === "plot") wrap.appendChild(plotSvg(d));
+    else if (d.type === "flow") {
+      var f = h("div", { class: "flow" });
+      d.items.forEach(function (it, k) {
+        if (k) f.appendChild(h("div", { class: "flow-arrow", text: "➜" }));
+        f.appendChild(h("div", { class: "flow-card" + (k === 1 && d.items.length >= 3 ? " mid" : "") },
+          h("div", { class: "flow-e", text: it.emoji }), h("div", { class: "flow-l", text: it.label })));
+      });
+      wrap.appendChild(f);
+    } else if (d.type === "table") {
+      var tb = h("table", { class: "ctable" }), thr = h("tr", {});
+      d.head.forEach(function (c) { thr.appendChild(h("th", { text: c })); });
+      tb.appendChild(h("thead", {}, thr));
+      var tbody = h("tbody", {});
+      d.rows.forEach(function (r) { var tr = h("tr", {}); r.forEach(function (c) { tr.appendChild(h("td", { text: c })); }); tbody.appendChild(tr); });
+      tb.appendChild(tbody); wrap.appendChild(mj(tb));
+    }
     else if (d.type === "svg") wrap.innerHTML = d.svg;   // server tomonida tozalangan (whitelist) SVG
     if (d.caption) wrap.appendChild(h("div", { class: "muted small", style: "text-align:center;margin-top:4px", text: d.caption }));
     return wrap;
@@ -6659,7 +6688,13 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
   // Diagramma elementlarini "chizilish" animatsiyasiga tayyorlaydi: [{el, w, kind}]
   function prepDraw(wrap) {
-    var svg = wrap.querySelector("svg"), out = [];
+    var out = [], fl = wrap.querySelector(".flow"), tb = wrap.querySelector(".ctable");
+    if (fl || tb) {
+      var els = fl ? Array.prototype.slice.call(fl.children) : [tb.querySelector("thead tr")].concat(Array.prototype.slice.call(tb.querySelectorAll("tbody tr")));
+      els.forEach(function (el) { var it = { el: el, w: el.classList.contains("flow-arrow") ? 0.5 : 1, kind: "fade", pop: !!fl }; setDraw(it, 0); out.push(it); });
+      return out;
+    }
+    var svg = wrap.querySelector("svg");
     if (!svg) return out;
     svg.querySelectorAll("line,path,polygon,polyline,circle,ellipse,rect,text").forEach(function (el) {
       var tag = el.tagName.toLowerCase(), stroke = el.getAttribute("stroke") || "", fill = el.getAttribute("fill");
@@ -6676,6 +6711,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     return out;
   }
   function setDraw(it, p) {
+    if (it.pop) { it.el.style.opacity = p; it.el.style.transform = "translateY(" + ((1 - p) * 10).toFixed(1) + "px) scale(" + (0.7 + 0.3 * p).toFixed(3) + ")"; return; }
     if (it.kind === "draw") { it.el.style.strokeDashoffset = it.len * (1 - p); it.el.style.opacity = p > 0 ? 1 : 0; }
     else it.el.style.opacity = p;
   }
@@ -8378,6 +8414,19 @@ def _clean_diagram(d) -> dict | None:
     if not isinstance(d, dict):
         return None
     t = d.get("type")
+    if t == "flow":
+        items = []
+        for it in (d.get("items") or [])[:5]:
+            if isinstance(it, dict) and str(it.get("emoji") or "").strip():
+                items.append({"emoji": str(it["emoji"]).strip()[:8], "label": str(it.get("label") or "").strip()[:48]})
+        return {"type": "flow", "items": items, "caption": str(d.get("caption") or "")[:120]} if len(items) >= 2 else None
+    if t == "table":
+        head = [str(x).strip()[:14] for x in (d.get("head") or [])[:4]]
+        rows = []
+        for r in (d.get("rows") or [])[:7]:
+            if isinstance(r, (list, tuple)) and len(r) >= 1:
+                rows.append([str(x).strip()[:14] for x in list(r)[:len(head) or 4]])
+        return {"type": "table", "head": head, "rows": rows, "caption": str(d.get("caption") or "")[:120]} if head and rows else None
     if t == "svg":
         svg = _sanitize_svg(d.get("svg"))
         return {"type": "svg", "svg": svg, "caption": str(d.get("caption") or "")[:120]} if svg else None
@@ -8420,21 +8469,32 @@ def _generate_tutor_lesson_sync(question: str, history: list) -> dict:
         "medical or legal advice, writing someone\'s homework, etc.), do NOT answer it: politely say in 1-2 sentences that you only help with the SAT, "
         "and offer 2-3 SAT topics instead - using the same chat format above. Never teach non-SAT content.\n"
         "If it is an SAT study question, TEACH it:\n"
-        "Teach it like a real teacher: simple language, a concrete worked example, common traps, and a quick SAT tip. "
+        "TEACH LIKE THE BEST SCHOOL TEACHER, FOR A BEGINNER WHO KNOWS NOTHING. Talk to the student informally as a friend (use 'sen'). Method, in this order:\n"
+        "  1) OPEN WITH A REAL-LIFE ANALOGY from everyday life that makes the idea obvious and fun (e.g. for a function: a juicer - you put an apple in, juice comes out; "
+        "the same apple always gives the same juice; for percent: a shop discount; for equations: a balance scale; for grammar: building with LEGO). Start the spoken text like: "
+        "'Hozir senga ... ni tez va oson tushuntiraman. Bir narsani tasavvur qil: ...'\n"
+        "  2) DRAW the analogy (flow or svg picture), then CONNECT it to the real SAT notation step by step (apple = input x, juicer = rule f, juice = output f(x)).\n"
+        "  3) A tiny numeric/example table, then a fully worked example, then (if visual) the graph, then ONE common SAT trap.\n"
+        "Use 5 to 7 steps. Every step except maybe the last MUST have a diagram (a picture). Spoken text of each step: 3-5 short, vivid sentences, no jargon before it is explained.\n"
         "Write all explanations in UZBEK (Latin script); English terms, SAT vocabulary and example sentences stay in English. "
         "Put ALL math in LaTeX between single dollar signs, e.g. $y=mx+b$, $\\\\frac{a}{b}$ (double every backslash inside JSON). "
         "Reply ONLY as JSON:\n"
-        '{"title": "short title", "steps": [ 4 to 6 items: {"heading": "short", "text": "2-4 short sentences (written notes)", '
-        '"say": "what you SAY ALOUD to the student in UZBEK: 2-4 short natural friendly sentences like a real teacher talking; NO symbols, NO LaTeX - read math in words and spell variables as letters, e.g. 0x is nol iks, y=2x+1 is igrek teng ikki iks plyus bir, x^2 is iks kvadrat", '
-        '"board": ["2-5 short lines written on the board: ONLY concrete worked EXAMPLES, step by step, e.g. $2x+3=7$ then $2x=4$ then $x=2$, or a correct vs incorrect example sentence (LaTeX allowed). NO definitions, NO explanations, NO long sentences on the board - the explanation goes in the spoken part"], '
-        '"diagram": null OR a picture } ], "summary": "2 sentences", '
+        '{"title": "short title", "steps": [ 5 to 7 items: {"heading": "short", "text": "2-4 short sentences (written notes)", '
+        '"say": "what you SAY ALOUD to the student in UZBEK: 3-5 short natural friendly sentences like a real teacher talking face to face; NO symbols, NO LaTeX - read math in words and spell variables as letters, e.g. 0x is nol iks, y=2x+1 is igrek teng ikki iks plyus bir, x^2 is iks kvadrat", '
+        '"board": ["1-5 short lines written on the board: ONLY concrete EXAMPLES, step by step (an emoji equation like 🍎 → ⚙️ → 🧃, a table row, $2x+3=7$ then $2x=4$ then $x=2$, a correct vs incorrect example sentence). NO definitions, NO explanations, NO long sentences on the board - explanation goes in the spoken part"], '
+        '"diagram": a picture } ], "summary": "2 sentences", '
         '"practice": {"question": "...", "options": ["...","...","...","..."], "correct_index": 0, "explanation": "..."}}\n'
-        "DIAGRAM kinds (use a diagram in at least 2 steps when the topic is visual — functions, graphs, geometry, data, angles, circles):\n"
-        '1) function graph: {"type":"plot","fns":[{"expr":"2*x+1","label":"y=2x+1"}],"xmin":-5,"xmax":5,"ymin":-5,"ymax":8,'
-        '"points":[{"x":0,"y":1,"label":"(0,1)"}],"caption":"..."} — expr uses x, + - * / ^ ( ), sqrt abs sin cos tan ln exp pi, always explicit * .\n'
-        '2) drawing: {"type":"svg","svg":"<svg viewBox=\\"0 0 400 260\\">...</svg>","caption":"..."} — only line, circle, ellipse, rect, path, polygon, polyline, text, g; '
-        "the board is dark, so use LIGHT colors (#f5f5f5, #ffd166, #7bdff2, #b2f7a3, #ff9aa2), stroke-width 2-3, text font-size 14-16, plain-text labels (no LaTeX), "
-        "shapes must be geometrically accurate (e.g. right angle really 90°, labels not overlapping).\n"
+        "DIAGRAM kinds:\n"
+        '1) flow (BEST for analogies and processes: input -> machine -> output): {"type":"flow","items":[{"emoji":"🍎","label":"olma (kirish, x)"},{"emoji":"⚙️","label":"sharbat chiqargich (qoida f)"},'
+        '{"emoji":"🧃","label":"sharbat (chiqish, f(x))"}],"caption":"..."} - 2 to 5 items, ONE emoji per item, label under 40 chars (plain text).\n'
+        '2) table (input/output pairs, data): {"type":"table","head":["x","f(x)"],"rows":[[1,3],[2,5],[3,7]],"caption":"..."} - 2-4 columns, up to 7 rows, cells short.\n'
+        '3) function graph: {"type":"plot","fns":[{"expr":"2*x+1","label":"y=2x+1"}],"xmin":-5,"xmax":5,"ymin":-5,"ymax":8,'
+        '"points":[{"x":0,"y":1,"label":"(0,1)"}],"caption":"..."} - expr uses x, + - * / ^ ( ), sqrt abs sin cos tan ln exp pi, always explicit * .\n'
+        '4) drawing: {"type":"svg","svg":"<svg viewBox=\\"0 0 400 260\\">...</svg>","caption":"..."} - only line, circle, ellipse, rect, path, polygon, polyline, text, g. '
+        "IMPORTANT: you may put EMOJI inside <text> elements (font-size 36-56) as pictures of real objects (🍎 🧃 🥤 ⚖️ 🚗 🛒 💰 🍕 📦 🏠 ⏱️ 🔋 ...) - combine them with arrows and shapes to draw scenes "
+        "(e.g. a balance scale with objects, a shop with a price tag, a car and a road). The board is dark, so use LIGHT colors (#f5f5f5, #ffd166, #7bdff2, #b2f7a3, #ff9aa2), "
+        "stroke-width 2-3, label font-size 14-16, plain-text labels (no LaTeX), geometry accurate (right angle really 90 degrees), labels never overlapping.\n"
+        "Prefer flow/svg-with-emoji for the first 2-3 steps (the analogy), table for numbers, plot only when the topic is about graphs. "
         "Make sure every number and computation is correct. practice must have exactly one correct option.",
         temperature=0.5)
     if data.get("mode") == "chat" or data.get("off_topic"):
@@ -8448,7 +8508,7 @@ def _generate_tutor_lesson_sync(question: str, history: list) -> dict:
             continue
         st = _sat_fix_tex_obj(st)
         board = [str(b).strip()[:120] for b in (st.get("board") or []) if str(b).strip()][:5]
-        say = re.sub(r"[$\\^_{}]", " ", str(st.get("say") or st["text"])).strip()[:600]
+        say = re.sub(r"[$\\^_{}]", " ", str(st.get("say") or st["text"])).strip()[:900]
         steps.append({"heading": str(st.get("heading") or "").strip()[:80], "text": str(st["text"]).strip()[:700], "say": say,
                       "board": board, "diagram": _clean_diagram(st.get("diagram"))})
     if len(steps) < 2:
@@ -8463,7 +8523,7 @@ def _generate_tutor_lesson_sync(question: str, history: list) -> dict:
                         "explanation": str(pr.get("explanation") or "").strip()}
     except (KeyError, TypeError, ValueError):
         pass
-    return {"mode": "lesson", "off_topic": False, "title": str(data.get("title") or question)[:100], "steps": steps[:7],
+    return {"mode": "lesson", "off_topic": False, "title": str(data.get("title") or question)[:100], "steps": steps[:8],
             "summary": str(data.get("summary") or "").strip()[:500], "practice": practice}
 
 
