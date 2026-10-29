@@ -5658,6 +5658,11 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   var initData = tg && tg.initData ? tg.initData : "";
   var T = {
     uz: {
+      mathTopics: "Matematika mavzulari",
+      mathTopicsD: "Hamma mavzu bir joyda: tanlang, ustoz tushuntiradi",
+      mathSearch: "Mavzuni qidirish",
+      mathNext: "Keyingi mavzu ➜",
+      mathDone: "{a}/{b} mavzu o'rganildi",
       advT: "Maslahat",
       advSatLow: "Natija hozircha past. Avval zaif mavzuni ustoz bilan tushunib ol, keyin yana urinib ko'r.",
       advSatMid: "Yaxshi! Zaif mavzularni mustahkamlab, yana mashq qil.",
@@ -5748,6 +5753,11 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       chatLink: "Botga o'tish"
     },
     ru: {
+      mathTopics: "Темы по математике",
+      mathTopicsD: "Все темы в одном месте: выберите, и учитель объяснит",
+      mathSearch: "Поиск темы",
+      mathNext: "Следующая тема ➜",
+      mathDone: "Изучено тем: {a}/{b}",
       advT: "Совет",
       advSatLow: "Пока результат низкий. Сначала разбери слабую тему с преподавателем, потом попробуй ещё раз.",
       advSatMid: "Хорошо! Закрепи слабые темы и потренируйся ещё.",
@@ -5838,6 +5848,11 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       chatLink: "Перейти в бота"
     },
     en: {
+      mathTopics: "Math topics",
+      mathTopicsD: "All topics in one place: pick one and the teacher explains",
+      mathSearch: "Search topics",
+      mathNext: "Next topic ➜",
+      mathDone: "{a}/{b} topics studied",
       advT: "Advice",
       advSatLow: "The score is low for now. First understand the weak topic with the teacher, then try again.",
       advSatMid: "Good! Reinforce the weak topics and practice more.",
@@ -6123,6 +6138,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     }
     parts.push(h("button", { class: "tile", style: "width:100%;margin-bottom:12px;background:linear-gradient(135deg,#3b2a63,#6a4fb5);color:#fff", onclick: function () { viewTutor(); } },
       h("div", { class: "e", text: "👩‍🏫" }), h("div", { class: "n", text: S("tutor") }), h("div", { class: "d", style: "color:#e6dcff", text: S("tutorD") })));
+    parts.push(h("button", { class: "tile", style: "width:100%;margin-bottom:12px;background:linear-gradient(135deg,#0f4c5c,#1b7f8c);color:#fff", onclick: viewMath },
+      h("div", { class: "e", text: "➗" }), h("div", { class: "n", text: S("mathTopics") }), h("div", { class: "d", style: "color:#d4f1f4", text: S("mathTopicsD") })));
     parts.push(h("div", { class: "section-title", text: "🚀" }),
       h("div", { class: "grid2" },
         tile("📅", S("daily"), S("dailyD"), function () { startQuiz({ kind: "daily" }); }),
@@ -6834,7 +6851,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
   var SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
 
-  function viewTutor(q0) {
+  function viewTutor(q0, backFn, nextFn) {
     var sid = null, area = h("div", {}), input, busy = false, player = null, askCard = null, tutorAudio = null, unlocked = Promise.resolve(false);
     function stopPlayer() { if (player) { player.stop(); player = null; } }
     cleanupFn = null;
@@ -7018,6 +7035,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         after.appendChild(h("div", { class: "row", style: "margin-top:10px" },
           h("button", { class: "btn ghost", onclick: function () { ask("Explain the same thing more simply, with a different example. Reply language: " + lang); }, text: S("tutorSimpler") }),
           h("button", { class: "btn ghost", onclick: function () { ask("Give me one more worked example of this topic, a bit harder. Reply language: " + lang); }, text: S("tutorExample") })));
+        if (nextFn) after.appendChild(h("button", { class: "btn", style: "margin-top:10px", onclick: nextFn, text: S("mathNext") }));
       }
 
       startBtn.addEventListener("click", function () { if (startBtn.parentNode) board.removeChild(startBtn); playStep(0, true); });
@@ -7052,11 +7070,115 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     TUTOR_TOPICS.forEach(function (t) { chips.appendChild(h("button", { class: "chip", onclick: function () { ask(t); }, text: t })); });
     askCard = h("div", { class: "card" }, input,
       h("button", { class: "btn", style: "margin-top:8px", onclick: function () { ask(input.value); }, text: S("tutorAsk") }), chips);
-    mount(backBtn(function () { if (tab === "sat") viewSat(); else show(); }), title("👩‍🏫 " + S("tutor"), S("tutorD")), askCard, area);
+    mount(backBtn(backFn || function () { if (tab === "sat") viewSat(); else show(); }), title("👩‍🏫 " + S("tutor"), S("tutorD")), askCard, area);
     if (q0) ask(q0);
     cleanupFn = stopPlayer;
   }
 
+
+  // ================= MATEMATIKA MAVZULARI =================
+  var MATH_TOPICS = [
+    { n: ["Sonlar va amallar", "Числа и действия", "Numbers & arithmetic"], t: [
+      ["Natural sonlar va razryadlar", "Натуральные числа и разряды", "Natural numbers and place value"],
+      ["Manfiy sonlar", "Отрицательные числа", "Negative numbers"],
+      ["Kasrlar", "Дроби", "Fractions"],
+      ["O'nli kasrlar", "Десятичные дроби", "Decimals"],
+      ["Foizlar", "Проценты", "Percentages"],
+      ["Nisbat va proporsiya", "Отношения и пропорции", "Ratios and proportions"],
+      ["Darajalar", "Степени", "Exponents (powers)"],
+      ["Kvadrat ildiz", "Квадратный корень", "Square roots"],
+      ["Amallar tartibi", "Порядок действий", "Order of operations"],
+      ["Bo'linish belgilari, EKUB va EKUK", "Признаки делимости, НОД и НОК", "Divisibility, GCD and LCM"]] },
+    { n: ["Algebra", "Алгебра", "Algebra"], t: [
+      ["O'zgaruvchilar va ifodalar", "Переменные и выражения", "Variables and algebraic expressions"],
+      ["Chiziqli tenglamalar", "Линейные уравнения", "Linear equations"],
+      ["Tengsizliklar", "Неравенства", "Inequalities"],
+      ["Tenglamalar sistemasi", "Системы уравнений", "Systems of equations"],
+      ["Ko'paytuvchilarga ajratish", "Разложение на множители", "Factoring"],
+      ["Kvadrat tenglamalar", "Квадратные уравнения", "Quadratic equations"],
+      ["Kvadrat formula va diskriminant", "Формула корней и дискриминант", "Quadratic formula and discriminant"],
+      ["Ko'phadlar", "Многочлены", "Polynomials"],
+      ["Ratsional ifodalar", "Рациональные выражения", "Rational expressions"],
+      ["Ildizli tenglamalar", "Иррациональные уравнения", "Radical equations"],
+      ["Modul (absolyut qiymat)", "Модуль (абсолютная величина)", "Absolute value"],
+      ["Ko'rsatkichli o'sish va kamayish", "Экспоненциальный рост и убывание", "Exponential growth and decay"],
+      ["Progressiyalar", "Прогрессии", "Arithmetic and geometric sequences"]] },
+    { n: ["Funksiyalar va grafiklar", "Функции и графики", "Functions & graphs"], t: [
+      ["Funksiya nima", "Что такое функция", "What is a function"],
+      ["Chiziqli funksiya va og'ish (slope)", "Линейная функция и наклон", "Linear functions and slope"],
+      ["Kvadrat funksiya va parabola", "Квадратичная функция и парабола", "Quadratic functions and the parabola"],
+      ["Grafik almashtirishlar", "Преобразования графиков", "Function transformations"],
+      ["Aniqlanish va qiymatlar sohasi", "Область определения и значений", "Domain and range"],
+      ["Murakkab va teskari funksiya", "Сложная и обратная функции", "Composite and inverse functions"],
+      ["Ko'rsatkichli funksiya", "Показательная функция", "Exponential functions"],
+      ["Logarifmlar", "Логарифмы", "Logarithms"]] },
+    { n: ["Geometriya", "Геометрия", "Geometry"], t: [
+      ["Burchaklar va to'g'ri chiziqlar", "Углы и прямые", "Angles and lines"],
+      ["Uchburchaklar", "Треугольники", "Triangles"],
+      ["Pifagor teoremasi", "Теорема Пифагора", "Pythagorean theorem"],
+      ["O'xshash uchburchaklar", "Подобные треугольники", "Similar triangles"],
+      ["Aylana va doira", "Окружность и круг", "Circles: circumference, area, arcs"],
+      ["Yuza va perimetr", "Площадь и периметр", "Area and perimeter"],
+      ["Hajm va sirt yuzi", "Объём и площадь поверхности", "Volume and surface area"],
+      ["Koordinatalar tekisligi: masofa va o'rta nuqta", "Координатная плоскость: расстояние и середина", "Coordinate geometry: distance and midpoint"],
+      ["Aylana tenglamasi", "Уравнение окружности", "Equation of a circle"]] },
+    { n: ["Trigonometriya", "Тригонометрия", "Trigonometry"], t: [
+      ["Sinus, kosinus, tangens", "Синус, косинус, тангенс", "Sine, cosine, tangent (SOH-CAH-TOA)"],
+      ["Maxsus uchburchaklar (30-60-90, 45-45-90)", "Особые треугольники (30-60-90, 45-45-90)", "Special right triangles (30-60-90, 45-45-90)"],
+      ["Radian va gradus", "Радианы и градусы", "Radians and degrees"],
+      ["Birlik aylana", "Единичная окружность", "The unit circle"],
+      ["Asosiy trigonometrik ayniyatlar", "Основные тригонометрические тождества", "Basic trigonometric identities"]] },
+    { n: ["Statistika va ehtimollik", "Статистика и вероятность", "Statistics & probability"], t: [
+      ["O'rtacha, mediana, moda", "Среднее, медиана, мода", "Mean, median, mode"],
+      ["Standart og'ish", "Стандартное отклонение", "Standard deviation"],
+      ["Ehtimollik asoslari", "Основы вероятности", "Probability basics"],
+      ["Shartli ehtimollik", "Условная вероятность", "Conditional probability"],
+      ["Kombinatorika: o'rin almashtirish va guruhlash", "Комбинаторика: перестановки и сочетания", "Permutations and combinations"],
+      ["Nuqtali diagramma va eng yaxshi mos chiziq", "Диаграмма рассеяния и линия тренда", "Scatterplots and line of best fit"],
+      ["Grafik va jadvallarni o'qish", "Чтение графиков и таблиц", "Reading graphs and tables"]] },
+    { n: ["Yuqori daraja", "Продвинутый уровень", "Advanced"], t: [
+      ["Kompleks sonlar", "Комплексные числа", "Complex numbers"],
+      ["Limitlar", "Пределы", "Limits"],
+      ["Hosila asoslari", "Основы производной", "Derivatives: the basics"],
+      ["Integral asoslari", "Основы интеграла", "Integrals: the basics"]] }
+  ];
+  var MATH_ALL = [];
+  MATH_TOPICS.forEach(function (sec) { sec.t.forEach(function (x) { MATH_ALL.push(x); }); });
+  function mathLi() { return lang === "uz" ? 0 : lang === "ru" ? 1 : 2; }
+  function mathDoneGet() { try { return JSON.parse(localStorage.getItem("mathDone") || "[]"); } catch (e) { return []; } }
+  function mathDoneAdd(en) { try { var d = mathDoneGet(); if (d.indexOf(en) < 0) { d.push(en); localStorage.setItem("mathDone", JSON.stringify(d)); } } catch (e) {} }
+
+  function mathOpen(x) {
+    mathDoneAdd(x[2]);
+    var i = MATH_ALL.indexOf(x), nxt = MATH_ALL[i + 1];
+    viewTutor("Teach me the math topic \"" + x[2] + "\" from scratch, for a complete beginner. Reply language: " + lang, viewMath,
+      nxt ? function () { mathOpen(nxt); } : null);
+  }
+
+  function viewMath() {
+    var li = mathLi(), done = mathDoneGet();
+    var list = h("div", {});
+    var input = h("input", { type: "text", placeholder: "🔎 " + S("mathSearch"), style: "width:100%;margin:6px 0 12px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:15px;box-sizing:border-box" });
+    function render() {
+      clear(list);
+      var q = input.value.trim().toLowerCase(), any = false;
+      MATH_TOPICS.forEach(function (sec) {
+        var rows = sec.t.filter(function (x) { return !q || x.join(" ").toLowerCase().indexOf(q) >= 0; });
+        if (!rows.length) return;
+        any = true;
+        list.appendChild(h("div", { class: "section-title", text: sec.n[li] }));
+        rows.forEach(function (x) {
+          var ok = done.indexOf(x[2]) >= 0;
+          list.appendChild(h("div", { class: "list-item", style: "margin-bottom:8px", onclick: function () { mathOpen(x); } },
+            h("span", { text: ok ? "✅" : "▫️" }), h("span", { style: "flex:1", text: x[li] })));
+        });
+      });
+      if (!any) list.appendChild(h("p", { class: "muted center", text: "—" }));
+    }
+    input.addEventListener("input", render);
+    render();
+    mount(backBtn(), title("➗ " + S("mathTopics"), S("mathDone", { a: done.filter(function (d) { return MATH_ALL.some(function (x) { return x[2] === d; }); }).length, b: MATH_ALL.length })), input, list);
+  }
 
   // ================= WRITING =================
   function writingFlow() {
