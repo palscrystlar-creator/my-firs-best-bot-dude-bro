@@ -5622,6 +5622,19 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   var initData = tg && tg.initData ? tg.initData : "";
   var T = {
     uz: {
+      advT: "Maslahat",
+      advSatLow: "Natija hozircha past. Avval zaif mavzuni ustoz bilan tushunib ol, keyin yana urinib ko'r.",
+      advSatMid: "Yaxshi! Zaif mavzularni mustahkamlab, yana mashq qil.",
+      advSatHigh: "Ajoyib! Endi to'liq mock testni vaqt bilan yechib ko'r.",
+      advWeakTopic: "Eng zaif mavzu: {d} ({p}%)",
+      advExplain: "👩‍🏫 Ustozdan tushuntirtir",
+      advPractice: "📘 SAT mashq",
+      advLow: "Mavzuni takrorlab, yana urinib ko'r. Har safar yaxshilanadi.",
+      advMid: "Yaxshi natija! Qiyinroq mavzuni yoki boshqa rejimni sinab ko'r.",
+      advHigh: "Zo'r! Endi sertifikat testi yoki SAT bo'limini sinab ko'r.",
+      advTutorDone: "Endi mustahkamlash savoliga javob ber. Tushunmasang «Soddaroq tushuntir» tugmasini bos.",
+      advPracRight: "To'g'ri! Mavzu o'zlashdi. Yana bir qiyinroq misol so'ra yoki yangi mavzuga o't.",
+      advPracWrong: "Hechqisi yo'q. «Soddaroq tushuntir» ni bosib qayta ko'r, keyin yana urinasan.",
       home: "Bosh", science: "Ilm", english: "Ingliz tili", top: "Reyting", pro: "PRO",
       loading: "Yuklanmoqda…", preparing: "Tayyorlanmoqda… (5–20 soniya)", err: "Xatolik. Qayta urinib ko'ring.", expired: "Sessiya tugadi. Qaytadan boshlang.",
       noTg: "Bu ilovani Telegramdagi bot orqali oching.", hello: "Salom", back: "← Orqaga", again: "🔁 Yana", done: "Tayyor", next: "Keyingisi ➜", start: "Boshlash",
@@ -5651,7 +5664,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium funksiya", payD: "PRO bilan hammasi tekin yoki bir martalik to'lang.", payOnce: "Faqat shu safar", limitT: "PRO limiti tugadi", limitD: "Bugungi limit ({n} ta) tugadi. Ertaga yana tekin yoki bir martalik to'lang.",
       upT: "🎉 Zo'r o'ynadingiz!", upD: "PRO bilan Writing, Speaking, SAT, Grammar, Reading, Listening, sertifikat testi va hikoyalar ham ochiladi. {p} ⭐ / {d} kun.", upBtn: "⭐ PRO ga o'tish", upLater: "Keyinroq",
       proActive: "PRO faol", until: "Tugash sanasi", daysLeft: "kun qoldi", extend: "Muddatni uzaytirish", buy: "PRO olish", offerT: "PRO obuna", days: "kun",
-      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modul) + Math (2 modul). 2-modul qiyinligi 1-modul natijasiga bog'liq. Formulalar uchun 📐, taymerni yashirish uchun ⏱. Ball — taxminiy, savollarni AI yozadi.", tutor: "SAT Tutor", tutorD: "Savol yozing yoki shunchaki gaplashing — o'qituvchi doskada tushuntiradi va javob beradi", tutorPlace: "Masalan: salom, qalaysan? Yoki: funksiya nima?", tutorAsk: "🧑‍🏫 Tushuntir", tutorBoard: "Doska tayyorlanmoqda…", tutorNext: "Davom ➜", tutorAll: "Hammasi", tutorSimpler: "🔁 Soddaroq tushuntir", tutorExample: "➕ Yana misol", tutorPractice: "Mustahkamlash", tutorOff: "Men SAT, matematika va ingliz tili bo'yicha yordam beraman. SAT savolingizni yozing 🙂", tutorStart: "Darsni boshlash", tutorNotes: "Konspekt", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
+      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modul) + Math (2 modul). 2-modul qiyinligi 1-modul natijasiga bog'liq. Formulalar uchun 📐, taymerni yashirish uchun ⏱. Ball — taxminiy, savollarni AI yozadi.", tutor: "SAT Tutor", tutorD: "Savol yozing yoki shunchaki gaplashing — o'qituvchi doskada tushuntiradi va javob beradi", tutorPlace: "Masalan: salom, qalaysan? Yoki: funksiya nima?", tutorAsk: "👩‍🏫 Tushuntir", tutorBoard: "Doska tayyorlanmoqda…", tutorNext: "Davom ➜", tutorAll: "Hammasi", tutorSimpler: "🔁 Soddaroq tushuntir", tutorExample: "➕ Yana misol", tutorPractice: "Mustahkamlash", tutorOff: "Men SAT, matematika va ingliz tili bo'yicha yordam beraman. SAT savolingizni yozing 🙂", tutorStart: "Darsni boshlash", tutorNotes: "Konspekt", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
       owner: "Siz bot egasisiz — hammasi doim tekin.", paidOk: "To'lov qabul qilindi! ⭐", cancelled: "To'lov bekor qilindi.", checking: "Tekshirilmoqda…", asSeparate: "Alohida: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Hozircha kontent yo'q.", questions: "ta savol", readOnly: "O'qish / tinglash", noRank: "Hozircha natijalar yo'q", boardQuiz: "Viktorina", boardCert: "Sertifikat", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (xalqaro)",
@@ -5699,6 +5712,19 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       chatLink: "Botga o'tish"
     },
     ru: {
+      advT: "Совет",
+      advSatLow: "Пока результат низкий. Сначала разбери слабую тему с преподавателем, потом попробуй ещё раз.",
+      advSatMid: "Хорошо! Закрепи слабые темы и потренируйся ещё.",
+      advSatHigh: "Отлично! Теперь реши полный мок-тест на время.",
+      advWeakTopic: "Самая слабая тема: {d} ({p}%)",
+      advExplain: "👩‍🏫 Пусть объяснит преподаватель",
+      advPractice: "📘 Практика SAT",
+      advLow: "Повтори тему и попробуй снова. С каждым разом будет лучше.",
+      advMid: "Хороший результат! Попробуй тему посложнее или другой режим.",
+      advHigh: "Отлично! Теперь попробуй тест с сертификатом или раздел SAT.",
+      advTutorDone: "Теперь ответь на закрепляющий вопрос. Если не понял, нажми «Объясни проще».",
+      advPracRight: "Верно! Тема усвоена. Попроси пример посложнее или переходи к новой теме.",
+      advPracWrong: "Ничего страшного. Нажми «Объясни проще», а потом попробуй снова.",
       home: "Главная", science: "Наука", english: "Английский", top: "Рейтинг", pro: "PRO",
       loading: "Загрузка…", preparing: "Готовлю… (5–20 секунд)", err: "Ошибка. Попробуйте ещё раз.", expired: "Сессия закончилась. Начните заново.",
       noTg: "Откройте приложение через бота в Telegram.", hello: "Привет", back: "← Назад", again: "🔁 Ещё раз", done: "Готово", next: "Дальше ➜", start: "Начать",
@@ -5728,7 +5754,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Премиум-функция", payD: "С PRO всё бесплатно, либо оплатите разово.", payOnce: "Только в этот раз", limitT: "Лимит PRO исчерпан", limitD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно, либо оплатите разово.",
       upT: "🎉 Отлично сыграли!", upD: "С PRO откроются Writing, Speaking, SAT, Grammar, Reading, Listening, тест с сертификатом и истории. {p} ⭐ / {d} дней.", upBtn: "⭐ Перейти на PRO", upLater: "Позже",
       proActive: "PRO активна", until: "Действует до", daysLeft: "дн. осталось", extend: "Продлить", buy: "Получить PRO", offerT: "PRO-подписка", days: "дней",
-      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 модуля) + Math (2 модуля). Сложность 2-го модуля зависит от результата 1-го. 📐 — формулы, ⏱ — скрыть таймер. Балл ориентировочный, вопросы пишет ИИ.", tutor: "SAT Tutor", tutorD: "Напишите вопрос или просто поболтайте — преподаватель объяснит на доске и ответит", tutorPlace: "Например: привет, как дела? Или: что такое функция?", tutorAsk: "🧑‍🏫 Объясни", tutorBoard: "Готовлю доску…", tutorNext: "Дальше ➜", tutorAll: "Всё сразу", tutorSimpler: "🔁 Объясни проще", tutorExample: "➕ Ещё пример", tutorPractice: "Закрепление", tutorOff: "Я помогаю с SAT, математикой и английским. Напишите вопрос по SAT 🙂", tutorStart: "Начать урок", tutorNotes: "Конспект", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
+      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 модуля) + Math (2 модуля). Сложность 2-го модуля зависит от результата 1-го. 📐 — формулы, ⏱ — скрыть таймер. Балл ориентировочный, вопросы пишет ИИ.", tutor: "SAT Tutor", tutorD: "Напишите вопрос или просто поболтайте — преподаватель объяснит на доске и ответит", tutorPlace: "Например: привет, как дела? Или: что такое функция?", tutorAsk: "👩‍🏫 Объясни", tutorBoard: "Готовлю доску…", tutorNext: "Дальше ➜", tutorAll: "Всё сразу", tutorSimpler: "🔁 Объясни проще", tutorExample: "➕ Ещё пример", tutorPractice: "Закрепление", tutorOff: "Я помогаю с SAT, математикой и английским. Напишите вопрос по SAT 🙂", tutorStart: "Начать урок", tutorNotes: "Конспект", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
       owner: "Вы владелец бота — для вас всё бесплатно.", paidOk: "Оплата получена! ⭐", cancelled: "Оплата отменена.", checking: "Проверяем…", asSeparate: "По отдельности: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Пока нет материалов.", questions: "вопросов", readOnly: "Для чтения / прослушивания", noRank: "Пока нет результатов", boardQuiz: "Викторина", boardCert: "Сертификат", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (международный)",
@@ -5776,6 +5802,19 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       chatLink: "Перейти в бота"
     },
     en: {
+      advT: "Advice",
+      advSatLow: "The score is low for now. First understand the weak topic with the teacher, then try again.",
+      advSatMid: "Good! Reinforce the weak topics and practice more.",
+      advSatHigh: "Excellent! Now try a full timed mock test.",
+      advWeakTopic: "Weakest topic: {d} ({p}%)",
+      advExplain: "👩‍🏫 Ask the teacher to explain",
+      advPractice: "📘 SAT practice",
+      advLow: "Review the topic and try again. You improve every time.",
+      advMid: "Good result! Try a harder topic or another mode.",
+      advHigh: "Great! Now try the certificate test or the SAT section.",
+      advTutorDone: "Now answer the practice question. If it's unclear, press “Simpler please”.",
+      advPracRight: "Correct! You've got it. Ask for a harder example or move to a new topic.",
+      advPracWrong: "No worries. Press “Simpler please”, then try again.",
       home: "Home", science: "Science", english: "English", top: "Ranking", pro: "PRO",
       loading: "Loading…", preparing: "Preparing… (5–20 seconds)", err: "Something went wrong. Please try again.", expired: "Session expired. Please start again.",
       noTg: "Please open this app from the bot inside Telegram.", hello: "Hi", back: "← Back", again: "🔁 Again", done: "Done", next: "Next ➜", start: "Start",
@@ -5805,7 +5844,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium feature", payD: "Included with PRO, or pay once for just this.", payOnce: "Just this once", limitT: "PRO limit reached", limitD: "Today's limit ({n}) is used up. Free again tomorrow, or pay for a single use.",
       upT: "🎉 Nice game!", upD: "PRO also unlocks Writing, Speaking, SAT, Grammar, Reading, Listening, the certificate test and stories. {p} ⭐ / {d} days.", upBtn: "⭐ Go PRO", upLater: "Later",
       proActive: "PRO is active", until: "Valid until", daysLeft: "days left", extend: "Extend", buy: "Get PRO", offerT: "PRO subscription", days: "days",
-      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modules) + Math (2 modules). Module 2 difficulty depends on module 1. 📐 for formulas, ⏱ to hide the timer. The score is an estimate; questions are AI-written.", tutor: "SAT Tutor", tutorD: "Ask a question or just chat — the teacher explains on the whiteboard and talks back", tutorPlace: "E.g. hi, how are you? Or: what is a function?", tutorAsk: "🧑‍🏫 Explain", tutorBoard: "Preparing the board…", tutorNext: "Next ➜", tutorAll: "Show all", tutorSimpler: "🔁 Simpler please", tutorExample: "➕ One more example", tutorPractice: "Quick practice", tutorOff: "I help with SAT, math and English. Ask me an SAT question 🙂", tutorStart: "Start the lesson", tutorNotes: "Notes", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
+      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modules) + Math (2 modules). Module 2 difficulty depends on module 1. 📐 for formulas, ⏱ to hide the timer. The score is an estimate; questions are AI-written.", tutor: "SAT Tutor", tutorD: "Ask a question or just chat — the teacher explains on the whiteboard and talks back", tutorPlace: "E.g. hi, how are you? Or: what is a function?", tutorAsk: "👩‍🏫 Explain", tutorBoard: "Preparing the board…", tutorNext: "Next ➜", tutorAll: "Show all", tutorSimpler: "🔁 Simpler please", tutorExample: "➕ One more example", tutorPractice: "Quick practice", tutorOff: "I help with SAT, math and English. Ask me an SAT question 🙂", tutorStart: "Start the lesson", tutorNotes: "Notes", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
       owner: "You're the bot owner — everything is always free for you.", paidOk: "Payment received! ⭐", cancelled: "Payment cancelled.", checking: "Checking…", asSeparate: "Bought separately: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "No content yet.", questions: "questions", readOnly: "For reading / listening", noRank: "No results yet", boardQuiz: "Quiz", boardCert: "Certificate", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (international)",
@@ -5961,6 +6000,14 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     var s = sheet(h("h2", { text: S(free ? "limitFreeT" : "limitT") }), h("p", { class: "muted", style: "margin-top:8px", text: S(free ? "limitFreeD" : "limitD", { n: me.prices.pro_daily_limit }) }),
       h("button", { class: "btn ghost", onclick: function () { s.close(); show(); }, text: S("done") }));
   }
+  function advice(lines, actions) {
+    var box = h("div", { class: "card advice" }, h("h3", { text: "💡 " + S("advT") }));
+    lines.forEach(function (l) { box.appendChild(h("p", { style: "margin-top:6px", text: l })); });
+    (actions || []).forEach(function (a) { box.appendChild(h("button", { class: "btn ghost", style: "margin-top:8px", onclick: a.fn, text: a.text })); });
+    return box;
+  }
+  function pctAdvice(pct) { return S(pct >= 85 ? "advHigh" : pct >= 60 ? "advMid" : "advLow"); }
+
   function upsell() {
     if (isPremium()) return;
     var now = Date.now();
@@ -6222,6 +6269,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       parts.push(h("div", { class: "card", text: msg }));
     }
     if (r.script) parts.push(h("div", { class: "card" }, h("div", { class: "muted small", text: S("script") }), h("p", { class: "pre", style: "margin-top:6px", text: r.script })));
+    parts.push(advice([pctAdvice(r.percentage)], []));
     parts.push(h("button", { class: "btn", onclick: function () { startQuiz(body); }, text: S("again") }), h("button", { class: "btn ghost", onclick: exitFor(body), text: S("back") }));
     haptic(r.percentage >= 60 ? "success" : "warning");
     mount.apply(null, parts);
@@ -6263,6 +6311,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     function end() {
       mount(h("div", { class: "card", style: "text-align:center" }, h("div", { class: "muted small", text: S("result") }),
         h("div", { class: "big", text: right + "/" + (round) }), h("div", { class: "muted", text: "🔥 " + S("streak") + ": " + streak })),
+        advice([pctAdvice(100 * right / Math.max(1, round))], []),
         h("button", { class: "btn", onclick: function () { roundGame(kind); }, text: S("again") }), h("button", { class: "btn ghost", onclick: viewScience, text: S("back") }));
       setTimeout(upsell, 700);
     }
@@ -6392,7 +6441,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     function go(body) { if (!P) { paywall(); return; } satStart(body); }
     var parts = [title("🎓 " + S("sat"), S("satD")), upgradeBar(),
       h("button", { class: "tile", style: "width:100%;margin-bottom:12px;background:linear-gradient(135deg,#1d3a2f,#274e3f);color:#fff", onclick: function () { viewTutor(); } },
-        h("div", { class: "e", text: "🧑‍🏫" }), h("div", { class: "n", text: S("tutor") }), h("div", { class: "d", style: "color:#cfe8dc", text: S("tutorD") })),
+        h("div", { class: "e", text: "👩‍🏫" }), h("div", { class: "n", text: S("tutor") }), h("div", { class: "d", style: "color:#cfe8dc", text: S("tutorD") })),
       h("div", { class: "card" }, h("p", { class: "small muted", text: S("satInfo") })),
       h("button", { class: "tile wide", style: "width:100%;margin-bottom:14px", onclick: function () { go({ mode: "mock" }); } },
         h("div", { class: "e", text: "🏁" }), h("div", { class: "n", text: S("satMock") }), h("div", { class: "d", text: S("satMockD") }),
@@ -6536,6 +6585,15 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
           h("div", { class: "progress", style: "margin:4px 0 0" }, h("i", { style: "width:" + d.pct + "%;background:" + (d.pct >= 60 ? "var(--good)" : "var(--bad)") })));
       })));
     if (weak.length) parts.push(h("div", { class: "card" }, h("h3", { text: "🎯 " + S("satWeak") }), weak.map(function (d) { return h("p", { style: "margin-top:6px", text: "• " + d.domain + " (" + d.pct + "%)" }); })));
+    var pctAll = r.mode === "mock" ? Math.round((r.total - 400) / 12) : Math.round(100 * r.right / Math.max(1, r.n));
+    var worst = r.domains.slice().sort(function (a, b) { return a.pct - b.pct; })[0];
+    var alines = [S(pctAll >= 75 ? "advSatHigh" : pctAll >= 50 ? "advSatMid" : "advSatLow")], aact = [];
+    if (worst && worst.pct < 80) {
+      alines.push(S("advWeakTopic", { d: worst.domain, p: worst.pct }));
+      aact.push({ text: S("advExplain"), fn: function () { viewTutor("Explain the SAT topic \"" + worst.domain + "\" simply, with a real-life example and one SAT-style question"); } });
+    }
+    aact.push({ text: S("advPractice"), fn: viewSat });
+    parts.push(advice(alines, aact));
     if (r.mode === "mock") parts.push(h("p", { class: "muted small", style: "margin:8px 2px", text: "ℹ️ " + S("satEstNote") }));
     parts.push(h("button", { class: "btn", onclick: function () { satReview(r, startBody); }, text: "🔍 " + S("satReview") }),
       h("button", { class: "btn ghost", onclick: function () { satStart(startBody); }, text: S("again") }),
@@ -6679,21 +6737,27 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   }
 
   var TEACHER_SVG = '<svg class="teacher-svg" viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">' +
-    '<ellipse cx="60" cy="193" rx="38" ry="5" fill="rgba(0,0,0,.25)"/>' +
-    '<g class="legL" style="transform-box:view-box;transform-origin:49px 134px"><rect x="42" y="132" width="15" height="58" rx="5" fill="#2b3a55"/><rect x="38" y="184" width="22" height="9" rx="4" fill="#1b1b1b"/></g>' +
-    '<g class="legR" style="transform-box:view-box;transform-origin:71px 134px"><rect x="63" y="132" width="15" height="58" rx="5" fill="#2b3a55"/><rect x="60" y="184" width="22" height="9" rx="4" fill="#1b1b1b"/></g>' +
-    '<g class="torso"><rect x="34" y="72" width="52" height="68" rx="14" fill="#4f7cff"/>' +
-    '<path d="M54 74 L60 92 L66 74 Z" fill="#fff"/><path d="M58 90 L62 90 L64 118 L60 124 L56 118 Z" fill="#ffd166"/>' +
-    '<g class="arm2"><rect x="80" y="78" width="12" height="46" rx="6" fill="#4f7cff" transform="rotate(-6 86 80)"/><circle cx="88" cy="126" r="7" fill="#f2c6a0"/></g></g>' +
-    '<g class="arm" style="transform-origin:38px 82px"><rect x="22" y="76" width="13" height="40" rx="6.5" fill="#4f7cff" transform="rotate(32 28 80)"/>' +
-    '<circle cx="14" cy="112" r="7" fill="#f2c6a0"/><rect x="-26" y="110" width="52" height="3.5" rx="1.7" fill="#c9a26b" transform="rotate(-18 14 112)"/></g>' +
-    '<rect x="53" y="62" width="14" height="14" rx="5" fill="#e8b88f"/>' +
-    '<circle cx="60" cy="46" r="27" fill="#f2c6a0"/>' +
-    '<path d="M33 44 C33 18 87 18 87 44 C82 31 72 28 60 28 C48 28 38 31 33 44 Z" fill="#6b4a2e"/>' +
-    '<g class="eyes"><circle cx="50" cy="47" r="3" fill="#222"/><circle cx="70" cy="47" r="3" fill="#222"/></g>' +
-    '<g fill="none" stroke="#333" stroke-width="2"><circle cx="50" cy="47" r="8"/><circle cx="70" cy="47" r="8"/><path d="M58 47 L62 47"/></g>' +
-    '<path d="M44 37 Q50 33 56 37 M64 37 Q70 33 76 37" stroke="#6b4a2e" stroke-width="2.4" fill="none" stroke-linecap="round"/>' +
-    '<ellipse class="mouth" cx="60" cy="62" rx="7" ry="4.5" fill="#8a3b3b"/>' +
+    '<ellipse cx="60" cy="193" rx="36" ry="5" fill="rgba(0,0,0,.25)"/>' +
+    '<path d="M29 50 C24 8 96 8 91 50 L98 116 C99 130 84 132 80 120 L40 120 C36 132 21 130 22 116 Z" fill="#5a3322"/>' +
+    '<g class="legL" style="transform-box:view-box;transform-origin:50px 140px"><rect x="43" y="138" width="12" height="48" rx="5" fill="#f4cba8"/><path d="M39 186 Q48 178 58 186 L60 192 L38 192 Z" fill="#c8325a"/></g>' +
+    '<g class="legR" style="transform-box:view-box;transform-origin:70px 140px"><rect x="65" y="138" width="12" height="48" rx="5" fill="#f4cba8"/><path d="M61 186 Q70 178 80 186 L82 192 L60 192 Z" fill="#c8325a"/></g>' +
+    '<g class="torso"><rect x="36" y="72" width="48" height="52" rx="15" fill="#ff7fae"/>' +
+    '<path d="M36 112 L84 112 L95 156 L25 156 Z" fill="#6a4fb5"/><path d="M36 112 L84 112" stroke="#51399a" stroke-width="3"/>' +
+    '<path d="M60 80 L51 86 L51 76 Z M60 80 L69 86 L69 76 Z" fill="#fff"/><circle cx="60" cy="80" r="3" fill="#ffd166"/>' +
+    '<g class="arm2"><rect x="79" y="78" width="12" height="44" rx="6" fill="#ff7fae" transform="rotate(-6 85 80)"/><circle cx="88" cy="125" r="6.5" fill="#f4cba8"/></g></g>' +
+    '<g class="arm" style="transform-origin:38px 82px"><rect x="22" y="76" width="13" height="40" rx="6.5" fill="#ff7fae" transform="rotate(32 28 80)"/>' +
+    '<circle cx="14" cy="112" r="6.5" fill="#f4cba8"/><rect x="-26" y="110" width="52" height="3.5" rx="1.7" fill="#c9a26b" transform="rotate(-18 14 112)"/></g>' +
+    '<rect x="54" y="62" width="12" height="14" rx="5" fill="#eebd96"/>' +
+    '<circle cx="60" cy="46" r="26" fill="#f8d6b8"/>' +
+    '<path d="M32 48 C28 12 92 12 88 48 C86 36 80 28 66 24 C60 32 44 36 36 44 Z" fill="#5a3322"/>' +
+    '<path d="M33 46 C32 56 33 62 36 68 C38 58 37 52 38 46 Z M87 46 C88 56 87 62 84 68 C82 58 83 52 82 46 Z" fill="#5a3322"/>' +
+    '<g transform="translate(82 26)"><path d="M0 0 L-8 -5 L-8 5 Z M0 0 L8 -5 L8 5 Z" fill="#ff5c93"/><circle r="2.6" fill="#ffd166"/></g>' +
+    '<ellipse cx="42" cy="56" rx="5" ry="3" fill="#ff8fa8" opacity=".45"/><ellipse cx="78" cy="56" rx="5" ry="3" fill="#ff8fa8" opacity=".45"/>' +
+    '<g class="eyes"><ellipse cx="50" cy="48" rx="4" ry="5" fill="#3a2418"/><ellipse cx="70" cy="48" rx="4" ry="5" fill="#3a2418"/>' +
+    '<circle cx="51.5" cy="46" r="1.5" fill="#fff"/><circle cx="71.5" cy="46" r="1.5" fill="#fff"/></g>' +
+    '<g fill="none" stroke="#3a2418" stroke-width="1.8" stroke-linecap="round"><path d="M44 43 Q50 39 56 43"/><path d="M64 43 Q70 39 76 43"/><path d="M44 43 L42 41 M76 43 L78 41"/></g>' +
+    '<path d="M45 35 Q50 32 55 35 M65 35 Q70 32 75 35" stroke="#5a3322" stroke-width="2" fill="none" stroke-linecap="round"/>' +
+    '<ellipse class="mouth" cx="60" cy="62" rx="5.5" ry="4" fill="#c4405f"/>' +
     '</svg>';
 
   function chalkWipe(el) { el.style.clipPath = "inset(0 100% 0 0)"; el.style.webkitClipPath = "inset(0 100% 0 0)"; }
@@ -6731,7 +6795,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
   var SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
 
-  function viewTutor() {
+  function viewTutor(q0) {
     var sid = null, area = h("div", {}), input, busy = false, player = null, askCard = null, tutorAudio = null, unlocked = Promise.resolve(false);
     function stopPlayer() { if (player) { player.stop(); player = null; } }
     cleanupFn = null;
@@ -6775,7 +6839,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       var after = h("div", {});
       if (!r.chat) askCard.style.display = "none";
       var room = h("div", { class: "classroom" }, board, walkway, bubble);
-      if (!r.chat) area.appendChild(mj(h("div", { class: "lesson-title", text: "🧑‍🏫 " + r.title })));
+      if (!r.chat) area.appendChild(mj(h("div", { class: "lesson-title", text: "👩‍🏫 " + r.title })));
       area.appendChild(room); area.appendChild(ctl); area.appendChild(after);
       setTimeout(function () { try { room.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 60);
       var tsvg = teacher.firstChild;
@@ -6909,6 +6973,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
           s0.board.forEach(function (b) { notes.appendChild(mj(h("div", { class: "chalk", style: "color:var(--text)", text: b }))); });
         });
         after.appendChild(notes);
+        after.appendChild(advice([S("advTutorDone")], []));
         if (r.practice) after.appendChild(practice(r.practice));
         after.appendChild(h("div", { class: "row", style: "margin-top:10px" },
           h("button", { class: "btn ghost", onclick: function () { ask("Explain the same thing more simply, with a different example"); }, text: S("tutorSimpler") }),
@@ -6935,6 +7000,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
           b.classList.add(right ? "correct" : "wrong");
           if (!right) box.querySelectorAll(".opt")[p.correct_index].classList.add("correct");
           if (p.explanation) box.appendChild(mj(h("p", { class: "small", style: "margin-top:8px", text: "💡 " + p.explanation })));
+          box.appendChild(advice([S(right ? "advPracRight" : "advPracWrong")], []));
         });
         box.appendChild(mj(b));
       });
@@ -6945,7 +7011,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     TUTOR_TOPICS.forEach(function (t) { chips.appendChild(h("button", { class: "chip", onclick: function () { ask(t); }, text: t })); });
     askCard = h("div", { class: "card" }, input,
       h("button", { class: "btn", style: "margin-top:8px", onclick: function () { ask(input.value); }, text: S("tutorAsk") }), chips);
-    mount(backBtn(viewSat), title("🧑‍🏫 " + S("tutor"), S("tutorD")), askCard, area);
+    mount(backBtn(viewSat), title("👩‍🏫 " + S("tutor"), S("tutorD")), askCard, area);
+    if (q0) ask(q0);
     cleanupFn = stopPlayer;
   }
 
@@ -7094,7 +7161,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     var card = h("div", { class: "card" },
       h("div", { class: "progress" }, h("i", { style: "width:" + Math.round(item.i / item.total * 100) + "%" })),
       h("div", { class: "muted small", text: "🎙 " + S("part") + " " + item.part + " · " + (item.i + 1) + "/" + item.total }),
-      item.lead ? h("p", { class: "muted", style: "margin-top:8px", text: "🧑‍🏫 " + item.lead }) : null);
+      item.lead ? h("p", { class: "muted", style: "margin-top:8px", text: "👩‍🏫 " + item.lead }) : null);
     if (item.part === 2) {
       if (item.pics) card.appendChild(h("div", { class: "pics" },
         h("figure", {}, h("img", { src: "/api/app/speaking/pic/" + sid + "/0", alt: "" }), h("figcaption", { text: "🅰️ " + S("picA") })),
@@ -8631,6 +8698,26 @@ def _speech_normalize(text: str, lang: str) -> str:
     W = _SP_WORDS[lang]
     t = str(text or "")
     t = t.replace("−", "-").replace("–", "-").replace("×", "*").replace("·", "*").replace("÷", "/")
+    if lang == "uz":
+        # oddiy arifmetika odamcha o'qiladi: 3+5=8 -> "uchni beshga qo'shamiz, javobi sakkiz"
+        _ops = {"+": "{a}ni {b}ga qo'shamiz", "-": "{a}dan {b}ni ayiramiz",
+                "*": "{a}ni {b}ga ko'paytiramiz", "/": "{a}ni {b}ga taqsim qilamiz"}
+
+        def _arith(m):
+            a, op, b, c = m.group(1), m.group(2), m.group(3), m.group(4)
+            if re.search(r"[+\-*/^]\s*$", m.string[:m.start()]):
+                return m.group(0)  # zanjir (3+5+2): umumiy qoida bilan o'qiladi
+            if op == "-" and not (c or (m.group(0)[len(a):].startswith(" "))):
+                return m.group(0)  # 10-12 (oraliq) bo'lishi mumkin
+            try:
+                ia, ib = int(a), int(b)
+                sent = _ops[op].format(a=_uz_num(ia), b=_uz_num(ib))
+                if c:
+                    sent += ", javobi " + _uz_num(int(c))
+                return " " + sent + " "
+            except Exception:
+                return m.group(0)
+        t = re.sub(r"(?<![\d.,/])(\d{1,6})\s*([+\-*/])\s*(\d{1,6})(?:\s*=\s*(\d{1,9}))?(?!\d|[.,]\d|/|\s*[+\-*/^]\s*\d)", _arith, t)
     t = t.replace("≤", f" {W['le']} ").replace("≥", f" {W['ge']} ").replace("≠", f" {W['ne']} ")
     t = t.replace("π", f" {W['pi']} ").replace("√", f" {W['root']} ").replace("°", f" {W['deg']} ").replace("%", f" {W['pct']} ")
     # LaTeX qoldiqlari
@@ -8681,8 +8768,8 @@ def _speech_normalize(text: str, lang: str) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
-_EDGE_VOICES = {"uz": "uz-UZ-SardorNeural", "ru": "ru-RU-DmitryNeural", "en": "en-US-AndrewNeural"}
-_EDGE_ALT = {"uz": "uz-UZ-MadinaNeural", "ru": "ru-RU-SvetlanaNeural", "en": "en-US-GuyNeural"}
+_EDGE_VOICES = {"uz": "uz-UZ-MadinaNeural", "ru": "ru-RU-SvetlanaNeural", "en": "en-US-JennyNeural"}
+_EDGE_ALT = {"uz": "uz-UZ-SardorNeural", "ru": "ru-RU-DariyaNeural", "en": "en-US-AriaNeural"}
 _TTS_STATS = {"edge": 0, "fallback": 0, "last_error": ""}
 
 
