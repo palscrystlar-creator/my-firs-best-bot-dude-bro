@@ -5645,6 +5645,45 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   .lb-row:last-child { border-bottom: 0; }
   .lb-row.me { color: var(--gold); font-weight: 700; }
   .lb-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ===== Yuzli ustoz + katakli matematik varaq ===== */
+  .classroom { background: linear-gradient(180deg, #eef3ff, #e4ebfb); padding: 10px; }
+  .tface-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .tface-row .teacher { position: relative; flex: 0 0 76px; width: 76px; left: auto; transition: none; }
+  .tface-row .bubble { display: block; flex: 1; margin: 0; min-height: 46px; background: #fff; color: #1a237e; border: 2px solid #c5cae9; border-radius: 14px; padding: 9px 12px; font-size: 14.5px; position: relative; }
+  .tface-row .bubble::before { content: ""; position: absolute; left: -9px; top: 18px; border: 8px solid transparent; border-right-color: #c5cae9; border-left: 0; }
+  .classroom .tboard { position: relative; background-color: #fffef9; background-image: linear-gradient(rgba(60,120,200,.20) 1px, transparent 1px), linear-gradient(90deg, rgba(60,120,200,.20) 1px, transparent 1px); background-size: 22px 22px; border: 1px solid #cfd8dc; border-radius: 10px; color: #1a237e; box-shadow: 0 3px 12px rgba(30,40,90,.18); padding: 14px 14px 18px 40px; min-height: 280px; }
+  .classroom .tboard::before { content: ""; position: absolute; left: 30px; top: 0; bottom: 0; width: 2px; background: rgba(229,57,53,.45); }
+  .classroom .chalk { background: none; border: 0; border-radius: 0; padding: 2px 4px; margin: 6px 0; color: #1a237e; font-size: 20px; width: fit-content; max-width: 100%; border-bottom: 2px solid rgba(26,35,126,.12); }
+  .classroom .board-pic { background: none; padding: 4px 0; }
+  .classroom .board-pic .muted { color: #5c6bc0; }
+  .classroom .tboard .board-pic svg { max-height: 230px; }
+  .classroom .flow-card { background: #fff; border: 2px solid #90a4ae; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+  .classroom .flow-card.mid { border-color: #ef6c00; background: #fff3e0; }
+  .classroom .flow-l { color: #263238; }
+  .classroom .flow-arrow { color: #ef6c00; }
+  .classroom .ctable { color: #1a237e; background: rgba(255,255,255,.8); }
+  .classroom .ctable th { color: #c62828; border-bottom-color: #1a237e; }
+  .classroom .ctable td { border-bottom-color: rgba(26,35,126,.18); }
+  .classroom .ctable td + td, .classroom .ctable th + th { border-left-color: rgba(26,35,126,.3); }
+  .classroom .board-start { z-index: 5; }
+  .pen { position: absolute; display: none; font-size: 28px; line-height: 1; z-index: 4; pointer-events: none; transform: rotate(-12deg); transform-origin: 0 100%; transition: left .09s linear, top .09s linear; filter: drop-shadow(1px 2px 1px rgba(0,0,0,.25)); }
+  .teacher-svg .fig { transform-origin: 50px 96px; }
+  .teacher-svg .head { transform-origin: 50px 92px; }
+  .teacher-svg .eye { transform-box: fill-box; transform-origin: center; animation: tblink 4.2s infinite; }
+  .teacher-svg .pupils { transition: transform .12s ease-out; }
+  .teacher-svg .mouth { transform-box: view-box; transform-origin: 50px 69px; transform: scaleY(.38); }
+  .t-talk .mouth, .t-write .mouth { animation: tmouth2 .26s ease-in-out infinite; }
+  .t-happy .mouth { animation: none !important; transform: scaleY(1.1) !important; }
+  .teacher-mini { width: 64px; }
+  @keyframes tmouth2 { 0%,100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+  @media (min-width: 900px) {
+    .tface-row .teacher { flex-basis: 96px; width: 96px; }
+    .tface-row .bubble { font-size: 17px; }
+    .classroom .tboard { padding: 22px 28px 26px 56px; min-height: 360px; }
+    .classroom .tboard::before { left: 44px; }
+    .classroom .chalk { font-size: 24px; }
+  }
 </style>
 </head>
 <body>
@@ -6738,16 +6777,16 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     var sy = function (y) { return H - pad - (y - d.ymin) / (d.ymax - d.ymin) * (H - 2 * pad); };
     var gx = niceStep(d.xmax - d.xmin), gy = niceStep(d.ymax - d.ymin), v;
     for (v = Math.ceil(d.xmin / gx) * gx; v <= d.xmax + 1e-9; v += gx) {
-      svg.appendChild(svgEl("line", { x1: sx(v), y1: pad, x2: sx(v), y2: H - pad, stroke: "rgba(255,255,255,.12)", "stroke-width": 1 }));
-      if (Math.abs(v) > 1e-9) svg.appendChild(svgEl("text", { x: sx(v), y: Math.min(H - 8, Math.max(pad + 10, sy(0) + 14)), fill: "#cfd8dc", "font-size": 11, "text-anchor": "middle" }, String(+v.toFixed(2))));
+      svg.appendChild(svgEl("line", { x1: sx(v), y1: pad, x2: sx(v), y2: H - pad, stroke: "rgba(30,70,150,.16)", "stroke-width": 1 }));
+      if (Math.abs(v) > 1e-9) svg.appendChild(svgEl("text", { x: sx(v), y: Math.min(H - 8, Math.max(pad + 10, sy(0) + 14)), fill: "#546e7a", "font-size": 11, "text-anchor": "middle" }, String(+v.toFixed(2))));
     }
     for (v = Math.ceil(d.ymin / gy) * gy; v <= d.ymax + 1e-9; v += gy) {
-      svg.appendChild(svgEl("line", { x1: pad, y1: sy(v), x2: W - pad, y2: sy(v), stroke: "rgba(255,255,255,.12)", "stroke-width": 1 }));
-      if (Math.abs(v) > 1e-9) svg.appendChild(svgEl("text", { x: Math.min(W - 6, Math.max(pad - 4, sx(0) - 5)), y: sy(v) + 4, fill: "#cfd8dc", "font-size": 11, "text-anchor": "end" }, String(+v.toFixed(2))));
+      svg.appendChild(svgEl("line", { x1: pad, y1: sy(v), x2: W - pad, y2: sy(v), stroke: "rgba(30,70,150,.16)", "stroke-width": 1 }));
+      if (Math.abs(v) > 1e-9) svg.appendChild(svgEl("text", { x: Math.min(W - 6, Math.max(pad - 4, sx(0) - 5)), y: sy(v) + 4, fill: "#546e7a", "font-size": 11, "text-anchor": "end" }, String(+v.toFixed(2))));
     }
-    if (d.xmin <= 0 && d.xmax >= 0) svg.appendChild(svgEl("line", { x1: sx(0), y1: pad - 6, x2: sx(0), y2: H - pad + 6, stroke: "#f5f5f5", "stroke-width": 2 }));
-    if (d.ymin <= 0 && d.ymax >= 0) svg.appendChild(svgEl("line", { x1: pad - 6, y1: sy(0), x2: W - pad + 6, y2: sy(0), stroke: "#f5f5f5", "stroke-width": 2 }));
-    var colors = ["#ffd166", "#7bdff2", "#b2f7a3", "#ff9aa2"];
+    if (d.xmin <= 0 && d.xmax >= 0) svg.appendChild(svgEl("line", { x1: sx(0), y1: pad - 6, x2: sx(0), y2: H - pad + 6, stroke: "#37474f", "stroke-width": 2 }));
+    if (d.ymin <= 0 && d.ymax >= 0) svg.appendChild(svgEl("line", { x1: pad - 6, y1: sy(0), x2: W - pad + 6, y2: sy(0), stroke: "#37474f", "stroke-width": 2 }));
+    var colors = ["#c62828", "#1565c0", "#2e7d32", "#ef6c00"];
     d.fns.forEach(function (f, k) {
       var fn; try { fn = plotEval(f.expr); } catch (e) { return; }
       var path = "", pen = false, prev = null, N = 400, yr = d.ymax - d.ymin;
@@ -6760,10 +6799,24 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       if (f.label) svg.appendChild(svgEl("text", { x: W - pad - 4, y: pad + 12 + k * 16, fill: colors[k % 4], "font-size": 13, "text-anchor": "end" }, f.label));
     });
     d.points.forEach(function (p) {
-      svg.appendChild(svgEl("circle", { cx: sx(p.x), cy: sy(p.y), r: 4.5, fill: "#ff9aa2", stroke: "#fff", "stroke-width": 1.5 }));
-      if (p.label) svg.appendChild(svgEl("text", { x: sx(p.x) + 7, y: sy(p.y) - 7, fill: "#fff", "font-size": 12 }, p.label));
+      svg.appendChild(svgEl("circle", { cx: sx(p.x), cy: sy(p.y), r: 4.5, fill: "#ffb300", stroke: "#37474f", "stroke-width": 1.5 }));
+      if (p.label) svg.appendChild(svgEl("text", { x: sx(p.x) + 7, y: sy(p.y) - 7, fill: "#1a237e", "font-size": 12 }, p.label));
     });
     return svg;
+  }
+
+  function inkify(s) {
+    function fix(hex) {
+      var h6 = hex.length === 4 ? "#" + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3] : hex;
+      var r = parseInt(h6.substr(1, 2), 16) / 255, g = parseInt(h6.substr(3, 2), 16) / 255, b = parseInt(h6.substr(5, 2), 16) / 255;
+      var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+      if (l < 0.55) return hex;
+      var d = mx - mn, hh = 0, ss = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+      if (d) { hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; hh *= 60; if (hh < 0) hh += 360; }
+      if (ss < 0.15) return "#263238";
+      return "hsl(" + Math.round(hh) + "," + Math.round(Math.min(1, ss + 0.2) * 100) + "%,32%)";
+    }
+    return String(s).replace(/#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g, fix).replace(/rgba?\(\s*255\s*,\s*255\s*,\s*255[^)]*\)/g, "#263238").replace(/(fill|stroke)="white"/g, '$1="#263238"');
   }
 
   function diagramEl(d) {
@@ -6786,34 +6839,20 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       d.rows.forEach(function (r) { var tr = h("tr", {}); r.forEach(function (c) { tr.appendChild(h("td", { text: c })); }); tbody.appendChild(tr); });
       tb.appendChild(tbody); wrap.appendChild(mj(tb));
     }
-    else if (d.type === "svg") wrap.innerHTML = d.svg;   // server tomonida tozalangan (whitelist) SVG
+    else if (d.type === "svg") wrap.innerHTML = inkify(d.svg);   // server tomonida tozalangan (whitelist) SVG
     if (d.caption) wrap.appendChild(h("div", { class: "muted small", style: "text-align:center;margin-top:4px", text: d.caption }));
     return wrap;
   }
 
-  var TEACHER_SVG = '<svg class="teacher-svg" viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">' +
-    '<ellipse class="shadow" cx="60" cy="193" rx="36" ry="5" fill="rgba(0,0,0,.25)"/><g class="fig">' +
-    '<g class="hairB"><path d="M29 50 C24 8 96 8 91 50 L98 116 C99 130 84 132 80 120 L40 120 C36 132 21 130 22 116 Z" fill="#5a3322"/></g>' +
-    '<g class="legL" style="transform-box:view-box;transform-origin:50px 140px"><rect x="43" y="138" width="12" height="48" rx="5" fill="#f4cba8"/><path d="M39 186 Q48 178 58 186 L60 192 L38 192 Z" fill="#c8325a"/></g>' +
-    '<g class="legR" style="transform-box:view-box;transform-origin:70px 140px"><rect x="65" y="138" width="12" height="48" rx="5" fill="#f4cba8"/><path d="M61 186 Q70 178 80 186 L82 192 L60 192 Z" fill="#c8325a"/></g>' +
-    '<g class="torso"><rect x="36" y="72" width="48" height="52" rx="15" fill="#ff7fae"/>' +
-    '<g class="skirt"><path d="M36 112 L84 112 L95 156 L25 156 Z" fill="#6a4fb5"/><path d="M36 112 L84 112" stroke="#51399a" stroke-width="3"/></g>' +
-    '<path d="M60 80 L51 86 L51 76 Z M60 80 L69 86 L69 76 Z" fill="#fff"/><circle cx="60" cy="80" r="3" fill="#ffd166"/>' +
-    '<g class="arm2"><rect x="79" y="78" width="12" height="44" rx="6" fill="#ff7fae" transform="rotate(-6 85 80)"/><circle cx="88" cy="125" r="6.5" fill="#f4cba8"/></g></g>' +
-    '<g class="arm" style="transform-origin:38px 82px"><rect x="22" y="76" width="13" height="40" rx="6.5" fill="#ff7fae" transform="rotate(32 28 80)"/>' +
-    '<circle cx="14" cy="112" r="6.5" fill="#f4cba8"/><rect x="-26" y="110" width="52" height="3.5" rx="1.7" fill="#c9a26b" transform="rotate(-18 14 112)"/></g>' +
-    '<rect x="54" y="62" width="12" height="14" rx="5" fill="#eebd96"/>' +
-    '<g class="head">' +
-    '<circle cx="60" cy="46" r="26" fill="#f8d6b8"/>' +
-    '<path d="M32 48 C28 12 92 12 88 48 C86 36 80 28 66 24 C60 32 44 36 36 44 Z" fill="#5a3322"/>' +
-    '<path d="M33 46 C32 56 33 62 36 68 C38 58 37 52 38 46 Z M87 46 C88 56 87 62 84 68 C82 58 83 52 82 46 Z" fill="#5a3322"/>' +
-    '<g class="ribbon" transform="translate(82 26)"><g class="ribbon-in"><path d="M0 0 L-8 -5 L-8 5 Z M0 0 L8 -5 L8 5 Z" fill="#ff5c93"/><circle r="2.6" fill="#ffd166"/></g></g>' +
-    '<ellipse cx="42" cy="56" rx="5" ry="3" fill="#ff8fa8" opacity=".45"/><ellipse cx="78" cy="56" rx="5" ry="3" fill="#ff8fa8" opacity=".45"/>' +
-    '<g class="eyes"><ellipse cx="50" cy="48" rx="4" ry="5" fill="#3a2418"/><ellipse cx="70" cy="48" rx="4" ry="5" fill="#3a2418"/>' +
-    '<circle cx="51.5" cy="46" r="1.5" fill="#fff"/><circle cx="71.5" cy="46" r="1.5" fill="#fff"/></g>' +
-    '<g fill="none" stroke="#3a2418" stroke-width="1.8" stroke-linecap="round"><path d="M44 43 Q50 39 56 43"/><path d="M64 43 Q70 39 76 43"/><path d="M44 43 L42 41 M76 43 L78 41"/></g>' +
-    '<g class="brows"><path d="M45 35 Q50 32 55 35 M65 35 Q70 32 75 35" stroke="#5a3322" stroke-width="2" fill="none" stroke-linecap="round"/></g>' +
-    '<ellipse class="mouth" cx="60" cy="62" rx="5.5" ry="4" fill="#c4405f"/>' +
+  var TEACHER_SVG = '<svg class="teacher-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' +
+    '<g class="fig"><g class="head">' +
+    '<circle cx="50" cy="50" r="44" fill="#ffd54a" stroke="#e0a000" stroke-width="3"/>' +
+    '<ellipse cx="22" cy="62" rx="7" ry="4.5" fill="#ff8a65" opacity=".45"/><ellipse cx="78" cy="62" rx="7" ry="4.5" fill="#ff8a65" opacity=".45"/>' +
+    '<g class="brows" fill="none" stroke="#6d4c41" stroke-width="3" stroke-linecap="round"><path d="M26 29 Q35 23 44 28"/><path d="M56 28 Q65 23 74 29"/></g>' +
+    '<g class="eye eyeL"><ellipse cx="35" cy="42" rx="9.5" ry="11" fill="#fff" stroke="#6d4c41" stroke-width="2"/><g class="pupils"><circle cx="35" cy="43" r="5" fill="#3e2723"/><circle cx="37" cy="40.5" r="1.8" fill="#fff"/></g></g>' +
+    '<g class="eye eyeR"><ellipse cx="65" cy="42" rx="9.5" ry="11" fill="#fff" stroke="#6d4c41" stroke-width="2"/><g class="pupils"><circle cx="65" cy="43" r="5" fill="#3e2723"/><circle cx="67" cy="40.5" r="1.8" fill="#fff"/></g></g>' +
+    '<ellipse class="nose" cx="50" cy="57" rx="5.5" ry="4.5" fill="#f08c2a" stroke="#c76f00" stroke-width="1.5"/>' +
+    '<path class="mouth" d="M32 69 Q50 92 68 69 Z" fill="#8d2b3a" stroke="#6d1f2c" stroke-width="2.5" stroke-linejoin="round"/>' +
     '</g></g></svg>';
 
   function chalkWipe(el) { el.style.clipPath = "inset(0 100% 0 0)"; el.style.webkitClipPath = "inset(0 100% 0 0)"; }
@@ -6831,7 +6870,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     if (!svg) return out;
     svg.querySelectorAll("line,path,polygon,polyline,circle,ellipse,rect,text").forEach(function (el) {
       var tag = el.tagName.toLowerCase(), stroke = el.getAttribute("stroke") || "", fill = el.getAttribute("fill");
-      var grid = /rgba\(255,255,255,\.12\)/.test(stroke);
+      var grid = /rgba\(30,70,150,\.16\)/.test(stroke);
       var item = { el: el, w: 1, kind: "fade", grid: grid };
       if (tag !== "text" && stroke && (fill === "none" || tag === "line" || tag === "path" || tag === "polyline") && typeof el.getTotalLength === "function") {
         var len = 0; try { len = el.getTotalLength(); } catch (e) {}
@@ -6887,14 +6926,15 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       var boardIn = h("div", { class: "board-in" });
       var board = h("div", { class: "board tboard" + (r.chat ? " chatboard" : "") }, boardIn);
       var teacher = h("div", { class: "teacher" }); teacher.innerHTML = TEACHER_SVG;
-      var walkway = h("div", { class: "walkway" }, teacher);
       var bubble = h("div", { class: "bubble", text: "" });
+      var faceRow = h("div", { class: "tface-row" }, teacher, bubble);
+      var pen = h("div", { class: "pen", text: "✏️" }); board.appendChild(pen);
       var startBtn = h("button", { class: "btn gold board-start", text: "▶ " + S("tutorStart") });
       if (!canAuto) board.appendChild(startBtn);
       var ctl = h("div", { class: "row", style: "margin:10px 0" });
       var after = h("div", {});
       if (!r.chat) askCard.style.display = "none";
-      var room = h("div", { class: "classroom" }, board, walkway, bubble);
+      var room = h("div", { class: "classroom" }, faceRow, board);
       if (!r.chat) area.appendChild(mj(h("div", { class: "lesson-title", text: "👩‍🏫 " + r.title })));
       area.appendChild(room); area.appendChild(ctl); area.appendChild(after);
       setTimeout(function () { try { room.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 60);
@@ -6902,12 +6942,35 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
       var audio = tutorAudio || (tutorAudio = new Audio()), st = { i: -1, playing: false, muted: false, t: 0, dur: 0, items: [], raf: 0, last: 0, usingAudio: false, say: [], active: -1, dead: false, ended: false, gen: 0 };
       var WALK = [0.06, 0.55, 0.92, 0.28, 0.75];
-      function walkTo(frac) {
-        if (st.dead) return;
-        var max = Math.max(0, walkway.clientWidth - teacher.clientWidth);
-        teacher.style.left = Math.round(max * frac) + "px";
-        tsvg.classList.add("walking");
-        clearTimeout(st.wt); st.wt = setTimeout(function () { tsvg.classList.remove("walking"); }, 1550);
+      function walkTo() {}
+      function look(cx, cy) {
+        var rc = teacher.getBoundingClientRect(), dx = Math.max(-1, Math.min(1, (cx - (rc.left + rc.width / 2)) / 180)) * 3.2, dy = Math.max(-1, Math.min(1, (cy - (rc.top + rc.height / 2)) / 220)) * 3;
+        tsvg.querySelectorAll(".pupils").forEach(function (p) { p.style.transform = "translate(" + dx.toFixed(2) + "px," + dy.toFixed(2) + "px)"; });
+      }
+      function penFor(p, pr) {          // qalam uchi: [clientX, clientY]
+        var rc;
+        if (p.kind === "wipe") {
+          try { var rg = document.createRange(); rg.selectNodeContents(p.el); rc = rg.getBoundingClientRect(); } catch (e) {}
+          if (!rc || !rc.width) rc = p.el.getBoundingClientRect();
+          return [rc.left + rc.width * pr, rc.top + rc.height * 0.8];
+        }
+        var acc = 0, tw = p.tw, hit = null;
+        p.draw.forEach(function (it) {
+          var a = acc / tw, b = (acc + it.w) / tw; acc += it.w;
+          var loc = (pr - a) / Math.max(1e-6, b - a);
+          if (loc > 0 && loc < 1 && !hit) hit = [it, loc];
+        });
+        if (hit) {
+          var it = hit[0], loc = hit[1];
+          try {
+            if (it.kind === "draw" && it.el.getPointAtLength && it.el.getScreenCTM) {
+              var pt = it.el.getPointAtLength(it.len * loc), m = it.el.getScreenCTM();
+              return [m.a * pt.x + m.c * pt.y + m.e, m.b * pt.x + m.d * pt.y + m.f];
+            }
+          } catch (e) {}
+          rc = it.el.getBoundingClientRect(); return [rc.left + rc.width * (0.2 + 0.6 * loc), rc.top + rc.height * 0.6];
+        }
+        rc = p.el.getBoundingClientRect(); return [rc.left + rc.width * pr, rc.top + rc.height * 0.6];
       }
       function setMode(m) { tsvg.classList.toggle("t-talk", m === "talk"); tsvg.classList.toggle("t-write", m === "write"); }
       function flash(cls, ms) { tsvg.classList.add(cls); setTimeout(function () { tsvg.classList.remove(cls); }, ms); }
@@ -6933,7 +6996,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       }
 
       function apply(step, t) {
-        var writing = false;
+        var writing = false, tip = null;
         step.parts.forEach(function (p) {
           var pr = Math.max(0, Math.min(1, (t - p.start) / p.dur));
           if (p.kind === "wipe") setWipe(p.el, pr);
@@ -6944,8 +7007,13 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
               setDraw(it, Math.max(0, Math.min(1, (pr - a) / Math.max(1e-6, b - a))));
             });
           }
-          if (pr > 0 && pr < 1) writing = true;
+          if (pr > 0 && pr < 1) { writing = true; tip = penFor(p, pr); }
         });
+        if (writing && tip) {
+          var br = board.getBoundingClientRect();
+          pen.style.display = "block"; pen.style.left = (tip[0] - br.left - 2) + "px"; pen.style.top = (tip[1] - br.top - 24) + "px";
+          look(tip[0], tip[1]);
+        } else { pen.style.display = "none"; var tr = teacher.getBoundingClientRect(); look(tr.left + tr.width / 2, tr.top + tr.height / 2 + 60); }
         return writing;
       }
 
@@ -8705,7 +8773,7 @@ def _tutor_lang(v, default: str) -> str:
 def _generate_tutor_lesson_sync(question: str, history: list, app_lang: str = "uz") -> dict:
     hist = "\n".join(f"- student asked: {h['q']} (you taught: {h['title']})" for h in history[-4:]) or "(none)"
     data = _llm_json_sync(
-        "You are a warm, brilliant AI teacher (a young woman) teaching at a WHITEBOARD. You can explain ANY topic: school subjects, math, science, history, languages, coding, SAT/IELTS, everyday life questions. The student wrote:\n"
+        "You are a warm, brilliant AI teacher (shown as a friendly round face) who writes and draws on a big sheet of squared math paper. You can explain ANY topic: school subjects, math, science, history, languages, coding, SAT/IELTS, everyday life questions. The student wrote:\n"
         f"\"{question}\"\n\nEarlier in this session:\n{hist}\n\n"
         f"LANGUAGE: reply in the language the student wrote in - Uzbek (Latin script), Russian or English. If you cannot tell, use '{app_lang}'. "
         'Put that language code ("uz", "ru" or "en") in the JSON field "lang". Every spoken and written explanation, the summary and the practice question are in that language '
@@ -8742,7 +8810,7 @@ def _generate_tutor_lesson_sync(question: str, history: list, app_lang: str = "u
         '"points":[{"x":0,"y":1,"label":"(0,1)"}],"caption":"..."} - expr uses x, + - * / ^ ( ), sqrt abs sin cos tan ln exp pi, always explicit * .\n'
         '4) drawing: {"type":"svg","svg":"<svg viewBox=\\"0 0 400 260\\">...</svg>","caption":"..."} - only line, circle, ellipse, rect, path, polygon, polyline, text, g. '
         "IMPORTANT: you may put EMOJI inside <text> elements (font-size 36-56) as pictures of real objects (🍎 🧃 🥤 ⚖️ 🚗 🛒 💰 🍕 📦 🏠 ⏱️ 🔋 ...) - combine them with arrows and shapes to draw scenes "
-        "(e.g. a balance scale with objects, a shop with a price tag, a car and a road). The board is dark, so use LIGHT colors (#f5f5f5, #ffd166, #7bdff2, #b2f7a3, #ff9aa2), "
+        "(e.g. a balance scale with objects, a shop with a price tag, a car and a road). The page is WHITE graph paper, so draw like a pen on paper: use DARK ink colors (#1a237e, #c62828, #2e7d32, #ef6c00, #00695c), never white or pale fills, "
         "stroke-width 2-3, label font-size 14-16, plain-text labels (no LaTeX), geometry accurate (right angle really 90 degrees), labels never overlapping.\n"
         "Prefer flow/svg-with-emoji for the first 2-3 steps (the analogy), table for numbers, plot only when the topic is about graphs. "
         "Make sure every number and computation is correct. practice must have exactly one correct option.",
@@ -8806,6 +8874,8 @@ async def api_app_sat_tutor(request: web.Request, uid: int, lang: str, user: dic
         s["history"] = s["history"][-6:]
         s.setdefault("lessons", []).append({"says": [lesson["say"]] if is_chat else [st["say"] for st in lesson["steps"]], "tts": {}, "lang": lesson.get("lang") or lang})
         s["lessons"] = s["lessons"][-6:]
+        entry = s["lessons"][-1]
+        entry["tasks"] = {i: asyncio.create_task(_tts_prefetch(entry, i, t, entry["lang"])) for i, t in enumerate(entry["says"][:3])}
         s["lang"] = lang
         n = s["lesson_count"] = s.get("lesson_count", 0) + 1
         s.setdefault("lesson_keys", []).append(n)
@@ -8906,7 +8976,8 @@ def _speech_normalize(text: str, lang: str) -> str:
     t = re.sub(r"\s-\s+(?=\d|[A-Za-z](?![A-Za-z]))", f" {W['minus']} ", t)                        # x - 3, 5 - x
     t = re.sub(r"(?<=[A-Za-zА-Яа-я0-9])-(?=[A-Za-zА-Яа-я])", " ", t)                               # 10-sinf, so-called
     t = t.replace("<=", f" {W['le']} ").replace(">=", f" {W['ge']} ").replace("!=", f" {W['ne']} ")
-    for sym, key in (("=", "eq"), ("+", "plus"), ("*", "mul"), ("<", "lt"), (">", "gt")):
+    t = t.replace("=", f", {W['eq']} ")      # tenglikdan oldin ozgina pauza
+    for sym, key in (("+", "plus"), ("*", "mul"), ("<", "lt"), (">", "gt")):
         t = t.replace(sym, f" {W[key]} ")
     t = re.sub(r"(?<=[\w\s])/(?=[\w\s])", f" {W['div']} ", t)
     # raqamlar -> so'z
@@ -8945,7 +9016,7 @@ _TTS_STATS = {"edge": 0, "fallback": 0, "last_error": ""}
 
 async def _edge_once(text: str, voice: str) -> bytes:
     import edge_tts
-    comm = edge_tts.Communicate(text, voice, rate="-3%", pitch="+0Hz")
+    comm = edge_tts.Communicate(text, voice, rate="-6%", pitch="+1Hz")
     chunks = []
 
     async def _collect():
@@ -8957,6 +9028,14 @@ async def _edge_once(text: str, voice: str) -> bytes:
     if len(data) < 1000:
         raise ValueError("bo'sh audio")
     return data
+
+
+async def _tts_prefetch(entry: dict, i: int, text: str, lang: str):
+    """Dars tayyor bo'lishi bilan birinchi qadamlar ovozini oldindan tayyorlaydi (kechikmasin)."""
+    try:
+        entry["tts"][i] = await _tutor_tts(text, lang)
+    except Exception as e:
+        logger.warning("TTS prefetch xatosi: %s", e)
 
 
 async def _tutor_tts(text: str, lang: str) -> bytes:
@@ -8986,6 +9065,11 @@ async def api_app_sat_tutor_tts(request: web.Request):
         text = lesson["says"][i]
     except (TypeError, ValueError, IndexError, KeyError, AttributeError):
         return web.Response(status=404)
+    if i not in lesson["tts"] and lesson.get("tasks", {}).get(i):
+        try:
+            await asyncio.shield(lesson["tasks"][i])
+        except Exception:
+            pass
     if i not in lesson["tts"]:
         try:
             lesson["tts"][i] = await _tutor_tts(text, lesson.get("lang") or s.get("lang", "en"))
