@@ -5697,6 +5697,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   var initData = tg && tg.initData ? tg.initData : "";
   var T = {
     uz: {
+      engTopics: "Ingliz tili mavzulari",
+      engTopicsD: "Grammatika, lug'at, IELTS, SAT: ustoz qattiqqo'l metodika bilan tushuntiradi",
       mathTopics: "Matematika mavzulari",
       mathTopicsD: "Hamma mavzu bir joyda: tanlang, ustoz tushuntiradi",
       mathSearch: "Mavzuni qidirish",
@@ -5792,6 +5794,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       chatLink: "Botga o'tish"
     },
     ru: {
+      engTopics: "Темы по английскому",
+      engTopicsD: "Грамматика, лексика, IELTS, SAT: учитель объясняет строго и по лучшим методикам",
       mathTopics: "Темы по математике",
       mathTopicsD: "Все темы в одном месте: выберите, и учитель объяснит",
       mathSearch: "Поиск темы",
@@ -5887,6 +5891,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       chatLink: "Перейти в бота"
     },
     en: {
+      engTopics: "English topics",
+      engTopicsD: "Grammar, vocabulary, IELTS, SAT: the teacher explains strictly, with the best methods",
       mathTopics: "Math topics",
       mathTopicsD: "All topics in one place: pick one and the teacher explains",
       mathSearch: "Search topics",
@@ -6179,6 +6185,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       h("div", { class: "e", text: "👩‍🏫" }), h("div", { class: "n", text: S("tutor") }), h("div", { class: "d", style: "color:#e6dcff", text: S("tutorD") })));
     parts.push(h("button", { class: "tile", style: "width:100%;margin-bottom:12px;background:linear-gradient(135deg,#0f4c5c,#1b7f8c);color:#fff", onclick: viewMath },
       h("div", { class: "e", text: "➗" }), h("div", { class: "n", text: S("mathTopics") }), h("div", { class: "d", style: "color:#d4f1f4", text: S("mathTopicsD") })));
+    parts.push(h("button", { class: "tile", style: "width:100%;margin-bottom:12px;background:linear-gradient(135deg,#7a1f2b,#c0392b);color:#fff", onclick: viewEngTopics },
+      h("div", { class: "e", text: "🇬🇧" }), h("div", { class: "n", text: S("engTopics") }), h("div", { class: "d", style: "color:#ffe3e0", text: S("engTopicsD") })));
     parts.push(h("div", { class: "section-title", text: "🚀" }),
       h("div", { class: "grid2" },
         tile("📅", S("daily"), S("dailyD"), function () { startQuiz({ kind: "daily" }); }),
@@ -7210,34 +7218,102 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       ["Hosila asoslari", "Основы производной", "Derivatives: the basics"],
       ["Integral asoslari", "Основы интеграла", "Integrals: the basics"]] }
   ];
-  var MATH_ALL = [];
-  MATH_TOPICS.forEach(function (sec) { sec.t.forEach(function (x) { MATH_ALL.push(x); }); });
+  var ENG_TOPICS = [
+    { n: ["Grammatika", "Грамматика", "Grammar"], t: [
+      ["Present Simple va Present Continuous", "Present Simple и Present Continuous", "Present Simple vs Present Continuous"],
+      ["Past Simple va Past Continuous", "Past Simple и Past Continuous", "Past Simple vs Past Continuous"],
+      ["Present Perfect va Past Simple", "Present Perfect и Past Simple", "Present Perfect vs Past Simple"],
+      ["Present Perfect Continuous", "Present Perfect Continuous", "Present Perfect Continuous"],
+      ["Past Perfect", "Past Perfect", "Past Perfect"],
+      ["Kelasi zamon: will, going to, Present Continuous", "Будущее время: will, going to, Present Continuous", "Future forms: will, going to, Present Continuous"],
+      ["Artikllar: a, an, the, artiklsiz", "Артикли: a, an, the, без артикля", "Articles: a, an, the, zero article"],
+      ["Predloglar: vaqt va joy", "Предлоги времени и места", "Prepositions of time and place"],
+      ["Shart gaplar (Conditionals 0-3)", "Условные предложения (Conditionals 0-3)", "Conditionals (zero, first, second, third)"],
+      ["Aralash shart gaplar va wish", "Смешанные условные и wish", "Mixed conditionals and wish"],
+      ["Majhul nisbat (Passive voice)", "Страдательный залог (Passive voice)", "Passive voice"],
+      ["Ko'chirma va o'zlashtirma gap (Reported speech)", "Косвенная речь (Reported speech)", "Reported speech"],
+      ["Modal fe'llar", "Модальные глаголы", "Modal verbs"],
+      ["Relative clauses (who, which, that)", "Относительные придаточные (who, which, that)", "Relative clauses (who, which, that)"],
+      ["Qiyosiy va orttirma darajalar", "Степени сравнения", "Comparatives and superlatives"],
+      ["Gerund va Infinitive", "Герундий и инфинитив", "Gerund vs infinitive"],
+      ["Sanaladigan/sanalmaydigan otlar va quantifiers", "Исчисляемые/неисчисляемые и quantifiers", "Countable/uncountable nouns and quantifiers"],
+      ["So'z tartibi va savol gaplar", "Порядок слов и вопросы", "Word order and question forms"],
+      ["Ega va kesim moslashuvi", "Согласование подлежащего и сказуемого", "Subject-verb agreement"]] },
+    { n: ["Lug'at", "Лексика", "Vocabulary"], t: [
+      ["Phrasal verbs", "Фразовые глаголы", "Phrasal verbs"],
+      ["Collocations", "Коллокации", "Collocations"],
+      ["Idioms", "Идиомы", "Idioms"],
+      ["So'z yasalishi: prefiks va suffikslar", "Словообразование: приставки и суффиксы", "Word formation: prefixes and suffixes"],
+      ["Adashtiriladigan so'zlar", "Часто путаемые слова", "Easily confused words"],
+      ["Akademik lug'at", "Академическая лексика", "Academic vocabulary"],
+      ["Sinonimlar va kontekstdagi so'zlar", "Синонимы и слова в контексте", "Synonyms and words in context"]] },
+    { n: ["Yozish (Writing)", "Письмо (Writing)", "Writing"], t: [
+      ["Paragraf va insho tuzilishi", "Структура абзаца и эссе", "Paragraph and essay structure"],
+      ["IELTS Writing Task 1", "IELTS Writing Task 1", "IELTS Writing Task 1"],
+      ["IELTS Writing Task 2", "IELTS Writing Task 2", "IELTS Writing Task 2"],
+      ["Bog'lovchi so'zlar va cohesion", "Связующие слова и cohesion", "Linking words and cohesion"],
+      ["Rasmiy va norasmiy uslub", "Формальный и неформальный стиль", "Formal vs informal style"]] },
+    { n: ["Speaking va talaffuz", "Speaking и произношение", "Speaking & pronunciation"], t: [
+      ["IELTS Speaking Part 1", "IELTS Speaking Part 1", "IELTS Speaking Part 1"],
+      ["IELTS Speaking Part 2 (cue card)", "IELTS Speaking Part 2 (cue card)", "IELTS Speaking Part 2 (cue card)"],
+      ["IELTS Speaking Part 3", "IELTS Speaking Part 3", "IELTS Speaking Part 3"],
+      ["So'z urg'usi va intonatsiya", "Ударение в словах и интонация", "Word stress and intonation"],
+      ["Talaffuzdagi keng tarqalgan xatolar (th, w/v, -ed)", "Частые ошибки произношения (th, w/v, -ed)", "Common pronunciation mistakes (th, w/v, -ed)"]] },
+    { n: ["Reading va Listening", "Reading и Listening", "Reading & listening"], t: [
+      ["Skimming va scanning", "Skimming и scanning", "Skimming and scanning"],
+      ["True / False / Not Given", "True / False / Not Given", "True / False / Not Given"],
+      ["Listening strategiyalari", "Стратегии Listening", "Listening strategies"]] },
+    { n: ["SAT Reading & Writing", "SAT Reading & Writing", "SAT Reading & Writing"], t: [
+      ["Vergul qoidalari", "Правила запятых", "Comma rules"],
+      ["Nuqtali vergul va ikki nuqta", "Точка с запятой и двоеточие", "Semicolons and colons"],
+      ["Transitions (bog'lovchilar)", "Transitions (связки)", "Transitions"],
+      ["Kontekstdagi so'zlar", "Слова в контексте", "Words in context"],
+      ["Apostrof va egalik", "Апостроф и притяжательность", "Apostrophes and possessives"],
+      ["Olmosh aniqligi", "Ясность местоимений", "Pronoun clarity"],
+      ["Fe'l zamonlari izchilligi", "Согласование времён", "Verb tense consistency"],
+      ["Parallel tuzilma", "Параллельные конструкции", "Parallel structure"],
+      ["Modifier xatolari", "Ошибки с модификаторами", "Misplaced modifiers"],
+      ["Rhetorical synthesis", "Rhetorical synthesis", "Rhetorical synthesis"],
+      ["Asosiy g'oya va xulosa", "Главная идея и вывод", "Central idea and inference"]] }
+  ];
+  var TOPIC_SETS = {
+    math: { sections: MATH_TOPICS, store: "mathDone", icon: "➗", title: "mathTopics",
+      ask: function (en) { return "Teach me the math topic \"" + en + "\" from scratch, for a complete beginner. Reply language: " + lang; } },
+    eng: { sections: ENG_TOPICS, store: "engDone", icon: "🇬🇧", title: "engTopics",
+      ask: function (en) { return "Teach me the English language topic \"" + en + "\" thoroughly and strictly, like a tough top exam coach: precise rule, formula, contrast examples, exceptions, typical mistakes of Uzbek and Russian speakers, exam traps. Reply language: " + lang; } }
+  };
+  Object.keys(TOPIC_SETS).forEach(function (k) {
+    var all = []; TOPIC_SETS[k].sections.forEach(function (sec) { sec.t.forEach(function (x) { all.push(x); }); }); TOPIC_SETS[k].all = all;
+  });
   function mathLi() { return lang === "uz" ? 0 : lang === "ru" ? 1 : 2; }
-  function mathDoneGet() { try { return JSON.parse(localStorage.getItem("mathDone") || "[]"); } catch (e) { return []; } }
-  function mathDoneAdd(en) { try { var d = mathDoneGet(); if (d.indexOf(en) < 0) { d.push(en); localStorage.setItem("mathDone", JSON.stringify(d)); } } catch (e) {} }
+  function topicDoneGet(k) { try { return JSON.parse(localStorage.getItem(TOPIC_SETS[k].store) || "[]"); } catch (e) { return []; } }
+  function topicDoneAdd(k, en) { try { var d = topicDoneGet(k); if (d.indexOf(en) < 0) { d.push(en); localStorage.setItem(TOPIC_SETS[k].store, JSON.stringify(d)); } } catch (e) {} }
 
-  function mathOpen(x) {
-    mathDoneAdd(x[2]);
-    var i = MATH_ALL.indexOf(x), nxt = MATH_ALL[i + 1];
-    viewTutor("Teach me the math topic \"" + x[2] + "\" from scratch, for a complete beginner. Reply language: " + lang, viewMath,
-      nxt ? function () { mathOpen(nxt); } : null);
+  function topicOpen(k, x) {
+    var set = TOPIC_SETS[k];
+    topicDoneAdd(k, x[2]);
+    var i = set.all.indexOf(x), nxt = set.all[i + 1];
+    viewTutor(set.ask(x[2]), function () { viewTopics(k); }, nxt ? function () { topicOpen(k, nxt); } : null);
   }
 
-  function viewMath() {
-    var li = mathLi(), done = mathDoneGet();
+  function viewMath() { viewTopics("math"); }
+  function viewEngTopics() { viewTopics("eng"); }
+
+  function viewTopics(k) {
+    var set = TOPIC_SETS[k], li = mathLi(), done = topicDoneGet(k);
     var list = h("div", {});
     var input = h("input", { type: "text", placeholder: "🔎 " + S("mathSearch"), style: "width:100%;margin:6px 0 12px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:15px;box-sizing:border-box" });
     function render() {
       clear(list);
       var q = input.value.trim().toLowerCase(), any = false;
-      MATH_TOPICS.forEach(function (sec) {
+      set.sections.forEach(function (sec) {
         var rows = sec.t.filter(function (x) { return !q || x.join(" ").toLowerCase().indexOf(q) >= 0; });
         if (!rows.length) return;
         any = true;
         list.appendChild(h("div", { class: "section-title", text: sec.n[li] }));
         rows.forEach(function (x) {
           var ok = done.indexOf(x[2]) >= 0;
-          list.appendChild(h("div", { class: "list-item", style: "margin-bottom:8px", onclick: function () { mathOpen(x); } },
+          list.appendChild(h("div", { class: "list-item", style: "margin-bottom:8px", onclick: function () { topicOpen(k, x); } },
             h("span", { text: ok ? "✅" : "▫️" }), h("span", { style: "flex:1", text: x[li] })));
         });
       });
@@ -7245,7 +7321,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     }
     input.addEventListener("input", render);
     render();
-    mount(backBtn(), title("➗ " + S("mathTopics"), S("mathDone", { a: done.filter(function (d) { return MATH_ALL.some(function (x) { return x[2] === d; }); }).length, b: MATH_ALL.length })), input, list);
+    var n = done.filter(function (d) { return set.all.some(function (x) { return x[2] === d; }); }).length;
+    mount(backBtn(), title(set.icon + " " + S(set.title), S("mathDone", { a: n, b: set.all.length })), input, list);
   }
 
   // ================= WRITING =================
@@ -8793,6 +8870,14 @@ def _generate_tutor_lesson_sync(question: str, history: list, app_lang: str = "u
         "English 'Let me explain ... quickly and simply. Imagine this: ...'\n"
         "  2) DRAW the analogy (flow or svg picture), then CONNECT it to the real SAT notation step by step (apple = input x, juicer = rule f, juice = output f(x)).\n"
         "  3) A tiny numeric/example table, then a fully worked example, then (if visual) the graph, then ONE common SAT trap.\n"
+        "ENGLISH LANGUAGE TOPICS (grammar, tenses, vocabulary, phrasal verbs, writing, reading, listening, speaking, pronunciation, IELTS, SAT Reading & Writing): teach like a STRICT, rigorous top exam coach "
+        "using the best proven methods, firm and exacting but encouraging: (1) the rule in ONE precise sentence plus a visual FORMULA (e.g. S + have/has + V3) drawn as a flow or table; "
+        "(2) CONTRAST examples side by side, correct vs incorrect, in a table (✅ / ❌); (3) for tenses and time words draw a TIMELINE with svg (past - now - future with dots and arrows); "
+        "(4) ALL the exceptions that matter and the 2-3 most common mistakes of Uzbek and Russian speakers, explaining WHY the mistake happens (mother-tongue interference); "
+        "(5) one memorable mnemonic or pattern; (6) active recall - make the student produce a sentence; (7) be exact: register, collocations, no vague statements, no skipped rules. "
+        "Board lines for English topics = English example sentences with ✅ / ❌. The practice question must test the exact rule with plausible distractors typical of real exam traps. "
+        "In the spoken text ('say') ALWAYS put every English word, phrase or example sentence inside double quotes, e.g. Mana misol: \"She has lived here since 2010.\" - quotes are used ONLY for English text. "
+        "For hard English topics you may use up to 8 steps.\n"
         "Use 5 to 7 steps. Every step except maybe the last MUST have a diagram (a picture). Spoken text of each step: 3-5 short, vivid sentences, no jargon before it is explained.\n"
         "Write everything in the chosen language. "
         "Put ALL math in LaTeX between single dollar signs, e.g. $y=mx+b$, $\\\\frac{a}{b}$ (double every backslash inside JSON). "
@@ -9038,20 +9123,52 @@ async def _tts_prefetch(entry: dict, i: int, text: str, lang: str):
         logger.warning("TTS prefetch xatosi: %s", e)
 
 
-async def _tutor_tts(text: str, lang: str) -> bytes:
-    """Tabiiy (neyron) ovoz: Microsoft Edge TTS (2 ovoz, qayta urinish). Ishlamasa — gTTS."""
-    norm = _speech_normalize(text, lang)
+def _tts_split(text: str, lang: str) -> list:
+    """Matnni [(til, bo'lak)] ga ajratadi: "qo'shtirnoq" ichidagi inglizcha qismlar inglizcha ovozda o'qiladi."""
+    text = str(text or "")
+    if lang == "en":
+        return [("en", text.replace('"', " ").replace("“", " ").replace("”", " "))]
+    out = []
+    for seg in re.split(r'("[^"]{1,300}"|“[^”]{1,300}”)', text):
+        if not seg or not seg.strip():
+            continue
+        if len(seg) > 2 and seg[0] in '"“' and seg[-1] in '"”':
+            out.append(("en", seg[1:-1]))
+        else:
+            out.append((lang, seg))
+    return out or [(lang, text)]
+
+
+async def _edge_part(txt: str, lang: str) -> bytes:
+    norm = _speech_normalize(txt, lang)
+    if not norm.strip():
+        return b""
+    last = None
     for voice in (_EDGE_VOICES.get(lang, _EDGE_VOICES["en"]), _EDGE_ALT.get(lang, _EDGE_ALT["en"])):
         try:
-            data = await _edge_once(norm, voice)
-            _TTS_STATS["edge"] += 1
-            return data
+            return await _edge_once(norm, voice)
         except Exception as e:
+            last = e
             _TTS_STATS["last_error"] = f"{type(e).__name__}: {e}"[:200]
             logger.warning("Edge TTS (%s) ishlamadi: %s", voice, _TTS_STATS["last_error"])
-    _TTS_STATS["fallback"] += 1
-    logger.warning("gTTS'ga o'tildi (robot ovoz). edge=%s fallback=%s", _TTS_STATS["edge"], _TTS_STATS["fallback"])
-    return await asyncio.to_thread(_tts_lang_mp3_sync, norm, lang)
+    raise last or RuntimeError("edge tts")
+
+
+async def _tutor_tts(text: str, lang: str) -> bytes:
+    """Tabiiy (neyron) ovoz: Microsoft Edge TTS. Inglizcha qismlar inglizcha ovozda. Ishlamasa — gTTS."""
+    parts = _tts_split(text, lang)
+    try:
+        datas = await asyncio.gather(*[_edge_part(t, l) for l, t in parts])
+        data = b"".join(datas)
+        if len(data) < 1000:
+            raise ValueError("bo'sh audio")
+        _TTS_STATS["edge"] += 1
+        return data
+    except Exception:
+        _TTS_STATS["fallback"] += 1
+        logger.warning("gTTS'ga o'tildi (robot ovoz). edge=%s fallback=%s", _TTS_STATS["edge"], _TTS_STATS["fallback"])
+        plain = " ".join(t for _, t in parts)
+        return await asyncio.to_thread(_tts_lang_mp3_sync, _speech_normalize(plain, lang), lang)
 
 
 async def api_app_sat_tutor_tts(request: web.Request):
