@@ -5684,6 +5684,12 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     .classroom .tboard::before { left: 44px; }
     .classroom .chalk { font-size: 24px; }
   }
+  .chatlog { margin-top: 14px; }
+  .chatlog .msg { display: flex; margin: 6px 0; }
+  .chatlog .msg.me { justify-content: flex-end; }
+  .chatlog .msg-b { max-width: 86%; padding: 9px 13px; border-radius: 16px; font-size: 14.5px; line-height: 1.45; background: var(--card); color: var(--text); white-space: pre-wrap; }
+  .chatlog .msg.me .msg-b { background: #3b6cf6; color: #fff; border-bottom-right-radius: 4px; }
+  .chatlog .msg.ai .msg-b { border-bottom-left-radius: 4px; }
 </style>
 </head>
 <body>
@@ -5709,7 +5715,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       advSatMid: "Yaxshi! Zaif mavzularni mustahkamlab, yana mashq qil.",
       advSatHigh: "Ajoyib! Endi to'liq mock testni vaqt bilan yechib ko'r.",
       advWeakTopic: "Eng zaif mavzu: {d} ({p}%)",
-      advExplain: "👩‍🏫 Ustozdan tushuntirtir",
+      advExplain: "🟡 Ustozdan tushuntirtir",
       advPractice: "📘 SAT mashq",
       advLow: "Mavzuni takrorlab, yana urinib ko'r. Har safar yaxshilanadi.",
       advMid: "Yaxshi natija! Qiyinroq mavzuni yoki boshqa rejimni sinab ko'r.",
@@ -5746,7 +5752,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium funksiya", payD: "PRO bilan hammasi tekin yoki bir martalik to'lang.", payOnce: "Faqat shu safar", limitT: "PRO limiti tugadi", limitD: "Bugungi limit ({n} ta) tugadi. Ertaga yana tekin yoki bir martalik to'lang.",
       upT: "🎉 Zo'r o'ynadingiz!", upD: "PRO bilan Writing, Speaking, SAT, Grammar, Reading, Listening, sertifikat testi va hikoyalar ham ochiladi. {p} ⭐ / {d} kun.", upBtn: "⭐ PRO ga o'tish", upLater: "Keyinroq",
       proActive: "PRO faol", until: "Tugash sanasi", daysLeft: "kun qoldi", extend: "Muddatni uzaytirish", buy: "PRO olish", offerT: "PRO obuna", days: "kun",
-      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modul) + Math (2 modul). 2-modul qiyinligi 1-modul natijasiga bog'liq. Formulalar uchun 📐, taymerni yashirish uchun ⏱. Ball — taxminiy, savollarni AI yozadi.", tutor: "AI Ustoz", tutorD: "Istalgan mavzuni so'rang yoki shunchaki gaplashing: ustoz doskada rasm bilan tushuntiradi va ovozda javob beradi", tutorPlace: "Masalan: salom! Yoki: fotosintez nima?", tutorAsk: "👩‍🏫 Tushuntir", tutorBoard: "Doska tayyorlanmoqda…", tutorNext: "Davom ➜", tutorAll: "Hammasi", tutorSimpler: "🔁 Soddaroq tushuntir", tutorExample: "➕ Yana misol", tutorPractice: "Mustahkamlash", tutorOff: "Men SAT, matematika va ingliz tili bo'yicha yordam beraman. SAT savolingizni yozing 🙂", tutorStart: "Darsni boshlash", tutorNotes: "Konspekt", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
+      perkSat: "SAT: adaptiv mock va mashqlar (formulalar bilan)", upgrade: "⭐ PRO ga o'tish", limitFreeT: "Kunlik limit tugadi", limitFreeD: "Bugungi limit ({n} ta) tugadi. Ertaga yana bepul.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modul) + Math (2 modul). 2-modul qiyinligi 1-modul natijasiga bog'liq. Formulalar uchun 📐, taymerni yashirish uchun ⏱. Ball — taxminiy, savollarni AI yozadi.", tutor: "AI yordamchi", tutorD: "Istalgan savol bering yoki shunchaki gaplashing: do'stdek javob beradi, kerak bo'lsa varaqda rasm bilan tushuntiradi", tutorPlace: "Masalan: salom! Yoki: nega osmon ko'k?", tutorAsk: "Yuborish ➤", tutorBoard: "Doska tayyorlanmoqda…", tutorNext: "Davom ➜", tutorAll: "Hammasi", tutorSimpler: "🔁 Soddaroq tushuntir", tutorExample: "➕ Yana misol", tutorPractice: "Mustahkamlash", tutorOff: "Men SAT, matematika va ingliz tili bo'yicha yordam beraman. SAT savolingizni yozing 🙂", tutorStart: "Darsni boshlash", tutorNotes: "Konspekt", perk1: "IELTS Writing tahlili", perk2: "To'liq Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Kutubxona", perk4: "Ingliz tili viktorinalari", perk5: "Sertifikat testi, Hikoya, «Men topaman»", perkLimit: "Writing va Speaking: kuniga {n} tagacha. Avtomatik yangilanmaydi.",
       owner: "Siz bot egasisiz — hammasi doim tekin.", paidOk: "To'lov qabul qilindi! ⭐", cancelled: "To'lov bekor qilindi.", checking: "Tekshirilmoqda…", asSeparate: "Alohida: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Hozircha kontent yo'q.", questions: "ta savol", readOnly: "O'qish / tinglash", noRank: "Hozircha natijalar yo'q", boardQuiz: "Viktorina", boardCert: "Sertifikat", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (xalqaro)",
@@ -5806,7 +5812,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       advSatMid: "Хорошо! Закрепи слабые темы и потренируйся ещё.",
       advSatHigh: "Отлично! Теперь реши полный мок-тест на время.",
       advWeakTopic: "Самая слабая тема: {d} ({p}%)",
-      advExplain: "👩‍🏫 Пусть объяснит преподаватель",
+      advExplain: "🟡 Пусть объяснит преподаватель",
       advPractice: "📘 Практика SAT",
       advLow: "Повтори тему и попробуй снова. С каждым разом будет лучше.",
       advMid: "Хороший результат! Попробуй тему посложнее или другой режим.",
@@ -5843,7 +5849,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Премиум-функция", payD: "С PRO всё бесплатно, либо оплатите разово.", payOnce: "Только в этот раз", limitT: "Лимит PRO исчерпан", limitD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно, либо оплатите разово.",
       upT: "🎉 Отлично сыграли!", upD: "С PRO откроются Writing, Speaking, SAT, Grammar, Reading, Listening, тест с сертификатом и истории. {p} ⭐ / {d} дней.", upBtn: "⭐ Перейти на PRO", upLater: "Позже",
       proActive: "PRO активна", until: "Действует до", daysLeft: "дн. осталось", extend: "Продлить", buy: "Получить PRO", offerT: "PRO-подписка", days: "дней",
-      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 модуля) + Math (2 модуля). Сложность 2-го модуля зависит от результата 1-го. 📐 — формулы, ⏱ — скрыть таймер. Балл ориентировочный, вопросы пишет ИИ.", tutor: "AI-учитель", tutorD: "Спросите о любой теме или просто поболтайте: учитель объяснит на доске с рисунками и ответит голосом", tutorPlace: "Например: привет! Или: что такое фотосинтез?", tutorAsk: "👩‍🏫 Объясни", tutorBoard: "Готовлю доску…", tutorNext: "Дальше ➜", tutorAll: "Всё сразу", tutorSimpler: "🔁 Объясни проще", tutorExample: "➕ Ещё пример", tutorPractice: "Закрепление", tutorOff: "Я помогаю с SAT, математикой и английским. Напишите вопрос по SAT 🙂", tutorStart: "Начать урок", tutorNotes: "Конспект", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
+      perkSat: "SAT: адаптивный мок и практика (с формулами)", upgrade: "⭐ Перейти на PRO", limitFreeT: "Дневной лимит исчерпан", limitFreeD: "Дневной лимит ({n}) исчерпан. Завтра снова бесплатно.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 модуля) + Math (2 модуля). Сложность 2-го модуля зависит от результата 1-го. 📐 — формулы, ⏱ — скрыть таймер. Балл ориентировочный, вопросы пишет ИИ.", tutor: "AI-помощник", tutorD: "Задавайте любой вопрос или просто болтайте: ответит как друг, а при необходимости объяснит на листе с рисунками", tutorPlace: "Например: привет! Или: почему небо голубое?", tutorAsk: "Отправить ➤", tutorBoard: "Готовлю доску…", tutorNext: "Дальше ➜", tutorAll: "Всё сразу", tutorSimpler: "🔁 Объясни проще", tutorExample: "➕ Ещё пример", tutorPractice: "Закрепление", tutorOff: "Я помогаю с SAT, математикой и английским. Напишите вопрос по SAT 🙂", tutorStart: "Начать урок", tutorNotes: "Конспект", perk1: "Разбор IELTS Writing", perk2: "Полный Speaking мок + Part 1", perk3: "Grammar, Reading, Listening, библиотека", perk4: "Английские викторины", perk5: "Тест с сертификатом, Истории, «Угадаю»", perkLimit: "Writing и Speaking: до {n} в день. Без автопродления.",
       owner: "Вы владелец бота — для вас всё бесплатно.", paidOk: "Оплата получена! ⭐", cancelled: "Оплата отменена.", checking: "Проверяем…", asSeparate: "По отдельности: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "Пока нет материалов.", questions: "вопросов", readOnly: "Для чтения / прослушивания", noRank: "Пока нет результатов", boardQuiz: "Викторина", boardCert: "Сертификат", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (международный)",
@@ -5903,7 +5909,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       advSatMid: "Good! Reinforce the weak topics and practice more.",
       advSatHigh: "Excellent! Now try a full timed mock test.",
       advWeakTopic: "Weakest topic: {d} ({p}%)",
-      advExplain: "👩‍🏫 Ask the teacher to explain",
+      advExplain: "🟡 Ask the teacher to explain",
       advPractice: "📘 SAT practice",
       advLow: "Review the topic and try again. You improve every time.",
       advMid: "Good result! Try a harder topic or another mode.",
@@ -5940,7 +5946,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       payT: "Premium feature", payD: "Included with PRO, or pay once for just this.", payOnce: "Just this once", limitT: "PRO limit reached", limitD: "Today's limit ({n}) is used up. Free again tomorrow, or pay for a single use.",
       upT: "🎉 Nice game!", upD: "PRO also unlocks Writing, Speaking, SAT, Grammar, Reading, Listening, the certificate test and stories. {p} ⭐ / {d} days.", upBtn: "⭐ Go PRO", upLater: "Later",
       proActive: "PRO is active", until: "Valid until", daysLeft: "days left", extend: "Extend", buy: "Get PRO", offerT: "PRO subscription", days: "days",
-      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modules) + Math (2 modules). Module 2 difficulty depends on module 1. 📐 for formulas, ⏱ to hide the timer. The score is an estimate; questions are AI-written.", tutor: "AI Teacher", tutorD: "Ask about any topic or just chat: the teacher explains on the whiteboard with pictures and answers aloud", tutorPlace: "E.g. hi! Or: what is photosynthesis?", tutorAsk: "👩‍🏫 Explain", tutorBoard: "Preparing the board…", tutorNext: "Next ➜", tutorAll: "Show all", tutorSimpler: "🔁 Simpler please", tutorExample: "➕ One more example", tutorPractice: "Quick practice", tutorOff: "I help with SAT, math and English. Ask me an SAT question 🙂", tutorStart: "Start the lesson", tutorNotes: "Notes", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
+      perkSat: "SAT: adaptive mock and practice (with formulas)", upgrade: "⭐ Upgrade to PRO", limitFreeT: "Daily limit reached", limitFreeD: "Today's limit ({n}) is used up. Free again tomorrow.", satTab: "SAT", satInfo: "Digital SAT: Reading & Writing (2 modules) + Math (2 modules). Module 2 difficulty depends on module 1. 📐 for formulas, ⏱ to hide the timer. The score is an estimate; questions are AI-written.", tutor: "AI Assistant", tutorD: "Ask anything or just chat: it answers like a friend and, when useful, explains on paper with drawings", tutorPlace: "E.g. hi! Or: why is the sky blue?", tutorAsk: "Send ➤", tutorBoard: "Preparing the board…", tutorNext: "Next ➜", tutorAll: "Show all", tutorSimpler: "🔁 Simpler please", tutorExample: "➕ One more example", tutorPractice: "Quick practice", tutorOff: "I help with SAT, math and English. Ask me an SAT question 🙂", tutorStart: "Start the lesson", tutorNotes: "Notes", perk1: "IELTS Writing review", perk2: "Full Speaking mock + Part 1", perk3: "Grammar, Reading, Listening, Library", perk4: "English quizzes", perk5: "Certificate test, Story, Guess game", perkLimit: "Writing and Speaking: up to {n} per day. Does not auto-renew.",
       owner: "You're the bot owner — everything is always free for you.", paidOk: "Payment received! ⭐", cancelled: "Payment cancelled.", checking: "Checking…", asSeparate: "Bought separately: Writing {w} ⭐ + Speaking {s} ⭐",
       empty: "No content yet.", questions: "questions", readOnly: "For reading / listening", noRank: "No results yet", boardQuiz: "Quiz", boardCert: "Certificate", boardRead: "Reading", boardListen: "Listening",
       sat: "SAT (international)",
@@ -6182,11 +6188,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         h("button", { class: "btn gold", onclick: function () { tab = "pro"; show(); }, text: S("promoBtn") })));
     }
     parts.push(h("button", { class: "tile", style: "width:100%;margin-bottom:12px;background:linear-gradient(135deg,#3b2a63,#6a4fb5);color:#fff", onclick: function () { viewTutor(); } },
-      h("div", { class: "e", text: "👩‍🏫" }), h("div", { class: "n", text: S("tutor") }), h("div", { class: "d", style: "color:#e6dcff", text: S("tutorD") })));
-    parts.push(h("button", { class: "tile", style: "width:100%;margin-bottom:12px;background:linear-gradient(135deg,#0f4c5c,#1b7f8c);color:#fff", onclick: viewMath },
-      h("div", { class: "e", text: "➗" }), h("div", { class: "n", text: S("mathTopics") }), h("div", { class: "d", style: "color:#d4f1f4", text: S("mathTopicsD") })));
-    parts.push(h("button", { class: "tile", style: "width:100%;margin-bottom:12px;background:linear-gradient(135deg,#7a1f2b,#c0392b);color:#fff", onclick: viewEngTopics },
-      h("div", { class: "e", text: "🇬🇧" }), h("div", { class: "n", text: S("engTopics") }), h("div", { class: "d", style: "color:#ffe3e0", text: S("engTopicsD") })));
+      h("div", { class: "e", text: "🟡" }), h("div", { class: "n", text: S("tutor") }), h("div", { class: "d", style: "color:#e6dcff", text: S("tutorD") })));
     parts.push(h("div", { class: "section-title", text: "🚀" }),
       h("div", { class: "grid2" },
         tile("📅", S("daily"), S("dailyD"), function () { startQuiz({ kind: "daily" }); }),
@@ -6543,7 +6545,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     function go(body) { if (!P) { paywall(); return; } satStart(body); }
     var parts = [title("🎓 " + S("sat"), S("satD")), upgradeBar(),
       h("button", { class: "tile", style: "width:100%;margin-bottom:12px;background:linear-gradient(135deg,#1d3a2f,#274e3f);color:#fff", onclick: function () { viewTutor(); } },
-        h("div", { class: "e", text: "👩‍🏫" }), h("div", { class: "n", text: S("tutor") }), h("div", { class: "d", style: "color:#cfe8dc", text: S("tutorD") })),
+        h("div", { class: "e", text: "🟡" }), h("div", { class: "n", text: S("tutor") }), h("div", { class: "d", style: "color:#cfe8dc", text: S("tutorD") })),
       h("div", { class: "card" }, h("p", { class: "small muted", text: S("satInfo") })),
       h("button", { class: "tile wide", style: "width:100%;margin-bottom:14px", onclick: function () { go({ mode: "mock" }); } },
         h("div", { class: "e", text: "🏁" }), h("div", { class: "n", text: S("satMock") }), h("div", { class: "d", text: S("satMockD") }),
@@ -6726,7 +6728,11 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
 
   // ================= SAT TUTOR (doska) =================
-  var TUTOR_TOPICS = ["Linear functions", "Quadratic equations", "Percent problems", "Circles", "Systems of equations", "Words in context", "Comma rules", "Transitions"];
+  var TUTOR_CHIPS = {
+    uz: ["Osmon nega ko'k?", "Funksiya nima?", "Present Perfect'ni tushuntir", "Foizni oson o'rgat", "Yaxshiroq o'qish uchun maslahat ber", "Menga qiziq fakt ayt"],
+    ru: ["Почему небо голубое?", "Что такое функция?", "Объясни Present Perfect", "Объясни проценты просто", "Дай совет, как лучше учиться", "Расскажи интересный факт"],
+    en: ["Why is the sky blue?", "What is a function?", "Explain the Present Perfect", "Teach me percentages simply", "Give me tips to study better", "Tell me a fun fact"]
+  };
 
   function plotEval(src) {
     var t = String(src).replace(/\*\*/g, "^").replace(/\s+/g, "").toLowerCase(), pos = 0;
@@ -6899,13 +6905,18 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   var SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
 
   function viewTutor(q0, backFn, nextFn) {
-    var sid = null, area = h("div", {}), input, busy = false, player = null, askCard = null, tutorAudio = null, unlocked = Promise.resolve(false);
+    var sid = null, area = h("div", {}), logBox = h("div", { class: "chatlog" }), input, busy = false, player = null, askCard = null, tutorAudio = null, unlocked = Promise.resolve(false);
     function stopPlayer() { if (player) { player.stop(); player = null; } }
     cleanupFn = null;
 
+    function logAdd(role, text) {
+      var m = h("div", { class: "msg " + role }, h("div", { class: "msg-b", text: text }));
+      logBox.insertBefore(m, logBox.firstChild);
+    }
     function ask(msg) {
       msg = (msg || "").trim();
       if (msg.length < 2 || busy) return;
+      if (!/Reply language: /.test(msg)) logAdd("me", msg);
       busy = true; stopPlayer(); clear(area); askCard.style.display = "";
       // Foydalanuvchi tugmani bosgan paytda audio'ni "ochib" qo'yamiz — keyin dars o'zi ovoz bilan boshlanadi
       if (!tutorAudio) tutorAudio = new Audio();
@@ -6921,6 +6932,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         busy = false; clear(area); sid = r.sid;
         input.value = "";
         var rr = r;
+        logAdd("ai", r.mode === "chat" ? r.say : "📒 " + String(r.title || "").replace(/\$/g, ""));
         if (r.mode === "chat") rr = { n: r.n, title: "", steps: [{ heading: "", text: r.say, say: r.say, board: r.board ? [r.board] : [], diagram: null }], summary: "", practice: null, chat: true };
         unlocked.then(function (ok) { scene(rr, msg, ok); });
       }).catch(function (e) {
@@ -6943,7 +6955,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       var after = h("div", {});
       if (!r.chat) askCard.style.display = "none";
       var room = h("div", { class: "classroom" }, faceRow, board);
-      if (!r.chat) area.appendChild(mj(h("div", { class: "lesson-title", text: "👩‍🏫 " + r.title })));
+      if (r.chat && !(r.steps[0].board && r.steps[0].board.length)) board.style.display = "none";
+      if (!r.chat) area.appendChild(mj(h("div", { class: "lesson-title", text: "🟡 " + r.title })));
       area.appendChild(room); area.appendChild(ctl); area.appendChild(after);
       setTimeout(function () { try { room.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 60);
       var tsvg = teacher.firstChild;
@@ -7143,187 +7156,14 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     }
     input = h("textarea", { placeholder: S("tutorPlace"), maxlength: "500", style: "min-height:70px" });
     var chips = h("div", { style: "display:flex;flex-wrap:wrap;gap:8px;margin:10px 0" });
-    TUTOR_TOPICS.forEach(function (t) { chips.appendChild(h("button", { class: "chip", onclick: function () { ask(t); }, text: t })); });
+    (TUTOR_CHIPS[lang] || TUTOR_CHIPS.en).forEach(function (t) { chips.appendChild(h("button", { class: "chip", onclick: function () { ask(t); }, text: t })); });
     askCard = h("div", { class: "card" }, input,
       h("button", { class: "btn", style: "margin-top:8px", onclick: function () { ask(input.value); }, text: S("tutorAsk") }), chips);
-    mount(backBtn(backFn || function () { if (tab === "sat") viewSat(); else show(); }), title("👩‍🏫 " + S("tutor"), S("tutorD")), askCard, area);
+    mount(backBtn(backFn || function () { if (tab === "sat") viewSat(); else show(); }), title("🟡 " + S("tutor"), S("tutorD")), askCard, area, logBox);
     if (q0) ask(q0);
     cleanupFn = stopPlayer;
   }
 
-
-  // ================= MATEMATIKA MAVZULARI =================
-  var MATH_TOPICS = [
-    { n: ["Sonlar va amallar", "Числа и действия", "Numbers & arithmetic"], t: [
-      ["Natural sonlar va razryadlar", "Натуральные числа и разряды", "Natural numbers and place value"],
-      ["Manfiy sonlar", "Отрицательные числа", "Negative numbers"],
-      ["Kasrlar", "Дроби", "Fractions"],
-      ["O'nli kasrlar", "Десятичные дроби", "Decimals"],
-      ["Foizlar", "Проценты", "Percentages"],
-      ["Nisbat va proporsiya", "Отношения и пропорции", "Ratios and proportions"],
-      ["Darajalar", "Степени", "Exponents (powers)"],
-      ["Kvadrat ildiz", "Квадратный корень", "Square roots"],
-      ["Amallar tartibi", "Порядок действий", "Order of operations"],
-      ["Bo'linish belgilari, EKUB va EKUK", "Признаки делимости, НОД и НОК", "Divisibility, GCD and LCM"]] },
-    { n: ["Algebra", "Алгебра", "Algebra"], t: [
-      ["O'zgaruvchilar va ifodalar", "Переменные и выражения", "Variables and algebraic expressions"],
-      ["Chiziqli tenglamalar", "Линейные уравнения", "Linear equations"],
-      ["Tengsizliklar", "Неравенства", "Inequalities"],
-      ["Tenglamalar sistemasi", "Системы уравнений", "Systems of equations"],
-      ["Ko'paytuvchilarga ajratish", "Разложение на множители", "Factoring"],
-      ["Kvadrat tenglamalar", "Квадратные уравнения", "Quadratic equations"],
-      ["Kvadrat formula va diskriminant", "Формула корней и дискриминант", "Quadratic formula and discriminant"],
-      ["Ko'phadlar", "Многочлены", "Polynomials"],
-      ["Ratsional ifodalar", "Рациональные выражения", "Rational expressions"],
-      ["Ildizli tenglamalar", "Иррациональные уравнения", "Radical equations"],
-      ["Modul (absolyut qiymat)", "Модуль (абсолютная величина)", "Absolute value"],
-      ["Ko'rsatkichli o'sish va kamayish", "Экспоненциальный рост и убывание", "Exponential growth and decay"],
-      ["Progressiyalar", "Прогрессии", "Arithmetic and geometric sequences"]] },
-    { n: ["Funksiyalar va grafiklar", "Функции и графики", "Functions & graphs"], t: [
-      ["Funksiya nima", "Что такое функция", "What is a function"],
-      ["Chiziqli funksiya va og'ish (slope)", "Линейная функция и наклон", "Linear functions and slope"],
-      ["Kvadrat funksiya va parabola", "Квадратичная функция и парабола", "Quadratic functions and the parabola"],
-      ["Grafik almashtirishlar", "Преобразования графиков", "Function transformations"],
-      ["Aniqlanish va qiymatlar sohasi", "Область определения и значений", "Domain and range"],
-      ["Murakkab va teskari funksiya", "Сложная и обратная функции", "Composite and inverse functions"],
-      ["Ko'rsatkichli funksiya", "Показательная функция", "Exponential functions"],
-      ["Logarifmlar", "Логарифмы", "Logarithms"]] },
-    { n: ["Geometriya", "Геометрия", "Geometry"], t: [
-      ["Burchaklar va to'g'ri chiziqlar", "Углы и прямые", "Angles and lines"],
-      ["Uchburchaklar", "Треугольники", "Triangles"],
-      ["Pifagor teoremasi", "Теорема Пифагора", "Pythagorean theorem"],
-      ["O'xshash uchburchaklar", "Подобные треугольники", "Similar triangles"],
-      ["Aylana va doira", "Окружность и круг", "Circles: circumference, area, arcs"],
-      ["Yuza va perimetr", "Площадь и периметр", "Area and perimeter"],
-      ["Hajm va sirt yuzi", "Объём и площадь поверхности", "Volume and surface area"],
-      ["Koordinatalar tekisligi: masofa va o'rta nuqta", "Координатная плоскость: расстояние и середина", "Coordinate geometry: distance and midpoint"],
-      ["Aylana tenglamasi", "Уравнение окружности", "Equation of a circle"]] },
-    { n: ["Trigonometriya", "Тригонометрия", "Trigonometry"], t: [
-      ["Sinus, kosinus, tangens", "Синус, косинус, тангенс", "Sine, cosine, tangent (SOH-CAH-TOA)"],
-      ["Maxsus uchburchaklar (30-60-90, 45-45-90)", "Особые треугольники (30-60-90, 45-45-90)", "Special right triangles (30-60-90, 45-45-90)"],
-      ["Radian va gradus", "Радианы и градусы", "Radians and degrees"],
-      ["Birlik aylana", "Единичная окружность", "The unit circle"],
-      ["Asosiy trigonometrik ayniyatlar", "Основные тригонометрические тождества", "Basic trigonometric identities"]] },
-    { n: ["Statistika va ehtimollik", "Статистика и вероятность", "Statistics & probability"], t: [
-      ["O'rtacha, mediana, moda", "Среднее, медиана, мода", "Mean, median, mode"],
-      ["Standart og'ish", "Стандартное отклонение", "Standard deviation"],
-      ["Ehtimollik asoslari", "Основы вероятности", "Probability basics"],
-      ["Shartli ehtimollik", "Условная вероятность", "Conditional probability"],
-      ["Kombinatorika: o'rin almashtirish va guruhlash", "Комбинаторика: перестановки и сочетания", "Permutations and combinations"],
-      ["Nuqtali diagramma va eng yaxshi mos chiziq", "Диаграмма рассеяния и линия тренда", "Scatterplots and line of best fit"],
-      ["Grafik va jadvallarni o'qish", "Чтение графиков и таблиц", "Reading graphs and tables"]] },
-    { n: ["Yuqori daraja", "Продвинутый уровень", "Advanced"], t: [
-      ["Kompleks sonlar", "Комплексные числа", "Complex numbers"],
-      ["Limitlar", "Пределы", "Limits"],
-      ["Hosila asoslari", "Основы производной", "Derivatives: the basics"],
-      ["Integral asoslari", "Основы интеграла", "Integrals: the basics"]] }
-  ];
-  var ENG_TOPICS = [
-    { n: ["Grammatika", "Грамматика", "Grammar"], t: [
-      ["Present Simple va Present Continuous", "Present Simple и Present Continuous", "Present Simple vs Present Continuous"],
-      ["Past Simple va Past Continuous", "Past Simple и Past Continuous", "Past Simple vs Past Continuous"],
-      ["Present Perfect va Past Simple", "Present Perfect и Past Simple", "Present Perfect vs Past Simple"],
-      ["Present Perfect Continuous", "Present Perfect Continuous", "Present Perfect Continuous"],
-      ["Past Perfect", "Past Perfect", "Past Perfect"],
-      ["Kelasi zamon: will, going to, Present Continuous", "Будущее время: will, going to, Present Continuous", "Future forms: will, going to, Present Continuous"],
-      ["Artikllar: a, an, the, artiklsiz", "Артикли: a, an, the, без артикля", "Articles: a, an, the, zero article"],
-      ["Predloglar: vaqt va joy", "Предлоги времени и места", "Prepositions of time and place"],
-      ["Shart gaplar (Conditionals 0-3)", "Условные предложения (Conditionals 0-3)", "Conditionals (zero, first, second, third)"],
-      ["Aralash shart gaplar va wish", "Смешанные условные и wish", "Mixed conditionals and wish"],
-      ["Majhul nisbat (Passive voice)", "Страдательный залог (Passive voice)", "Passive voice"],
-      ["Ko'chirma va o'zlashtirma gap (Reported speech)", "Косвенная речь (Reported speech)", "Reported speech"],
-      ["Modal fe'llar", "Модальные глаголы", "Modal verbs"],
-      ["Relative clauses (who, which, that)", "Относительные придаточные (who, which, that)", "Relative clauses (who, which, that)"],
-      ["Qiyosiy va orttirma darajalar", "Степени сравнения", "Comparatives and superlatives"],
-      ["Gerund va Infinitive", "Герундий и инфинитив", "Gerund vs infinitive"],
-      ["Sanaladigan/sanalmaydigan otlar va quantifiers", "Исчисляемые/неисчисляемые и quantifiers", "Countable/uncountable nouns and quantifiers"],
-      ["So'z tartibi va savol gaplar", "Порядок слов и вопросы", "Word order and question forms"],
-      ["Ega va kesim moslashuvi", "Согласование подлежащего и сказуемого", "Subject-verb agreement"]] },
-    { n: ["Lug'at", "Лексика", "Vocabulary"], t: [
-      ["Phrasal verbs", "Фразовые глаголы", "Phrasal verbs"],
-      ["Collocations", "Коллокации", "Collocations"],
-      ["Idioms", "Идиомы", "Idioms"],
-      ["So'z yasalishi: prefiks va suffikslar", "Словообразование: приставки и суффиксы", "Word formation: prefixes and suffixes"],
-      ["Adashtiriladigan so'zlar", "Часто путаемые слова", "Easily confused words"],
-      ["Akademik lug'at", "Академическая лексика", "Academic vocabulary"],
-      ["Sinonimlar va kontekstdagi so'zlar", "Синонимы и слова в контексте", "Synonyms and words in context"]] },
-    { n: ["Yozish (Writing)", "Письмо (Writing)", "Writing"], t: [
-      ["Paragraf va insho tuzilishi", "Структура абзаца и эссе", "Paragraph and essay structure"],
-      ["IELTS Writing Task 1", "IELTS Writing Task 1", "IELTS Writing Task 1"],
-      ["IELTS Writing Task 2", "IELTS Writing Task 2", "IELTS Writing Task 2"],
-      ["Bog'lovchi so'zlar va cohesion", "Связующие слова и cohesion", "Linking words and cohesion"],
-      ["Rasmiy va norasmiy uslub", "Формальный и неформальный стиль", "Formal vs informal style"]] },
-    { n: ["Speaking va talaffuz", "Speaking и произношение", "Speaking & pronunciation"], t: [
-      ["IELTS Speaking Part 1", "IELTS Speaking Part 1", "IELTS Speaking Part 1"],
-      ["IELTS Speaking Part 2 (cue card)", "IELTS Speaking Part 2 (cue card)", "IELTS Speaking Part 2 (cue card)"],
-      ["IELTS Speaking Part 3", "IELTS Speaking Part 3", "IELTS Speaking Part 3"],
-      ["So'z urg'usi va intonatsiya", "Ударение в словах и интонация", "Word stress and intonation"],
-      ["Talaffuzdagi keng tarqalgan xatolar (th, w/v, -ed)", "Частые ошибки произношения (th, w/v, -ed)", "Common pronunciation mistakes (th, w/v, -ed)"]] },
-    { n: ["Reading va Listening", "Reading и Listening", "Reading & listening"], t: [
-      ["Skimming va scanning", "Skimming и scanning", "Skimming and scanning"],
-      ["True / False / Not Given", "True / False / Not Given", "True / False / Not Given"],
-      ["Listening strategiyalari", "Стратегии Listening", "Listening strategies"]] },
-    { n: ["SAT Reading & Writing", "SAT Reading & Writing", "SAT Reading & Writing"], t: [
-      ["Vergul qoidalari", "Правила запятых", "Comma rules"],
-      ["Nuqtali vergul va ikki nuqta", "Точка с запятой и двоеточие", "Semicolons and colons"],
-      ["Transitions (bog'lovchilar)", "Transitions (связки)", "Transitions"],
-      ["Kontekstdagi so'zlar", "Слова в контексте", "Words in context"],
-      ["Apostrof va egalik", "Апостроф и притяжательность", "Apostrophes and possessives"],
-      ["Olmosh aniqligi", "Ясность местоимений", "Pronoun clarity"],
-      ["Fe'l zamonlari izchilligi", "Согласование времён", "Verb tense consistency"],
-      ["Parallel tuzilma", "Параллельные конструкции", "Parallel structure"],
-      ["Modifier xatolari", "Ошибки с модификаторами", "Misplaced modifiers"],
-      ["Rhetorical synthesis", "Rhetorical synthesis", "Rhetorical synthesis"],
-      ["Asosiy g'oya va xulosa", "Главная идея и вывод", "Central idea and inference"]] }
-  ];
-  var TOPIC_SETS = {
-    math: { sections: MATH_TOPICS, store: "mathDone", icon: "➗", title: "mathTopics",
-      ask: function (en) { return "Teach me the math topic \"" + en + "\" from scratch, for a complete beginner. Reply language: " + lang; } },
-    eng: { sections: ENG_TOPICS, store: "engDone", icon: "🇬🇧", title: "engTopics",
-      ask: function (en) { return "Teach me the English language topic \"" + en + "\" thoroughly and strictly, like a tough top exam coach: precise rule, formula, contrast examples, exceptions, typical mistakes of Uzbek and Russian speakers, exam traps. Reply language: " + lang; } }
-  };
-  Object.keys(TOPIC_SETS).forEach(function (k) {
-    var all = []; TOPIC_SETS[k].sections.forEach(function (sec) { sec.t.forEach(function (x) { all.push(x); }); }); TOPIC_SETS[k].all = all;
-  });
-  function mathLi() { return lang === "uz" ? 0 : lang === "ru" ? 1 : 2; }
-  function topicDoneGet(k) { try { return JSON.parse(localStorage.getItem(TOPIC_SETS[k].store) || "[]"); } catch (e) { return []; } }
-  function topicDoneAdd(k, en) { try { var d = topicDoneGet(k); if (d.indexOf(en) < 0) { d.push(en); localStorage.setItem(TOPIC_SETS[k].store, JSON.stringify(d)); } } catch (e) {} }
-
-  function topicOpen(k, x) {
-    var set = TOPIC_SETS[k];
-    topicDoneAdd(k, x[2]);
-    var i = set.all.indexOf(x), nxt = set.all[i + 1];
-    viewTutor(set.ask(x[2]), function () { viewTopics(k); }, nxt ? function () { topicOpen(k, nxt); } : null);
-  }
-
-  function viewMath() { viewTopics("math"); }
-  function viewEngTopics() { viewTopics("eng"); }
-
-  function viewTopics(k) {
-    var set = TOPIC_SETS[k], li = mathLi(), done = topicDoneGet(k);
-    var list = h("div", {});
-    var input = h("input", { type: "text", placeholder: "🔎 " + S("mathSearch"), style: "width:100%;margin:6px 0 12px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:15px;box-sizing:border-box" });
-    function render() {
-      clear(list);
-      var q = input.value.trim().toLowerCase(), any = false;
-      set.sections.forEach(function (sec) {
-        var rows = sec.t.filter(function (x) { return !q || x.join(" ").toLowerCase().indexOf(q) >= 0; });
-        if (!rows.length) return;
-        any = true;
-        list.appendChild(h("div", { class: "section-title", text: sec.n[li] }));
-        rows.forEach(function (x) {
-          var ok = done.indexOf(x[2]) >= 0;
-          list.appendChild(h("div", { class: "list-item", style: "margin-bottom:8px", onclick: function () { topicOpen(k, x); } },
-            h("span", { text: ok ? "✅" : "▫️" }), h("span", { style: "flex:1", text: x[li] })));
-        });
-      });
-      if (!any) list.appendChild(h("p", { class: "muted center", text: "—" }));
-    }
-    input.addEventListener("input", render);
-    render();
-    var n = done.filter(function (d) { return set.all.some(function (x) { return x[2] === d; }); }).length;
-    mount(backBtn(), title(set.icon + " " + S(set.title), S("mathDone", { a: n, b: set.all.length })), input, list);
-  }
 
   // ================= WRITING =================
   function writingFlow() {
@@ -7469,7 +7309,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     var card = h("div", { class: "card" },
       h("div", { class: "progress" }, h("i", { style: "width:" + Math.round(item.i / item.total * 100) + "%" })),
       h("div", { class: "muted small", text: "🎙 " + S("part") + " " + item.part + " · " + (item.i + 1) + "/" + item.total }),
-      item.lead ? h("p", { class: "muted", style: "margin-top:8px", text: "👩‍🏫 " + item.lead }) : null);
+      item.lead ? h("p", { class: "muted", style: "margin-top:8px", text: "🟡 " + item.lead }) : null);
     if (item.part === 2) {
       if (item.pics) card.appendChild(h("div", { class: "pics" },
         h("figure", {}, h("img", { src: "/api/app/speaking/pic/" + sid + "/0", alt: "" }), h("figcaption", { text: "🅰️ " + S("picA") })),
@@ -8848,19 +8688,24 @@ def _tutor_lang(v, default: str) -> str:
 
 
 def _generate_tutor_lesson_sync(question: str, history: list, app_lang: str = "uz") -> dict:
-    hist = "\n".join(f"- student asked: {h['q']} (you taught: {h['title']})" for h in history[-4:]) or "(none)"
+    hist = "\n".join(f"- student: {h['q']}\n  you: {str(h.get('a') or h.get('title') or '')[:300]}" for h in history[-6:]) or "(none)"
     data = _llm_json_sync(
-        "You are a warm, brilliant AI teacher (shown as a friendly round face) who writes and draws on a big sheet of squared math paper. You can explain ANY topic: school subjects, math, science, history, languages, coding, SAT/IELTS, everyday life questions. The student wrote:\n"
+        "You are a warm, clever, natural AI companion (shown as a friendly round face) who talks with the student like a smart friend and, when useful, writes and draws on a big sheet of squared math paper. You can talk about ANY topic: school subjects, math, science, history, languages, coding, SAT/IELTS, everyday life questions. The student wrote:\n"
         f"\"{question}\"\n\nEarlier in this session:\n{hist}\n\n"
         f"LANGUAGE: reply in the language the student wrote in - Uzbek (Latin script), Russian or English. If you cannot tell, use '{app_lang}'. "
         'Put that language code ("uz", "ru" or "en") in the JSON field "lang". Every spoken and written explanation, the summary and the practice question are in that language '
         "(keep English terms and example sentences in English when teaching English/SAT).\n"
-        "If the message is a greeting, thanks, a joke or friendly small talk, answer warmly like a real teacher face to face: reply ONLY with "
-        '{"mode": "chat", "lang": "uz", "say": "1-3 short, natural, warm sentences in the student\'s language (greet back, say you are doing well, ask how they are, '
-        'suggest 2-3 concrete things you can explain on the board)", '
-        '"board": "OPTIONAL very short text to write on the board, e.g. Salom! (or empty string)"}.\n'
+        "CHOOSE THE MODE. Talk like a real person in a normal conversation - natural, direct, with your own opinion and personality, remembering everything said earlier in this session "
+        "(use the conversation above: follow-ups like 'and why?', 'give an example', 'what about the second one' refer to it). "
+        "Use mode CHAT for everything conversational: greetings, small talk, questions about you, opinions, advice, quick factual answers, translations, follow-up questions, "
+        "study or life advice, jokes, motivation, short explanations. Reply ONLY with "
+        '{"mode": "chat", "lang": "uz", "say": "your answer in the student\'s language, like a friend talking: usually 2-5 natural sentences (up to 8 if the question really needs it), no lists, no markdown, no emoji, '
+        'no LaTeX - say numbers and math in words; when you give English words or sentences put them in double quotes", '
+        '"board": "OPTIONAL: one short thing worth writing on the paper (a formula like 2x+3=7 or a key word), or an empty string"}.\n'
+        "Use mode LESSON (the full whiteboard lesson below) ONLY when the student clearly asks you to teach or explain a concept or to solve a problem step by step "
+        "(e.g. 'explain', 'teach me', 'how does X work', 'tushuntir', 'объясни', 'show me how to solve') and a picture would help. Short or casual questions are CHAT, even about school subjects.\n"
         "If the student asks for something harmful or unsafe (weapons, self-harm methods, sexual content, hacking others), politely refuse in 1-2 sentences and offer a safe topic, "
-        "using the same chat format. For medical or legal questions give only general educational information and advise seeing a professional. "
+        "using the CHAT format. For medical or legal questions give only general educational information and advise seeing a professional. "
         "Do not just do someone's whole graded homework: teach the method with a similar example instead.\n"
         "For any other question, TEACH it:\n"
         "TEACH LIKE THE BEST SCHOOL TEACHER, FOR A BEGINNER WHO KNOWS NOTHING. Talk to the student informally as a friend (use 'sen'). Method, in this order:\n"
@@ -8901,7 +8746,7 @@ def _generate_tutor_lesson_sync(question: str, history: list, app_lang: str = "u
         "Make sure every number and computation is correct. practice must have exactly one correct option.",
         temperature=0.5)
     if data.get("mode") == "chat" or data.get("off_topic"):
-        say = re.sub(r"[$\\^_{}]", " ", str(data.get("say") or data.get("reply") or "")).strip()[:500]
+        say = re.sub(r"[$\\^_{}]", " ", str(data.get("say") or data.get("reply") or "")).strip()[:1000]
         if not say:
             raise ValueError("Tutor suhbat javobi bo'sh")
         return {"mode": "chat", "off_topic": False, "lang": _tutor_lang(data.get("lang"), app_lang), "say": say, "board": str(data.get("board") or "").strip()[:60]}
@@ -8955,8 +8800,8 @@ async def api_app_sat_tutor(request: web.Request, uid: int, lang: str, user: dic
     n = None
     if True:
         is_chat = lesson.get("mode") == "chat"
-        s["history"].append({"q": msg[:200], "title": ("(chatted) " + lesson["say"][:60]) if is_chat else lesson["title"]})
-        s["history"] = s["history"][-6:]
+        s["history"].append({"q": msg[:300], "title": ("(chatted) " + lesson["say"][:60]) if is_chat else lesson["title"], "a": lesson["say"][:400] if is_chat else (lesson["title"] + ": " + lesson.get("summary", ""))[:400]})
+        s["history"] = s["history"][-8:]
         s.setdefault("lessons", []).append({"says": [lesson["say"]] if is_chat else [st["say"] for st in lesson["steps"]], "tts": {}, "lang": lesson.get("lang") or lang})
         s["lessons"] = s["lessons"][-6:]
         entry = s["lessons"][-1]
